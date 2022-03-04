@@ -1,0 +1,15 @@
+
+
+.idea
+
+venv
+data/*
+!data/.gitkeep
+dist/*
+logs/*
+*.log
+
+.snakemake
+workflow
+*.pyc
+

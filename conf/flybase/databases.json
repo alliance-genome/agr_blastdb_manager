@@ -1,0 +1,36 @@
+{
+  "organisms": [
+    {
+      "genus": "Drosphila",
+      "species": "melanogaster",
+      "taxid": 7227,
+      "organism_group": "invertebrate",
+      "output_dir": "Drosophila_melanogaster",
+      "databases": [
+        {
+          "url": "ftp://ftp.flybase.org/genomes/dmel/current/fasta/dmel-all-chromosome-r6.44.fasta.gz",
+          "localFilename": "assembly.fa.gz",
+          "title": "D. melanogaster genomic assembly",
+          "blast": {
+            "dbName": "assembly",
+            "type": "nucl"
+          }
+        }
+      ]
+    },
+    {
+      "genus": "Drosphila",
+      "species": "simulans",
+      "taxid": 7240,
+      "organism_group": "invertebrate",
+      "output_dir": "Drosophila_simulans"
+    },
+    {
+      "genus": "Drosphila",
+      "species": "erecta",
+      "taxid": 7220,
+      "organism_group": "invertebrate",
+      "output_dir": "Drosophila_erecta"
+    }
+  ]
+}

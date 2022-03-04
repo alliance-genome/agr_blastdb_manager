@@ -1,0 +1,39 @@
+{
+  "genus": "Drosphila",
+  "species": "simulans",
+  "taxid": 7220,
+  "organism_group": "invertebrate",
+  "output_dir": "Drosophila_simulans",
+  "databases": [
+    {
+      "file_pattern": "(?<!_from)_genomic.fna.gz$",
+      "title": "Drosophila simulans genome assembly",
+      "type": "nucl"
+    },
+    {
+      "file_pattern": ".*_protein.faa.gz$",
+      "title": "Drosophila simulans protein",
+      "type": "prot"
+    },
+    {
+      "file_pattern": ".*_rna.fna.gz$",
+      "title": "Drosophila simulans RNA",
+      "type": "nucl"
+    },
+    {
+      "file_pattern": ".*_rna_from_genomic.fna.gz$",
+      "title": "Drosophila simulans RNA from genomic",
+      "type": "nucl"
+    },
+    {
+      "file_pattern": ".*_translated_cds.faa.gz$",
+      "title": "Drosophila simulans translated CDS",
+      "type": "prot"
+    },
+    {
+      "file_pattern": ".*_cds_from_genomic.fna.gz$",
+      "title": "Drosophila simulans CDS from genomic",
+      "type": "nucl"
+    }
+  ]
+}
