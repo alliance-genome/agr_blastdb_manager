@@ -1,0 +1,56 @@
+from pathlib import Path
+from typing import List
+
+DATA_DIR = Path("data")
+FASTA_DIR = DATA_DIR.joinpath("fasta")
+BLASTDB_DIR = DATA_DIR.joinpath("blastdb")
+
+BLAST_DB_EXTS = {
+    "nucl": ['.ndb','.nhr','.nin','.nog','.nos','.not','.nsq','.ntf','.nto'],
+    "prot": ['.pdb','.phd','.phi','.phr','.pin','.pog','.pos','.pot','.psq','.ptf','.pto']
+}
+
+organisms = [
+    {"genus":"Drosophila", "species":"melanogaster"},
+    {"genus":"Drosophila", "species":"erecta"},
+]
+
+def get_organism_paths(organisms:List[dict] = []) -> List[str]:
+    for org in organisms:
+        print(org['genus'])
+        return org['genus'] + '_' + org['species']
+
+
+wildcard_constraints:
+    genus   = "[A-Za-z]+",
+    species = "[A-Za-z]+"
+
+rule all:
+    input: expand("{blastdb}/{org}/test.txt", blastdb=BLASTDB_DIR, org=get_organism_paths(organisms))
+
+rule test:
+    output: f'{BLASTDB_DIR}/{org}/test.txt'
+    shell:
+        """
+        touch {output}
+        """
+
+rule retrieve_fasta:
+    output: "data/Drosophila_melanogaster/dmel-all-chromosome-r6.44.fasta.gz"
+    log: "logs/wget.log"
+    shell:
+        """
+        wget -c --timestamping ftp://ftp.flybase.org/genomes/dmel/current/fasta/dmel-all-chromosome-r6.44.fasta.gz \
+        --directory-prefix data/Drosophila_melanogaster -o {log}
+        """
+
+rule makeblastdb:
+    input: "data/Drosophila_melanogaster/dmel-all-chromosome-r6.44.fasta.gz"
+    output: multiext("data/Drosophila_melanogaster/assembly", *blast_db_ext['nucl'])
+    log: "logs/makeblastdb.log"
+    shell:
+        """
+        gunzip -c {input} | /usr/local/ncbi/blast/bin/makeblastdb -in - -dbtype nucl \
+            -title "Drosophila melanogaster assembly." -parse_seqids -out data/Drosophila_melanogaster/assembly \
+            -taxid 7227 -logfile {log} 2>&1
+        """

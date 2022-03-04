@@ -10,6 +10,5 @@ logs/*
 *.log
 
 .snakemake
-workflow
 *.pyc
 
