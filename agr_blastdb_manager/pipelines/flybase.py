@@ -1,4 +1,0 @@
-import subprocess
-
-
-# Download data
