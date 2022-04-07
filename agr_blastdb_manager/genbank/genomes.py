@@ -2,13 +2,15 @@ import logging
 import re
 import subprocess
 from ftplib import FTP
-from os.path import dirname, join
+from pathlib import Path
+from typing import Iterator
 
 logger = logging.getLogger(__name__)
 FTP_HOST = "ftp.ncbi.nlm.nih.gov"
-PROJECT_DIR = dirname(__file__)
-DEFAULT_OUTPUT_DIR = join(PROJECT_DIR, 'data')
+PROJECT_DIR = Path(__file__).parent
+DEFAULT_OUTPUT_DIR = Path(PROJECT_DIR, 'data')
 
+DEFAULT_ORGANISM_GROUP = "invertebrate"
 
 def get_assembly_dir(path: str) -> str | None:
     directories = []
@@ -31,8 +33,17 @@ def get_assembly_dir(path: str) -> str | None:
         return None
 
 
+def list_genome_files(genus: str, species: str, organism_group: str = DEFAULT_ORGANISM_GROUP) -> Iterator[tuple[str,dict]]:
+    genome_ftp_dir = f'genomes/refseq/{organism_group}/{genus}_{species}/latest_assembly_versions'
+    assembly_dir = get_assembly_dir(genome_ftp_dir)
+    with FTP(FTP_HOST) as ftp:
+        ftp.login()
+        files = ftp.mlsd(f'{genome_ftp_dir}/{assembly_dir}')
+    return files
+
+
 # Fetch Genome files
-def fetch_genome_files(genus: str, species: str, organism_group: str = 'invertebrate',
+def fetch_genome_files(genus: str, species: str, organism_group: str = DEFAULT_ORGANISM_GROUP,
                        output_dir: str = DEFAULT_OUTPUT_DIR, force: bool = False) -> None:
     genome_ftp_dir = f'genomes/refseq/{organism_group}/{genus}_{species}/latest_assembly_versions'
     assembly_dir = get_assembly_dir(genome_ftp_dir)

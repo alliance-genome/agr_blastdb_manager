@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Iterator
+from agr_blastdb_manager.genbank import genomes
 
 DATA_DIR = Path("data")
 FASTA_DIR = Path(DATA_DIR,"fasta")
@@ -55,8 +56,7 @@ def get_taxid(genus: str, species: str) -> int:
     :param species:
     :return:
     """
-    organism = next((o for o in ORGANISMS if o["genus"] == genus and o["species"] == species), None)
-    return organism["taxid"] if organism else organism
+    return next((o["taxid"] for o in ORGANISMS if o["genus"] == genus and o["species"] == species), None)
 
 
 def get_organism_paths(organisms: list[dict] = None) -> Iterator[str]:
@@ -79,19 +79,36 @@ def get_fasta(wildcards: dict) -> list:
 # Global wildcard regex patterns.
 #=========================================================
 wildcard_constraints:
-    org="[A-Za-z]+_[A-Za-z]+",
+    genus="[A-Za-z]+",
+    species="[A-Za-z_]+",
+    org="[A-Za-z]+_[A-Za-z_]+",
     annot_rel="\d+\.\d+"
 
 rule all:
     input:
         expand(Path(BLASTDB_DIR, "{org}/genomic.nin"), org=get_organism_paths(ORGANISMS)),
         expand(Path(BLASTDB_DIR,"{org}/protein.pin"), org=get_organism_paths(ORGANISMS)),
-        expand(Path(BLASTDB_DIR,"{org}/genes.nin"),org=get_organism_paths(ORGANISMS))
+        expand(Path(BLASTDB_DIR,"{org}/genes.nin"),org=get_organism_paths(ORGANISMS)),
+        #expand(Path(BLASTDB_DIR,"{org}/genbank.nin"),org=get_organism_paths(ORGANISMS))
 
 #expand("{blastdbdir}/{org}/gene.nin", blastdbdir=BLASTDB_DIR, org=get_organism_paths(ORGANISMS)),
     #expand("{blastdbdir}/{org}/protein.nin", blastdbdir=BLASTDB_DIR, org=get_organism_paths(ORGANISMS)),
     #expand("{blastdb}/{org}/gene.{ext}",blastdb=BLASTDB_DIR,org=get_organism_paths(ORGANISMS), ext=BLASTDB_EXTS['nucl']),
     #expand("{blastdb}/{org}/protein.{ext}",blastdb=BLASTDB_DIR,org=get_organism_paths(ORGANISMS),ext=BLASTDB_EXTS['prot'])
+
+rule retrieve_ncbi_genome:
+    output: expand(Path(FASTA_DIR, "{org}", "{{ncbi_fasta}}"), org=["Drosophila_erecta"])
+    params:
+        organism=lambda wildcards: wildcards.org.split('_', maxsplit=2)
+    wildcard_constraints:
+        ncbi_fasta="GC[AF]_.*_(genomic|protein|rna)\.f[an]a\.gz"
+    run:
+        for o in output:
+            output_path = Path(o)
+            genomes.fetch_genome_files(genus=params.organism[0],
+                                       species=params.organism[1],
+                                       output_dir=output_path.parent)
+
 
 rule retrieve_dmel_fasta:
     output: Path(FASTA_DIR, "Drosophila_melanogaster", "{fasta}")
@@ -102,14 +119,6 @@ rule retrieve_dmel_fasta:
         """
         wget -c --timestamping ftp://ftp.flybase.org/genomes/dmel/current/fasta/{wildcards.fasta} \
              --directory-prefix {params.dir_prefix} -o {log}
-        """
-
-rule makeblastdb_non_dmel:
-    output: expand(Path(BLASTDB_DIR,"{org}","{{blastdb}}.nin"), org=['Drosophila_erecta'])
-    log: "logs/{blastdb}_makeblastdb.log"
-    shell:
-        """
-        echo "Hello" > {output} 2> {log}
         """
 
 rule makeblastdb_dmel_nucleotide:
