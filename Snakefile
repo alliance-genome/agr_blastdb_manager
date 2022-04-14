@@ -28,7 +28,7 @@ wildcard_constraints:
 
 rule all:
     input:
-        expected_blast_files(db_files=write_db_metadata_files(mod="wormbase", json_file="conf/wormbase/databases_test.json", db_meta_dir=META_DIR), mod="wormbase", base_dir=BLASTDB_DIR)
+        expected_blast_files(db_files=write_db_metadata_files(mod="wormbase", json_file="conf/wormbase/databases.json", db_meta_dir=META_DIR), mod="wormbase", base_dir=BLASTDB_DIR)
 
 rule makeblastdb:
     output: Path(BLASTDB_DIR,"{mod}", "{org}", "{fasta}.done")

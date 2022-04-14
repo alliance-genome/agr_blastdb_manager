@@ -13,11 +13,12 @@ include = [
     "LICENSE",
     "README.md",
     "Snakefile",
+    "Dockerfile",
     "conf"
 ]
 
 [tool.poetry.dependencies]
-python = "^3.7.10"
+python = "^3.10.0"
 snakemake = "^7.3.0"
 pydantic = {extras = ["email"], version = "^1.9.0"}
 orjson = "^3.6.7"
