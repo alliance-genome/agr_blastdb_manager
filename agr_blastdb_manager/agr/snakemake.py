@@ -1,5 +1,4 @@
 import sys
-import pprint
 from pathlib import Path
 
 from orjson import JSONEncodeError, JSONDecodeError

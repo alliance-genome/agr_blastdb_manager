@@ -3,7 +3,7 @@ import re
 import subprocess
 from ftplib import FTP
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Union
 
 logger = logging.getLogger(__name__)
 FTP_HOST = "ftp.ncbi.nlm.nih.gov"
@@ -13,7 +13,7 @@ DEFAULT_OUTPUT_DIR = Path(PROJECT_DIR, 'data')
 DEFAULT_ORGANISM_GROUP = "invertebrate"
 
 
-def get_assembly_dir(path: str) -> str | None:
+def get_assembly_dir(path: str) -> Union[str, None]:
     directories = []
     with FTP(FTP_HOST) as ftp:
         ftp.login()
@@ -34,7 +34,8 @@ def get_assembly_dir(path: str) -> str | None:
         return None
 
 
-def list_genome_files(genus: str, species: str, organism_group: str = DEFAULT_ORGANISM_GROUP) -> Iterator[tuple[str,dict]]:
+def list_genome_files(genus: str, species: str, organism_group: str = DEFAULT_ORGANISM_GROUP) -> Iterator[
+    tuple[str, dict]]:
     genome_ftp_dir = f'genomes/refseq/{organism_group}/{genus}_{species}/latest_assembly_versions'
     assembly_dir = get_assembly_dir(genome_ftp_dir)
     with FTP(FTP_HOST) as ftp:

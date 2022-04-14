@@ -1,9 +1,9 @@
-import sys
 from datetime import datetime
 from enum import Enum
 from typing import List
-from pydantic import BaseModel as PydanticBaseModel, EmailStr, AnyUrl
+
 import orjson
+from pydantic import BaseModel as PydanticBaseModel, EmailStr, AnyUrl
 
 
 class BaseModel(PydanticBaseModel):
@@ -11,6 +11,7 @@ class BaseModel(PydanticBaseModel):
     Extend the Pydantic BaseModel to add JSON (de)serialization via orjson.
     See https://pydantic-docs.helpmanual.io/usage/model_config/
     """
+
     class Config:
         json_loads = orjson.loads
 
@@ -66,4 +67,3 @@ class AGRBlastDatabases(BaseModel):
     """
     data: List[BlastDBMetaData]
     metaData: AGRBlastMetadata
-
