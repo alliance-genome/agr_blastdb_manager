@@ -12,6 +12,7 @@ DEFAULT_OUTPUT_DIR = Path(PROJECT_DIR, 'data')
 
 DEFAULT_ORGANISM_GROUP = "invertebrate"
 
+
 def get_assembly_dir(path: str) -> str | None:
     directories = []
     with FTP(FTP_HOST) as ftp:
