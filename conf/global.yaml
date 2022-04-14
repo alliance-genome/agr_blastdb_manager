@@ -1,0 +1,36 @@
+
+DATA_DIR: data
+MAKEBLASTDB_BIN: /usr/local/ncbi/blast/bin/makeblastdb
+
+# MOD directory to proccess
+mods:
+  - conf/wormbase/databases.json
+
+# Uncomment to override workflow defaults.
+# FASTA_DIR: data/fasta
+# BLASTDB_DIR: data/blastdb
+# META_DIR: data/meta
+
+BLASTDB_EXTS:
+  nucl:
+  - .ndb
+  - .nhr
+  - .nin
+  - .nog
+  - .nos
+  - .not
+  - .nsq
+  - .ntf
+  - .nto
+  prot:
+  - .pdb
+  - .phd
+  - .phi
+  - .phr
+  - .pin
+  - .pog
+  - .pos
+  - .pot
+  - .psq
+  - .ptf
+  - .pto

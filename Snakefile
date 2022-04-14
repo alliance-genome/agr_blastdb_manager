@@ -1,79 +1,22 @@
 from pathlib import Path
-from typing import Iterator
 from agr_blastdb_manager.genbank import genomes
+from agr_blastdb_manager.agr.snakemake import write_db_metadata_files, expected_blast_files, get_blastdb_obj
 
-DATA_DIR = Path("data")
-FASTA_DIR = Path(DATA_DIR,"fasta")
-BLASTDB_DIR = Path(DATA_DIR,"blastdb")
-MAKEBLASTDB_BIN = Path("/usr","local","ncbi","blast","bin","makeblastdb")
+configfile: "conf/global.yaml"
 
-BLASTDB_EXTS = {
-    "nucl": ['.ndb', '.nhr', '.nin', '.nog', '.nos', '.not', '.nsq', '.ntf', '.nto'],
-    "prot": ['.pdb', '.phd', '.phi', '.phr', '.pin', '.pog', '.pos', '.pot', '.psq', '.ptf', '.pto']
-}
+DATA_DIR = Path(config.get("DATA_DIR", 'data'))
+# Use user specified directories or default to subdirectories of the data directory.
+FASTA_DIR = config.get("FASTA_DIR", Path(DATA_DIR,"fasta"))
+BLASTDB_DIR = config.get("BLASTDB_DIR", Path(DATA_DIR,"blast"))
+META_DIR = config.get("META_DIR", Path(DATA_DIR,"meta"))
 
-ORGANISMS = [
-    {
-        "genus": "Drosophila",
-        "species": "melanogaster",
-        "taxid": 7227
-    },
-    #{"genus": "Drosophila", "species": "erecta", "taxid": 7220 },
-]
-
-DBS = {
-    "Drosophila_melanogaster": {
-        "genomic": {
-            "fasta": ["dmel-all-chromosome-r6.44.fasta.gz"],
-            "title": "Drosophila melanogaster assembly",
-            "dbtype": "nucl"
-        },
-        "genes": {
-            "fasta": [
-                "dmel-all-miRNA-r6.44.fasta.gz",
-                "dmel-all-miscRNA-r6.44.fasta.gz",
-                "dmel-all-ncRNA-r6.44.fasta.gz",
-                "dmel-all-pseudogene-r6.44.fasta.gz",
-                "dmel-all-transcript-r6.44.fasta.gz",
-                "dmel-all-tRNA-r6.44.fasta.gz",
-            ],
-            "title": "Drosophila melanogaster annoated genes",
-            "dbtype": "nucl"
-        },
-        "protein": {
-            "fasta": ["dmel-all-translation-r6.44.fasta.gz"],
-            "title": "Drosophila melanogaster annotated proteins",
-            "dbtype": "prot"
-        }
-    }
-}
-
-def get_taxid(genus: str, species: str) -> int:
-    """
-    Return the taxonomy ID
-
-    :param genus:
-    :param species:
-    :return:
-    """
-    return next((o["taxid"] for o in ORGANISMS if o["genus"] == genus and o["species"] == species), None)
+# Path to NCBI makeblastdb binary
+MAKEBLASTDB_BIN = config.get("MAKEBLASTDB_BIN", Path("/usr","local","ncbi","blast","bin","makeblastdb"))
 
 
-def get_organism_paths(organisms: list[dict] = None) -> Iterator[str]:
-    if organisms is None: organisms = []
 
-    for org in organisms:
-        yield org['genus'] + '_' + org['species']
-
-
-def get_fasta(wildcards: dict) -> list:
-    print(list(wildcards.keys()))
-    dbtype = wildcards["blastdb"]
-    org: str = wildcards["org"]
-
-    for fasta_files in DBS[org][dbtype]:
-        yield Path(BLASTDB_DIR,fasta_files)
-
+def get_taxid(*args):
+    return None
 
 #=========================================================
 # Global wildcard regex patterns.
@@ -82,71 +25,89 @@ wildcard_constraints:
     genus="[A-Za-z]+",
     species="[A-Za-z_]+",
     org="[A-Za-z]+_[A-Za-z_]+",
-    annot_rel="\d+\.\d+"
 
 rule all:
     input:
-        expand(Path(BLASTDB_DIR, "{org}/genomic.nin"), org=get_organism_paths(ORGANISMS)),
-        expand(Path(BLASTDB_DIR,"{org}/protein.pin"), org=get_organism_paths(ORGANISMS)),
-        expand(Path(BLASTDB_DIR,"{org}/genes.nin"),org=get_organism_paths(ORGANISMS)),
-        #expand(Path(BLASTDB_DIR,"{org}/genbank.nin"),org=get_organism_paths(ORGANISMS))
+        expected_blast_files(db_files=write_db_metadata_files(mod="wormbase", json_file="conf/wormbase/databases_test.json", db_meta_dir=META_DIR), mod="wormbase", base_dir=BLASTDB_DIR)
 
-#expand("{blastdbdir}/{org}/gene.nin", blastdbdir=BLASTDB_DIR, org=get_organism_paths(ORGANISMS)),
-    #expand("{blastdbdir}/{org}/protein.nin", blastdbdir=BLASTDB_DIR, org=get_organism_paths(ORGANISMS)),
-    #expand("{blastdb}/{org}/gene.{ext}",blastdb=BLASTDB_DIR,org=get_organism_paths(ORGANISMS), ext=BLASTDB_EXTS['nucl']),
-    #expand("{blastdb}/{org}/protein.{ext}",blastdb=BLASTDB_DIR,org=get_organism_paths(ORGANISMS),ext=BLASTDB_EXTS['prot'])
-
-rule retrieve_ncbi_genome:
-    output: expand(Path(FASTA_DIR, "{org}", "{{ncbi_fasta}}"), org=["Drosophila_erecta"])
+rule makeblastdb:
+    output: Path(BLASTDB_DIR,"{mod}", "{org}", "{fasta}.done")
+    input: lambda wildcards: Path(FASTA_DIR, wildcards.mod, wildcards.org, wildcards.fasta)
     params:
-        organism=lambda wildcards: wildcards.org.split('_', maxsplit=2)
-    wildcard_constraints:
-        ncbi_fasta="GC[AF]_.*_(genomic|protein|rna)\.f[an]a\.gz"
-    run:
-        for o in output:
-            output_path = Path(o)
-            genomes.fetch_genome_files(genus=params.organism[0],
-                                       species=params.organism[1],
-                                       output_dir=output_path.parent)
-
-
-rule retrieve_dmel_fasta:
-    output: Path(FASTA_DIR, "Drosophila_melanogaster", "{fasta}")
-    params:
-        dir_prefix= Path(FASTA_DIR, "Drosophila_melanogaster")
-    log: "logs/wget_{fasta}.log"
+        db_info=lambda wildcards: get_blastdb_obj(meta_dir=META_DIR, fasta=wildcards.fasta, mod=wildcards.mod),
+        out=lambda wildcards, output: Path(str(output)).with_suffix('').with_suffix('')
+    log: "logs/makeblastdb_{mod}_{org}_{fasta}.log"
     shell:
         """
-        wget -c --timestamping ftp://ftp.flybase.org/genomes/dmel/current/fasta/{wildcards.fasta} \
-             --directory-prefix {params.dir_prefix} -o {log}
+        dirname {output} | xargs mkdir -p
+        gunzip -c {input} | {MAKEBLASTDB_BIN} -in - -dbtype {params.db_info.seqtype} \
+            -title "{params.db_info.blast_title}" -parse_seqids -out {params.out} \
+            -taxid {params.db_info.taxon_id} -logfile {log} 2>&1
+        touch {output}
         """
 
-rule makeblastdb_dmel_nucleotide:
-    input: lambda wildcards: expand(Path(FASTA_DIR, "Drosophila_melanogaster","{fasta}"), fasta=DBS["Drosophila_melanogaster"][wildcards.blastdb]["fasta"])
-    output: Path(BLASTDB_DIR,"Drosophila_melanogaster","{blastdb}.nin")
+rule retrieve_fasta:
+    output: Path(FASTA_DIR, "{mod}", "{org}", "{fasta}")
     params:
-        title=lambda wildcards: DBS["Drosophila_melanogaster"][wildcards.blastdb]["title"],
-        taxid=get_taxid("Drosophila", "melanogaster"),
-        dbpath=lambda wildcards, output: Path(str(output)).with_suffix('')
-    log: "logs/dmel_{blastdb}_makeblastdb.log"
+        dir_prefix=lambda wildcards: Path(FASTA_DIR, wildcards.mod, wildcards.org),
+        uri=lambda wildcards: get_blastdb_obj(meta_dir=META_DIR, fasta=wildcards.fasta, mod=wildcards.mod).URI
+    log: "logs/wget_{mod}_{org}_{fasta}.log"
     shell:
         """
-        gunzip -c {input} | {MAKEBLASTDB_BIN} -in - -dbtype nucl \
-            -title "{params.title}" -parse_seqids -out {params.dbpath} \
-            -taxid {params.taxid} -logfile {log} 2>&1
+        wget -c --timestamping {params.uri} --directory-prefix {params.dir_prefix} -o {log}
         """
 
-rule makeblastdb_dmel_protein:
-    input: lambda wildcards: expand(Path(FASTA_DIR, "Drosophila_melanogaster","{fasta}"), fasta=DBS["Drosophila_melanogaster"][wildcards.blastdb]["fasta"])
-    output: Path(BLASTDB_DIR,"Drosophila_melanogaster","{blastdb}.pin")
-    params:
-        title=lambda wildcards: DBS["Drosophila_melanogaster"][wildcards.blastdb]["title"],
-        taxid=get_taxid("Drosophila", "melanogaster"),
-        dbpath=lambda wildcards, output: Path(str(output)).with_suffix('')
-    log: "logs/dmel_{blastdb}_makeblastdb.log"
-    shell:
-        """
-        gunzip -c {input} | {MAKEBLASTDB_BIN} -in - -dbtype prot \
-            -title "{params.title}" -parse_seqids -out {params.dbpath} \
-            -taxid {params.taxid} -logfile {log} 2>&1
-        """
+# rule retrieve_ncbi_genome:
+#     output: expand(Path(FASTA_DIR, "{org}", "{{ncbi_fasta}}"), org=["Drosophila_erecta"])
+#     params:
+#         organism=lambda wildcards: wildcards.org.split('_', maxsplit=2)
+#     wildcard_constraints:
+#         ncbi_fasta="GC[AF]_.*_(genomic|protein|rna)\.f[an]a\.gz"
+#     run:
+#         for o in output:
+#             output_path = Path(o)
+#             genomes.fetch_genome_files(genus=params.organism[0],
+#                                        species=params.organism[1],
+#                                        output_dir=output_path.parent)
+#
+#
+# rule retrieve_dmel_fasta:
+#     output: Path(FASTA_DIR, "Drosophila_melanogaster", "{fasta}")
+#     params:
+#         dir_prefix= Path(FASTA_DIR, "Drosophila_melanogaster")
+#     log: "logs/wget_{fasta}.log"
+#     shell:
+#         """
+#         wget -c --timestamping ftp://ftp.flybase.org/genomes/dmel/current/fasta/{wildcards.fasta} \
+#              --directory-prefix {params.dir_prefix} -o {log}
+#         """
+#
+# rule makeblastdb_dmel_nucleotide:
+#     input: lambda wildcards: expand(Path(FASTA_DIR, "Drosophila_melanogaster","{fasta}"), fasta=DBS["Drosophila_melanogaster"][wildcards.blastdb]["fasta"])
+#     output: Path(BLASTDB_DIR,"Drosophila_melanogaster","{blastdb}.nin")
+#     params:
+#         title=lambda wildcards: DBS["Drosophila_melanogaster"][wildcards.blastdb]["title"],
+#         taxid=get_taxid("Drosophila", "melanogaster"),
+#         dbpath=lambda wildcards, output: Path(str(output)).with_suffix('')
+#     log: "logs/dmel_{blastdb}_makeblastdb.log"
+#     shell:
+#         """
+#         gunzip -c {input} | {MAKEBLASTDB_BIN} -in - -dbtype nucl \
+#             -title "{params.title}" -parse_seqids -out {params.dbpath} \
+#             -taxid {params.taxid} -logfile {log} 2>&1
+#         """
+#
+# rule makeblastdb_dmel_protein:
+#     input: lambda wildcards: expand(Path(FASTA_DIR, "Drosophila_melanogaster","{fasta}"), fasta=DBS["Drosophila_melanogaster"][wildcards.blastdb]["fasta"])
+#     output: Path(BLASTDB_DIR,"Drosophila_melanogaster","{blastdb}.pin")
+#     params:
+#         title=lambda wildcards: DBS["Drosophila_melanogaster"][wildcards.blastdb]["title"],
+#         taxid=get_taxid("Drosophila", "melanogaster"),
+#         dbpath=lambda wildcards, output: Path(str(output)).with_suffix('')
+#     log: "logs/dmel_{blastdb}_makeblastdb.log"
+#     shell:
+#         """
+#         gunzip -c {input} | {MAKEBLASTDB_BIN} -in - -dbtype prot \
+#             -title "{params.title}" -parse_seqids -out {params.dbpath} \
+#             -taxid {params.taxid} -logfile {log} 2>&1
+#         """
