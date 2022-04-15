@@ -13,7 +13,6 @@ include = [
     "LICENSE",
     "README.md",
     "Snakefile",
-    "Dockerfile",
     "conf"
 ]
 

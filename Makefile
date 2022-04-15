@@ -24,7 +24,7 @@ clean-all-blast: clean-fasta clean-blast clean-meta
 clean:
 	rm $(DIST_DIR)/*.{gz,whl}
 
-docker-build: build
+docker-build:
 	docker build --tag $(DOCKER_TAG) .
 
 docker-run:
