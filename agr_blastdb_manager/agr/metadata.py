@@ -18,8 +18,13 @@ class BaseModel(PydanticBaseModel):
         @staticmethod
         def json_dumps(v, *, default):
             # orjson.dumps returns bytes, to match standard json.dumps we need to decode
-            return orjson.dumps(v, default=default,
-                                option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS | orjson.OPT_APPEND_NEWLINE).decode()
+            return orjson.dumps(
+                v,
+                default=default,
+                option=orjson.OPT_INDENT_2
+                | orjson.OPT_SORT_KEYS
+                | orjson.OPT_APPEND_NEWLINE,
+            ).decode()
 
 
 class BlastDBType(str, Enum):
@@ -27,14 +32,16 @@ class BlastDBType(str, Enum):
     NCBI types for BLAST databases.
     Taken from the dbtype flag of the makeblastdb command line tool.
     """
-    nucl = 'nucl'
-    prot = 'prot'
+
+    nucl = "nucl"
+    prot = "prot"
 
 
 class BlastDBMetaData(BaseModel):
     """
     Class for representing the individual BLAST database metadata.
     """
+
     URI: AnyUrl
     blast_title: str
     description: str
@@ -52,6 +59,7 @@ class AGRBlastMetadata(BaseModel):
     Class for representing the AGR BLAST database top level
     metadata section.
     """
+
     contact: EmailStr
     dataProvider: str
     release: str
@@ -65,5 +73,6 @@ class AGRBlastDatabases(BaseModel):
     :param data - List of BlastDBMetaData  objects
     :param metaData - Global metadata section.
     """
+
     data: List[BlastDBMetaData]
     metaData: AGRBlastMetadata

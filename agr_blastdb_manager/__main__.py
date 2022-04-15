@@ -2,13 +2,17 @@
 import logging
 from pathlib import Path
 
-logging.basicConfig(encoding='utf-8', level=logging.DEBUG, format='%(asctime)s [%(levelname)s] [%(name)s] %(message)s',
-                    datefmt='%m/%d/%Y %I:%M:%S %p')
+logging.basicConfig(
+    encoding="utf-8",
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
+    datefmt="%m/%d/%Y %I:%M:%S %p",
+)
 
 # Project root directory
 project_dir = Path(__file__).resolve().parent.parent
 # Data directory
-data_dir = project_dir.joinpath('data')
+data_dir = project_dir.joinpath("data")
 
 
 def connect_ncbi():
@@ -21,5 +25,5 @@ def connect_ncbi():
     return None
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     connect_ncbi()
