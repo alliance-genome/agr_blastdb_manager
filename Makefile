@@ -41,4 +41,7 @@ build: $(DIST_DIR)/%.whl
 $(DIST_DIR)/%.whl:
 	poetry build
 
-.PHONY: docker-build docker-run clean clean-fasta clean-blast clean-meta clean-all-blast build
+format:
+	black agr_blastdb_manager
+
+.PHONY: docker-build docker-run clean clean-fasta clean-blast clean-meta clean-all-blast build format
