@@ -5,24 +5,36 @@ NUM_CORES   := 2
 CURRENT_UID := $(shell id -u)
 CURRENT_GID := $(shell id -g)
 
+DIST_DIR    := dist
+DATA_DIR    := data
+
+all: docker-build docker-run
+
 clean-fasta:
-	rm -rf data/fasta/*
+	rm -rf $(DATA_DIR)/fasta/*
 
 clean-meta:
-	rm -rf data/meta/*
+	rm -rf $(DATA_DIR)/meta/*
 
 clean-blast:
-	rm -rf data/blast/*
+	rm -rf $(DATA_DIR)/blast/*
 
-clean: clean-fasta clean-blast clean-meta
+clean-all-blast: clean-fasta clean-blast clean-meta
 
-build:
+clean:
+	rm $(DIST_DIR)/*.{gz,whl}
+
+docker-build: build
 	docker build --tag $(DOCKER_TAG) .
 
-run:
+docker-run:
 	docker run --user $(CURRENT_UID):$(CURRENT_GID) --rm -it -v $PWD/data:/usr/src/app/data \
                -v $PWD/logs:/usr/src/app/logs -v $PWD/.snakemake:/usr/src/app/.snakemake \
                -v $PWD/.cache:/.cache $(DOCKER_TAG)
 
+build: $(DIST_DIR)/%.whl
 
-.PHONY: build run clean clean-fasta clean-blast clean-meta
+$(DIST_DIR)/%.whl:
+	poetry build
+
+.PHONY: docker-build docker-run clean clean-fasta clean-blast clean-meta clean-all-blast build
