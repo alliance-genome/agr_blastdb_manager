@@ -49,7 +49,7 @@ RUN pip install --no-cache-dir ./dist/*.whl
 
 RUN mkdir logs .snakemake
 
-VOLUME ["/usr/src/app/data", "/usr/src/app/logs", "/usr/src/app/.snakemake", "/.cache"]
+VOLUME ["/app/data", "/app/logs", "/app/.snakemake", "/.cache"]
 
 ENTRYPOINT [ "snakemake", "--config", "MAKEBLASTDB_BIN=/blast/bin/makeblastdb" ]
 CMD [ "-c1" ]

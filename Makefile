@@ -1,5 +1,8 @@
 #!/usr/bin/make
+PERL_SPLIT = perl -n -e '($$key, $$val) = split /\s*=\s*/, $$_, 2; print $$val;'
 
+# Get the version from the pyproject.toml file.
+VERSION     := $(shell grep '^version' pyproject.toml | $(PERL_SPLIT))
 DOCKER_TAG  := agr_blastdb_manager
 NUM_CORES   := 2
 CURRENT_UID := $(shell id -u)
@@ -25,7 +28,7 @@ clean:
 	rm $(DIST_DIR)/*.{gz,whl}
 
 docker-build:
-	docker build --tag $(DOCKER_TAG) .
+	docker build --tag $(DOCKER_TAG):$(VERSION) .
 
 docker-run:
 	docker run --user $(CURRENT_UID):$(CURRENT_GID) --rm -it -v $PWD/data:/usr/src/app/data \
