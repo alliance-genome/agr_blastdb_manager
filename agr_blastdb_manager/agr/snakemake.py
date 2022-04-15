@@ -1,4 +1,5 @@
 import sys
+import hashlib
 from pathlib import Path
 
 from orjson import JSONEncodeError, JSONDecodeError
@@ -101,3 +102,18 @@ def expected_blast_files(db_files: list[Path], base_dir: Path, mod: str) -> list
 
 def get_blastdb_obj(meta_dir: Path, fasta: str, mod: str) -> BlastDBMetaData:
     return read_db_json(Path(meta_dir, mod, fasta).with_suffix(".json"))
+
+
+def file_md5_is_valid(fasta_file: Path, checksum: str) -> bool:
+    """
+    Checks whether or not the file matches the MD5 checksum argument.
+
+    Returns True if it matches and False otherwise.
+
+    :param fasta_file: Path object for the FASTA file.
+    :param checksum: MD5 checksum string.
+    :return: boolean indicating if the file validates.
+    """
+    with fasta_file.open(mode="rb") as fh:
+        actual_checksum = hashlib.md5(fh.read()).hexdigest()
+    return actual_checksum == checksum
