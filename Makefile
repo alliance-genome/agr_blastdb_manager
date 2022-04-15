@@ -29,12 +29,12 @@ clean:
 	rm -f $(DIST_DIR)/*.{gz,whl}
 
 docker-build:
-	docker build --tag $(DOCKER_TAG):$(VERSION) .
+	docker build --tag $(DOCKER_TAG):$(VERSION) --tag $(DOCKER_TAG):latest .
 
 docker-run:
-	docker run --user $(CURRENT_UID):$(CURRENT_GID) --rm -it -v $(CURRENT_DIR)/data:/usr/src/app/data \
-               -v $(CURRENT_DIR)/logs:/usr/src/app/logs -v $(CURRENT_DIR)/.snakemake:/usr/src/app/.snakemake \
-               -v $(CURRENT_DIR)/.cache:/.cache $(DOCKER_TAG)
+	docker run --user $(CURRENT_UID):$(CURRENT_GID) --rm -it -v $(CURRENT_DIR)/data:/app/data \
+               -v $(CURRENT_DIR)/logs:/app/logs -v $(CURRENT_DIR)/.snakemake:/app/.snakemake \
+               -v $(CURRENT_DIR)/.cache:/.cache $(DOCKER_TAG):$(VERSION)
 
 build: $(DIST_DIR)/%.whl
 
