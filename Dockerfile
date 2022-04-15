@@ -24,7 +24,7 @@ WORKDIR /blast
 
 # Download and extract NCBI BLAST
 RUN wget $BLAST_URI && \
-    tar zxvf $BLAST_TARBALL && \
+    tar zxf $BLAST_TARBALL && \
     mv ncbi-blast-${BLAST_VERSION}+/* ./
 
 WORKDIR /app
