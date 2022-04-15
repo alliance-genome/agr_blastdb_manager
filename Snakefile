@@ -1,7 +1,7 @@
 from pathlib import Path
 from agr_blastdb_manager.genbank import genomes
-from agr_blastdb_manager.agr.snakemake import write_db_metadata_files, expected_blast_files, get_blastdb_obj,
-                                              file_md5_is_valid
+from agr_blastdb_manager.agr.snakemake import write_db_metadata_files, expected_blast_files, get_blastdb_obj, file_md5_is_valid
+
 
 configfile: "conf/global.yaml"
 
