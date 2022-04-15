@@ -7,6 +7,7 @@ DOCKER_TAG  := agr_blastdb_manager
 NUM_CORES   := 2
 CURRENT_UID := $(shell id -u)
 CURRENT_GID := $(shell id -g)
+CURRENT_DIR := $(shell PWD)
 
 DIST_DIR    := dist
 DATA_DIR    := data
@@ -31,9 +32,9 @@ docker-build:
 	docker build --tag $(DOCKER_TAG):$(VERSION) .
 
 docker-run:
-	docker run --user $(CURRENT_UID):$(CURRENT_GID) --rm -it -v $PWD/data:/usr/src/app/data \
-               -v $PWD/logs:/usr/src/app/logs -v $PWD/.snakemake:/usr/src/app/.snakemake \
-               -v $PWD/.cache:/.cache $(DOCKER_TAG)
+	docker run --user $(CURRENT_UID):$(CURRENT_GID) --rm -it -v $(CURRENT_DIR)/data:/usr/src/app/data \
+               -v $(CURRENT_DIR)/logs:/usr/src/app/logs -v $(CURRENT_DIR)/.snakemake:/usr/src/app/.snakemake \
+               -v $(CURRENT_DIR)/.cache:/.cache $(DOCKER_TAG)
 
 build: $(DIST_DIR)/%.whl
 
