@@ -1,6 +1,3 @@
-# Declare NCBI BLAST version before FROM statements.
-ARG BLAST_VERSION=2.13.0
-
 # Stage 1 - Poetry build process to build the wheel install file.
 FROM python:3.10 AS builder
 WORKDIR /app
@@ -15,26 +12,25 @@ RUN poetry config virtualenvs.in-project true
 RUN poetry install --no-ansi
 RUN poetry build --format wheel --no-ansi
 
-# Pull in NCBI container with BLAST binaries.
-FROM ncbi/blast:${BLAST_VERSION} AS ncbi-blast
-
+# Stage 2 - Building base application image.
 # Use the python 3.10 image as a base.
 # The slim and alpine python images did not work.
 FROM python:3.10 AS agr_blastdb_manager
+ARG BLAST_VERSION=2.13.0
+ARG BLAST_TARBALL=ncbi-blast-${BLAST_VERSION}+-x64-linux.tar.gz
+ARG BLAST_URI=https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/${BLAST_VERSION}/${BLAST_TARBALL}
+
+WORKDIR /blast
+
+# Download and extract NCBI BLAST
+RUN wget $BLAST_URI && \
+    tar zxvf $BLAST_TARBALL && \
+    mv ncbi-blast-${BLAST_VERSION}+/* ./
 
 WORKDIR /app
 
-# Copy python wheel install file and BLAST libraries/binaries from NCBI image into the agr_blastdb_manager image.
+# Copy python wheel install file into the agr_blastdb_manager image.
 COPY --from=builder    /app/dist /app/dist/
-COPY --from=ncbi-blast /blast/lib /blast/lib/
-COPY --from=ncbi-blast /blast/bin/blast_formatter /blast/bin/
-COPY --from=ncbi-blast /blast/bin/blastdbcmd /blast/bin/
-COPY --from=ncbi-blast /blast/bin/blastn.REAL /blast/bin/blastn
-COPY --from=ncbi-blast /blast/bin/blastp.REAL /blast/bin/blastp
-COPY --from=ncbi-blast /blast/bin/blastx.REAL /blast/bin/blastx
-COPY --from=ncbi-blast /blast/bin/makeblastdb /blast/bin
-COPY --from=ncbi-blast /blast/bin/tblastn.REAL /blast/bin/tblastn
-COPY --from=ncbi-blast /blast/bin/tblastx.REAL /blast/bin/tblastx
 
 # Add BLAST binaries to PATH.
 ENV PATH=/blast/bin:${PATH}
