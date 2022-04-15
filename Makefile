@@ -7,7 +7,7 @@ DOCKER_TAG  := agr_blastdb_manager
 NUM_CORES   := 2
 CURRENT_UID := $(shell id -u)
 CURRENT_GID := $(shell id -g)
-CURRENT_DIR := $(shell PWD)
+CURRENT_DIR := $(shell pwd)
 
 DIST_DIR    := dist
 DATA_DIR    := data
