@@ -42,8 +42,8 @@ rule makeblastdb:
         dirname {output} | xargs mkdir -p
         gunzip -c {input} | {MAKEBLASTDB_BIN} -in - -dbtype {params.db_info.seqtype} \
             -title "{params.db_info.blast_title}" -parse_seqids -out {params.out} \
-            -taxid {params.db_info.taxon_id} -logfile {log} 2>&1
-        touch {output}
+            -taxid {params.db_info.taxon_id} -logfile {log} 2>&1 && \
+            touch {output}
         """
 
 rule retrieve_fasta:
