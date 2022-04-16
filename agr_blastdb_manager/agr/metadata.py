@@ -39,7 +39,7 @@ class BlastDBType(str, Enum):
 
 class BlastDBMetaData(BaseModel):
     """
-    Class for representing the individual BLAST database metadata.
+    BLAST database metadata.
     """
 
     URI: AnyUrl
@@ -56,8 +56,7 @@ class BlastDBMetaData(BaseModel):
 
 class AGRBlastMetadata(BaseModel):
     """
-    Class for representing the AGR BLAST database top level
-    metadata section.
+    Top level Alliance BLAST database metadata section.
     """
 
     contact: EmailStr
@@ -68,7 +67,7 @@ class AGRBlastMetadata(BaseModel):
 
 class AGRBlastDatabases(BaseModel):
     """
-    Class for representing the entire AGR BLAST database metadata file.
+    Alliance BLAST databases metadata file.
 
     :param data - List of BlastDBMetaData  objects
     :param metaData - Global metadata section.
