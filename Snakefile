@@ -14,10 +14,18 @@ META_DIR = config.get("META_DIR", Path(DATA_DIR,"meta"))
 # Path to NCBI makeblastdb binary
 MAKEBLASTDB_BIN = config.get("MAKEBLASTDB_BIN", Path("/usr","local","ncbi","blast","bin","makeblastdb"))
 
+# Build the list of BLAST indices that we are expecting from the pipeline.
+# This is used as the starting point for our pipeline. Snakemake uses this to
+# build a list of dependent rules (DAG) that need to be executed to produce them.
 blast_files = []
+# Loop over each MOD defined in conf/global.yaml.
 for mod, mod_json in config["mods"].items():
         blast_files.append(
+            # Using the list of metadata files, returns a list of expected BLAST database files.
             expected_blast_files(
+                # Reads the MOD metadata file and writes the individual database metadata
+                # to its own file that is used throughout the pipeline.
+                # Returns a list of files written.
                 db_files=write_db_metadata_files(
                     mod=mod,
                     json_file=mod_json,
@@ -29,7 +37,6 @@ for mod, mod_json in config["mods"].items():
         )
 
 
-
 #=========================================================
 # Global wildcard regex patterns.
 #=========================================================
@@ -39,21 +46,32 @@ wildcard_constraints:
     org="[A-Za-z]+_[A-Za-z_]+",
     fasta="[\w\._\-]+(\.gz|\.bz2|\.fasta|\.fa|\.f[na]a)"
 
+
+#=========================================================
+# Start of pipeline.
+#=========================================================
 rule all:
     input: blast_files
 
+#============================================================================
+# Generate the blast databases using the NCBI makeblastdb command.
+# Takes the FASTA file and a file that indicates that the MD5 checksum
+# from the metadata validates the file that was mirrored.
+#============================================================================
 rule makeblastdb:
     output: touch(Path(BLASTDB_DIR,"{mod}", "{org}", "{fasta}.done"))
     input:
         fa=lambda wildcards: Path(FASTA_DIR, wildcards.mod, wildcards.org, wildcards.fasta),
         md5=lambda wildcards: Path(FASTA_DIR, wildcards.mod, wildcards.org, wildcards.fasta + '.md5_validated')
     params:
+        # Fetch the database metadata object from the JSON file.
         db_info=lambda wildcards: get_blastdb_obj(meta_dir=META_DIR, fasta=wildcards.fasta, mod=wildcards.mod),
-        # TODO - This will fail with certain variations of filename extensions.
         # Strip the '.gz.done' from the output name
+        # TODO - This will fail with certain variations of filename extensions.
         out=lambda wildcards, output: Path(str(output)).with_suffix('').with_suffix('')
     log: "logs/makeblastdb_{mod}_{org}_{fasta}.log"
     shell:
+        # Create the BLAST DB directory and then pipe the FASTA file into makeblastdb.
         """
         dirname {output} | xargs mkdir -p
         gunzip -c {input.fa} | {MAKEBLASTDB_BIN} -in - -dbtype {params.db_info.seqtype} \
@@ -61,6 +79,10 @@ rule makeblastdb:
             -taxid {params.db_info.taxon_id} -logfile {log} 2>&1
         """
 
+#============================================================================
+# Validates that the downloaded file has the same MD5 checksum as the
+# database metadata. If it does not, an
+#============================================================================
 rule validate_fasta_md5:
     output: touch(Path(FASTA_DIR, "{mod}", "{org}", "{fasta}.md5_validated"))
     input: lambda wildcards: Path(FASTA_DIR, wildcards.mod, wildcards.org, wildcards.fasta)
@@ -69,9 +91,12 @@ rule validate_fasta_md5:
     run:
         is_valid = file_md5_is_valid(fasta_file=Path(str(input)), checksum=params.db_info.md5sum)
         if not is_valid:
-            raise Exception("Invalid MD5 checksum")
+            raise ValueError(f'The MD5 checksum for {input} did not validate')
 
 
+#==============================================================================
+# Retrieves the FASTA file from the remote source defined in the metadata file.
+#==============================================================================
 rule retrieve_fasta:
     output: Path(FASTA_DIR, "{mod}", "{org}", "{fasta}")
     params:
@@ -81,57 +106,3 @@ rule retrieve_fasta:
     run:
         shell("wget -c --timestamping {params.db_info.URI} --directory-prefix {params.dir_prefix} -o {log}")
 
-# rule retrieve_ncbi_genome:
-#     output: expand(Path(FASTA_DIR, "{org}", "{{ncbi_fasta}}"), org=["Drosophila_erecta"])
-#     params:
-#         organism=lambda wildcards: wildcards.org.split('_', maxsplit=2)
-#     wildcard_constraints:
-#         ncbi_fasta="GC[AF]_.*_(genomic|protein|rna)\.f[an]a\.gz"
-#     run:
-#         for o in output:
-#             output_path = Path(o)
-#             genomes.fetch_genome_files(genus=params.organism[0],
-#                                        species=params.organism[1],
-#                                        output_dir=output_path.parent)
-#
-#
-# rule retrieve_dmel_fasta:
-#     output: Path(FASTA_DIR, "Drosophila_melanogaster", "{fasta}")
-#     params:
-#         dir_prefix= Path(FASTA_DIR, "Drosophila_melanogaster")
-#     log: "logs/wget_{fasta}.log"
-#     shell:
-#         """
-#         wget -c --timestamping ftp://ftp.flybase.org/genomes/dmel/current/fasta/{wildcards.fasta} \
-#              --directory-prefix {params.dir_prefix} -o {log}
-#         """
-#
-# rule makeblastdb_dmel_nucleotide:
-#     input: lambda wildcards: expand(Path(FASTA_DIR, "Drosophila_melanogaster","{fasta}"), fasta=DBS["Drosophila_melanogaster"][wildcards.blastdb]["fasta"])
-#     output: Path(BLASTDB_DIR,"Drosophila_melanogaster","{blastdb}.nin")
-#     params:
-#         title=lambda wildcards: DBS["Drosophila_melanogaster"][wildcards.blastdb]["title"],
-#         taxid=get_taxid("Drosophila", "melanogaster"),
-#         dbpath=lambda wildcards, output: Path(str(output)).with_suffix('')
-#     log: "logs/dmel_{blastdb}_makeblastdb.log"
-#     shell:
-#         """
-#         gunzip -c {input} | {MAKEBLASTDB_BIN} -in - -dbtype nucl \
-#             -title "{params.title}" -parse_seqids -out {params.dbpath} \
-#             -taxid {params.taxid} -logfile {log} 2>&1
-#         """
-#
-# rule makeblastdb_dmel_protein:
-#     input: lambda wildcards: expand(Path(FASTA_DIR, "Drosophila_melanogaster","{fasta}"), fasta=DBS["Drosophila_melanogaster"][wildcards.blastdb]["fasta"])
-#     output: Path(BLASTDB_DIR,"Drosophila_melanogaster","{blastdb}.pin")
-#     params:
-#         title=lambda wildcards: DBS["Drosophila_melanogaster"][wildcards.blastdb]["title"],
-#         taxid=get_taxid("Drosophila", "melanogaster"),
-#         dbpath=lambda wildcards, output: Path(str(output)).with_suffix('')
-#     log: "logs/dmel_{blastdb}_makeblastdb.log"
-#     shell:
-#         """
-#         gunzip -c {input} | {MAKEBLASTDB_BIN} -in - -dbtype prot \
-#             -title "{params.title}" -parse_seqids -out {params.dbpath} \
-#             -taxid {params.taxid} -logfile {log} 2>&1
-#         """

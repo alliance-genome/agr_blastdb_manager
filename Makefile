@@ -31,6 +31,9 @@ clean:
 docker-build:
 	docker build --tag $(DOCKER_TAG):$(VERSION) --tag $(DOCKER_TAG):latest .
 
+docker-buildx:
+	docker buildx build --platform linux/arm64,linux/amd64 --tag $(DOCKER_TAG):$(VERSION) --tag $(DOCKER_TAG):latest .
+
 docker-run:
 	docker run --user $(CURRENT_UID):$(CURRENT_GID) --rm -it -v $(CURRENT_DIR)/data:/app/data \
                -v $(CURRENT_DIR)/logs:/app/logs -v $(CURRENT_DIR)/.snakemake:/app/.snakemake \

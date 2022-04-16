@@ -7,10 +7,11 @@ COPY pyproject.toml poetry.lock README.md LICENSE /app/
 COPY agr_blastdb_manager /app/agr_blastdb_manager
 
 # Setup poetry and run the build.
-RUN pip install poetry
-RUN poetry config virtualenvs.in-project true
-RUN poetry install --no-ansi
-RUN poetry build --format wheel --no-ansi
+RUN pip install -U pip wheel && \
+    pip install poetry && \
+    poetry config virtualenvs.in-project true && \
+    poetry install --no-ansi && \
+    poetry build --format wheel --no-ansi
 
 # Stage 2 - Building base application image.
 # Use the python 3.10 image as a base.
@@ -23,7 +24,7 @@ ARG BLAST_URI=https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/${BLAST_VERS
 WORKDIR /blast
 
 # Download and extract NCBI BLAST
-RUN wget $BLAST_URI && \
+RUN wget --quiet $BLAST_URI && \
     tar zxf $BLAST_TARBALL && \
     mv ncbi-blast-${BLAST_VERSION}+/* ./
 
@@ -40,10 +41,9 @@ COPY Snakefile ./
 COPY conf/ ./conf/
 
 # Install the wheel package.
-RUN pip install -U pip wheel
-RUN pip install --no-cache-dir ./dist/*.whl
-
-RUN mkdir logs .snakemake
+RUN pip install -U pip wheel && \
+    pip install --no-cache-dir ./dist/*.whl && \
+    mkdir logs .snakemake
 
 VOLUME ["/app/data", "/app/logs", "/app/.snakemake", "/.cache"]
 

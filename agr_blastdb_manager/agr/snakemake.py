@@ -75,7 +75,13 @@ def extract_fasta_file(uri: str) -> str | None:
     return uri[uri.rindex("/") + 1 :] if "/" in uri else None
 
 
-def read_db_json(db_file: Path | str) -> BlastDBMetaData:
+def read_db_json(db_file: Path | str) -> BlastDBMetaData | None:
+    """
+    Reads the BLAST database metadata file for a single database.
+
+    :param db_file:  Database metadata file.
+    :return:  The metadata object or None
+    """
     try:
         db_info: BlastDBMetaData = BlastDBMetaData.parse_file(db_file)
         return db_info
@@ -89,6 +95,15 @@ def read_db_json(db_file: Path | str) -> BlastDBMetaData:
 
 
 def expected_blast_files(db_files: list[Path], base_dir: Path, mod: str) -> list[Path]:
+    """
+    Given a list of BLAST database metadata files, returns a list of '.done' files in the BLAST database
+    location that is expected based on the MOD and metadata.
+
+    :param db_files: List of Path objects for the database metadata files.
+    :param base_dir: The base BLAST database directory.
+    :param mod: The model organism database being processed.
+    :return: List of paths for the BLAST database '.done' files.
+    """
     blast_files = []
     for db_file in db_files:
         db_info = read_db_json(db_file)
@@ -101,12 +116,21 @@ def expected_blast_files(db_files: list[Path], base_dir: Path, mod: str) -> list
 
 
 def get_blastdb_obj(meta_dir: Path, fasta: str, mod: str) -> BlastDBMetaData:
+    """
+    Constructs the proper path for the BLAST database metadata file, loads the JSON, and
+    returns the metadata object.
+
+    :param meta_dir: The metadata directory.
+    :param fasta: FASTA file being processed.
+    :param mod: The model organism database being processed.
+    :return: The BLAST database metadata object.
+    """
     return read_db_json(Path(meta_dir, mod, fasta).with_suffix(".json"))
 
 
 def file_md5_is_valid(fasta_file: Path, checksum: str) -> bool:
     """
-    Checks whether or not the file matches the MD5 checksum argument.
+    Checks if the FASTA file matches the MD5 checksum argument.
 
     Returns True if it matches and False otherwise.
 
