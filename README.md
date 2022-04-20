@@ -12,7 +12,7 @@ Items marked with '(dev)' indicate dependencies that are only needed if running 
 * xargs (dev)
 * makeblastdb - NCBI BLAST 2.12.0+ (dev)
 * git
-* wget
+* wget (dev)
 
 ## Getting Started
 
@@ -46,3 +46,5 @@ ls -l data/fasta/* data/blast/*
 ## Description
 
 A Snakemake pipeline for automating the aggregation of model organism datasets and production of BLAST databases.
+
+
