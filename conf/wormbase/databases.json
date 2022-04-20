@@ -517,18 +517,6 @@
          "version" : "WS284"
       },
       {
-         "URI" : "ftp://ftp.wormbase.org/pub/wormbase/releases/WS284/species/c_elegans/PRJNA275000/c_elegans.PRJNA275000.WS284.protein.fa.gz",
-         "bioproject" : "PRJNA275000",
-         "blast_title" : "C. elegans Protein Sequences",
-         "description" : "Caenorhabditis elegans protein sequences",
-         "genus" : "Caenorhabditis",
-         "md5sum" : "4a4dd3598707603b3f76a2378a4504aa",
-         "seqtype" : "prot",
-         "species" : "elegans",
-         "taxon_id" : "6239",
-         "version" : "WS284"
-      },
-      {
          "URI" : "ftp://ftp.wormbase.org/pub/wormbase/releases/WS284/species/c_zanzibari/PRJEB12596/c_zanzibari.PRJEB12596.WS284.genomic.fa.gz",
          "bioproject" : "PRJEB12596",
          "blast_title" : "C. zanzibari Genome Assembly",
