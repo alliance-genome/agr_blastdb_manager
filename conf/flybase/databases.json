@@ -1,36 +1,32 @@
 {
-  "organisms": [
-    {
-      "genus": "Drosphila",
-      "species": "melanogaster",
-      "taxid": 7227,
-      "organism_group": "invertebrate",
-      "output_dir": "Drosophila_melanogaster",
-      "databases": [
-        {
-          "url": "ftp://ftp.flybase.org/genomes/dmel/current/fasta/dmel-all-chromosome-r6.44.fasta.gz",
-          "localFilename": "assembly.fa.gz",
-          "title": "D. melanogaster genomic assembly",
-          "blast": {
-            "dbName": "assembly",
-            "type": "nucl"
-          }
-        }
-      ]
-    },
-    {
-      "genus": "Drosphila",
-      "species": "simulans",
-      "taxid": 7240,
-      "organism_group": "invertebrate",
-      "output_dir": "Drosophila_simulans"
-    },
-    {
-      "genus": "Drosphila",
-      "species": "erecta",
-      "taxid": 7220,
-      "organism_group": "invertebrate",
-      "output_dir": "Drosophila_erecta"
-    }
-  ]
+   "data" : [
+      {
+         "URI" : "ftp://ftp.flybase.org/genomes/Drosophila_melanogaster/dmel_r6.45_FB2022_02/fasta/dmel-all-chromosome-r6.45.fasta.gz",
+         "blast_title" : "D. melanogaster Genome Assembly",
+         "description" : "Drosophila melanogaster genome assembly",
+         "genus" : "Drosophila",
+         "md5sum" : "8dd4464e993ffdcf8591719255a4a3d8",
+         "seqtype" : "nucl",
+         "species" : "melanogaster",
+         "taxon_id" : "7227",
+         "version" : "6.45"
+      },
+      {
+         "URI" : "https://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Drosophila_erecta/latest_assembly_versions/GCF_003286155.1_DereRS2/GCF_003286155.1_DereRS2_genomic.fna.gz",
+         "blast_title" : "D. erecta Genome Assembly",
+         "description" : "Drosophila erecta genome assembly",
+         "genus" : "Drosophila",
+         "seqtype" : "nucl",
+         "species" : "erecta",
+         "taxon_id" : "7220",
+         "md5sum" : "60f077f218625ecb12da3fe04c98471d",
+         "version" : "GCF_003286155.1"
+      }
+   ],
+   "metaData" : {
+      "contact" : "helpfb@morgan.harvard.edu",
+      "dataProvider" : "FB",
+      "dateProduced" : "2022-04-20T11:22:23+01:00",
+      "release" : "FB2022_02"
+   }
 }

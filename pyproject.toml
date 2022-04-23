@@ -13,7 +13,8 @@ include = [
     "LICENSE",
     "README.md",
     "Snakefile",
-    "conf"
+    "conf",
+    "scripts"
 ]
 
 [tool.poetry.dependencies]

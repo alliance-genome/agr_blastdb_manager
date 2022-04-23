@@ -20,7 +20,6 @@ def write_db_metadata_files(mod: str, json_file: str, db_meta_dir: Path) -> list
     :return: List of Path objects for the JSON metadata files produced.
     """
     try:
-        # mod_dbs: dict = json.load(f)
         mod_blast_metadata: AGRBlastDatabases = AGRBlastDatabases.parse_file(json_file)
     except JSONDecodeError as jde:
         print(

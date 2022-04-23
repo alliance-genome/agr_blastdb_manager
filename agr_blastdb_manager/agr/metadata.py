@@ -48,7 +48,7 @@ class BlastDBMetaData(BaseModel):
     genus: str
     species: str
     md5sum: str
-    taxon_id: int
+    taxon_id: str
     version: str
     bioproject: str = None
     seqtype: BlastDBType = BlastDBType.nucl
@@ -62,7 +62,7 @@ class AGRBlastMetadata(BaseModel):
     contact: EmailStr
     dataProvider: str
     release: str
-    dateProduced: datetime = None
+    dateProduced: datetime = datetime.now()
 
 
 class AGRBlastDatabases(BaseModel):

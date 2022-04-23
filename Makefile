@@ -14,6 +14,10 @@ DATA_DIR    := data
 
 all: docker-build docker-run
 
+# Generate the BLAST database metadata schema file.
+conf/metadata_schema.json:
+	snakemake -c1 -f $@
+
 clean-fasta:
 	rm -rf $(DATA_DIR)/fasta/*
 
@@ -45,6 +49,7 @@ $(DIST_DIR)/%.whl:
 	poetry build
 
 format:
-	black agr_blastdb_manager
+	black agr_blastdb_manager scripts
+
 
 .PHONY: docker-build docker-run clean clean-fasta clean-blast clean-meta clean-all-blast build format

@@ -4,8 +4,8 @@ MAKEBLASTDB_BIN: /usr/local/ncbi/blast/bin/makeblastdb
 
 # MOD directory to proccess
 mods:
-  wormbase: conf/wormbase/databases.json
-  #flybase: conf/flybase/databases.json
+  #wormbase: conf/wormbase/databases.json
+  flybase: conf/flybase/databases.json
 
 # Uncomment to override workflow defaults.
 # FASTA_DIR: data/fasta

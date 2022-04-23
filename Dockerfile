@@ -5,6 +5,7 @@ WORKDIR /app
 # Files required for the python package.
 COPY pyproject.toml poetry.lock README.md LICENSE /app/
 COPY agr_blastdb_manager /app/agr_blastdb_manager
+COPY scripts /app/scripts
 
 # Setup poetry and run the build.
 RUN pip install -U pip wheel && \
