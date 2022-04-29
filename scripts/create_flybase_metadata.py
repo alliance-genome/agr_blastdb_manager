@@ -111,31 +111,31 @@ def create_flybase_metadata(options: argparse.Namespace) -> None:
             "description": "{} {} protein sequences",
         },
     ]
-    # for genus, species in flyblast_organisms():
-    #     logger.info(f"Creating metadata for {genus} {species}")
-    #     for target in assembly_targets:
-    #         assembly_files = genomes.get_current_genome_assembly_files(
-    #             genus, species, file_regex=target["file_regex"]
-    #         )
-    #         if not assembly_files:
-    #             logger.error(f"No assembly files found for {genus} {species}")
-    #             continue
-    #
-    #         # Get taxonomy ID.
-    #         taxid = tax.get_taxonomy_id(genus, species)
-    #         db = {
-    #             "version": assembly_files[0],
-    #             "URI": assembly_files[1],
-    #             "md5sum": assembly_files[2],
-    #             "genus": genus,
-    #             "species": species,
-    #             "blast_title": target["blast_title"].format(
-    #                 genus[0].upper(), species, assembly_files[0]
-    #             ),
-    #             "description": target["description"].format(genus, species),
-    #             "taxon_id": f"NCBITaxon:{taxid}",
-    #         }
-    #         dbs.append(blast_metadata.BlastDBMetaData(**db))
+    for genus, species in flyblast_organisms():
+        logger.info(f"Creating metadata for {genus} {species}")
+        for target in assembly_targets:
+            assembly_files = genomes.get_current_genome_assembly_files(
+                genus, species, file_regex=target["file_regex"]
+            )
+            if not assembly_files:
+                logger.error(f"No assembly files found for {genus} {species}")
+                continue
+
+            # Get taxonomy ID.
+            taxid = tax.get_taxonomy_id(genus, species)
+            db = {
+                "version": assembly_files[0],
+                "URI": assembly_files[1],
+                "md5sum": assembly_files[2],
+                "genus": genus,
+                "species": species,
+                "blast_title": target["blast_title"].format(
+                    genus[0].upper(), species, assembly_files[0]
+                ),
+                "description": target["description"].format(genus, species),
+                "taxon_id": f"NCBITaxon:{taxid}",
+            }
+            dbs.append(blast_metadata.BlastDBMetaData(**db))
 
     dbs.extend(
         [
