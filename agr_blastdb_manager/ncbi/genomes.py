@@ -3,9 +3,11 @@ import logging
 import re
 import urllib.error
 import urllib.request as req
+from functools import cache
 from ftplib import FTP
 from pathlib import Path
 from typing import Iterator, Union
+from Bio import Entrez
 
 logger = logging.getLogger(__name__)
 FTP_HOST = "ftp.ncbi.nlm.nih.gov"
@@ -44,9 +46,7 @@ def get_current_genome_assembly_files(
     :param file_regex: Regular expression to match files (default: None)
     :return: Tuple of (genome assembly directory, genome assembly file, md5 checksum file)
     """
-    path = (
-        f"/genomes/refseq/{organism_group}/{genus}_{species.replace(' ', '_')}/latest_assembly_versions"
-    )
+    path = f"/genomes/refseq/{organism_group}/{genus}_{species.replace(' ', '_')}/latest_assembly_versions"
     with FTP(FTP_HOST) as ftp:
         # Use a passive connection to avoid firewall blocking and login.
         ftp.set_pasv(True)
@@ -57,8 +57,14 @@ def get_current_genome_assembly_files(
             # Look for the latest genome assembly directory.
             directories = filter_ftp_paths(files, "^GC[AF]_")
         except ftplib.error_perm as e:
-            logger.error(f"FTP error: {e}")
-            return None
+            if "No such file or directory" in str(e):
+                # TODO - query NCBI for latest assembly
+                # logger.info(f"No genome assembly found at {path}, querying NCBI for latest assembly.")
+                # search_ncbi_assemblies(genus, species)
+                return None
+            else:
+                logger.error(f"FTP error: {e}")
+                return None
         except ftplib.all_errors as e:
             logger.error(f"FTP error while processing {genus} {species}: {e}")
             return None
@@ -116,6 +122,30 @@ def get_current_genome_assembly_files(
             return None
 
 
+@cache
+def search_ncbi_assemblies(genus: str, species: str) -> list[str]:
+    try:
+        assembly_query = f"({genus} {species}[Organism]) AND (latest[filter] AND all[filter] NOT anomalous[filter])"
+        assembly_handle = Entrez.esearch(db="assembly", term=assembly_query)
+        assembly_records = Entrez.read(assembly_handle)
+        num_results = int(assembly_records["Count"])
+        if num_results == 0:
+            return []
+        else:
+            efetch_handle = Entrez.efetch(
+                db="assembly", id=",".join(assembly_records["IdList"])
+            )
+            efetch_records = Entrez.read(efetch_handle)
+            print(efetch_records)
+    except IOError as ioe:
+        print(ioe)
+    finally:
+        assembly_handle.close()
+        efetch_handle.close()
+    return None
+
+
+@cache
 def filter_ftp_paths(files: Iterator, file_regex: str = None) -> list[str]:
     """
     Given an iterator for files from the `mlsd` FTP command, filter the files based on the regular expression.
