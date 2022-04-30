@@ -60,10 +60,10 @@ rule all:
 # from the metadata validates the file that was mirrored.
 #============================================================================
 rule makeblastdb:
-    output: touch(Path(BLASTDB_DIR,"{mod}", "{org}", "{fasta}.done"))
+    output: touch(Path(BLASTDB_DIR,"{mod}", "{genus}", "{org}", "{fasta}.done"))
     input:
-        fa=lambda wildcards: Path(FASTA_DIR, wildcards.mod, wildcards.org, wildcards.fasta),
-        md5=lambda wildcards: Path(FASTA_DIR, wildcards.mod, wildcards.org, wildcards.fasta + '.md5_validated')
+        fa=lambda wildcards: Path(FASTA_DIR, wildcards.mod, wildcards.genus, wildcards.org, wildcards.fasta),
+        md5=lambda wildcards: Path(FASTA_DIR, wildcards.mod, wildcards.genus, wildcards.org, wildcards.fasta + '.md5_validated')
     params:
         # Fetch the database metadata object from the JSON file.
         db_info=lambda wildcards: agr_sm.get_blastdb_obj(meta_dir=META_DIR, fasta=wildcards.fasta, mod=wildcards.mod),
@@ -72,7 +72,7 @@ rule makeblastdb:
         # Strip the '.gz.done' from the output name
         # TODO - This will fail with certain variations of filename extensions.
         out=lambda wildcards, output: Path(output[0]).with_suffix('').with_suffix('')
-    log: "logs/makeblastdb_{mod}_{org}_{fasta}.log"
+    log: "logs/makeblastdb_{mod}_{genus}_{org}_{fasta}.log"
     shell:
         # Create the BLAST DB directory and then pipe the FASTA file into makeblastdb.
         """
@@ -87,8 +87,8 @@ rule makeblastdb:
 # database metadata. If it does not, an
 #============================================================================
 rule validate_fasta_md5:
-    output: touch(Path(FASTA_DIR, "{mod}", "{org}", "{fasta}.md5_validated"))
-    input: lambda wildcards: Path(FASTA_DIR, wildcards.mod, wildcards.org, wildcards.fasta)
+    output: touch(Path(FASTA_DIR, "{mod}", "{genus}", "{org}", "{fasta}.md5_validated"))
+    input: lambda wildcards: Path(FASTA_DIR, wildcards.mod, wildcards.genus, wildcards.org, wildcards.fasta)
     params:
         db_info=lambda wildcards: agr_sm.get_blastdb_obj(meta_dir=META_DIR, fasta=wildcards.fasta, mod=wildcards.mod),
     run:
@@ -101,11 +101,11 @@ rule validate_fasta_md5:
 # Retrieves the FASTA file from the remote source defined in the metadata file.
 #==============================================================================
 rule retrieve_fasta:
-    output: Path(FASTA_DIR, "{mod}", "{org}", "{fasta}")
+    output: Path(FASTA_DIR, "{mod}", "{genus}", "{org}", "{fasta}")
     params:
-        dir_prefix=lambda wildcards: Path(FASTA_DIR, wildcards.mod, wildcards.org),
+        dir_prefix=lambda wildcards: Path(FASTA_DIR, wildcards.mod, wildcards.genus, wildcards.org),
         db_info=lambda wildcards: agr_sm.get_blastdb_obj(meta_dir=META_DIR, fasta=wildcards.fasta, mod=wildcards.mod)
-    log: "logs/wget_{mod}_{org}_{fasta}.log"
+    log: "logs/wget_{mod}_{genus}_{org}_{fasta}.log"
     run:
         shell("wget -c --tries 3 --timestamping {params.db_info.URI} --directory-prefix {params.dir_prefix} -o {log}")
 

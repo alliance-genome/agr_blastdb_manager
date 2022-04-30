@@ -108,7 +108,13 @@ def expected_blast_files(db_files: list[Path], base_dir: Path, mod: str) -> list
         db_info = read_db_json(db_file)
         fasta = Path(extract_fasta_file(db_info.URI) + ".done")
         blast_files.append(
-            Path(base_dir, mod, f"{db_info.genus}_{db_info.species}", fasta)
+            Path(
+                base_dir,
+                mod,
+                db_info.genus,
+                f"{db_info.genus}_{db_info.species}",
+                fasta,
+            )
         )
 
     return blast_files
