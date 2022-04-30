@@ -26,7 +26,6 @@ def flyblast_organisms() -> tuple[tuple[str, str], ...]:
     the FlyBase BLAST databases.
     """
     return (
-        ("Drosophila", "grimshawi"),
         ("Drosophila", "albomicans"),
         ("Drosophila", "ananassae"),
         ("Drosophila", "arizonae"),

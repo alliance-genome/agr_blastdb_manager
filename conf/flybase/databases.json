@@ -1,30 +1,6 @@
 {
   "data": [
     {
-      "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Drosophila_grimshawi/latest_assembly_versions/GCF_018153295.1_ASM1815329v1/GCF_018153295.1_ASM1815329v1_genomic.fna.gz",
-      "bioproject": null,
-      "blast_title": "D. grimshawi Genome Assembly (GCF_018153295.1_ASM1815329v1)",
-      "description": "Drosophila grimshawi genome assembly",
-      "genus": "Drosophila",
-      "md5sum": "bd771b16cd2c7aa56a73080c68a890c2",
-      "seqtype": "nucl",
-      "species": "grimshawi",
-      "taxon_id": "NCBITaxon:7222",
-      "version": "GCF_018153295.1_ASM1815329v1"
-    },
-    {
-      "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Drosophila_grimshawi/latest_assembly_versions/GCF_018153295.1_ASM1815329v1/GCF_018153295.1_ASM1815329v1_protein.faa.gz",
-      "bioproject": null,
-      "blast_title": "D. grimshawi Protein Sequences (GCF_018153295.1_ASM1815329v1)",
-      "description": "Drosophila grimshawi protein sequences",
-      "genus": "Drosophila",
-      "md5sum": "0d96f2bad4bb86a04bd6bb4850f8b93e",
-      "seqtype": "prot",
-      "species": "grimshawi",
-      "taxon_id": "NCBITaxon:7222",
-      "version": "GCF_018153295.1_ASM1815329v1"
-    },
-    {
       "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Drosophila_albomicans/latest_assembly_versions/GCF_009650485.1_drosAlbom15112-1751.03v1/GCF_009650485.1_drosAlbom15112-1751.03v1_genomic.fna.gz",
       "bioproject": null,
       "blast_title": "D. albomicans Genome Assembly (GCF_009650485.1_drosAlbom15112-1751.03v1)",
@@ -1468,7 +1444,7 @@
   "metaData": {
     "contact": "jogoodma@iu.edu",
     "dataProvider": "FlyBase",
-    "dateProduced": "2022-04-29T22:24:45.093407",
+    "dateProduced": "2022-04-30T12:51:55.337805",
     "release": "FB2022_02"
   }
 }
