@@ -104,11 +104,13 @@ def create_flybase_metadata(options: argparse.Namespace) -> None:
             "file_regex": "(?<!_from)_genomic.fna.gz$",
             "blast_title": "{}. {} Genome Assembly ({})",
             "description": "{} {} genome assembly",
+            "seqtype": "nucl",
         },
         {
             "file_regex": "_protein.faa.gz$",
             "blast_title": "{}. {} Protein Sequences ({})",
             "description": "{} {} protein sequences",
+            "seqtype": "prot",
         },
     ]
     for genus, species in flyblast_organisms():
@@ -134,6 +136,7 @@ def create_flybase_metadata(options: argparse.Namespace) -> None:
                 ),
                 "description": target["description"].format(genus, species),
                 "taxon_id": f"NCBITaxon:{taxid}",
+                "seqtype": target["seqtype"],
             }
             dbs.append(blast_metadata.BlastDBMetaData(**db))
 
@@ -148,6 +151,7 @@ def create_flybase_metadata(options: argparse.Namespace) -> None:
                 blast_title=f"D. melanogaster Genome Assembly ({options.dmel_annot})",
                 description="Drosophila melanogaster genome assembly",
                 taxon_id="NCBITaxon:7227",
+                seqtype="nucl",
             ),
             blast_metadata.BlastDBMetaData(
                 version=options.dmel_annot,
@@ -159,6 +163,7 @@ def create_flybase_metadata(options: argparse.Namespace) -> None:
                 blast_title=f"D. melanogaster Protein Sequences ({options.dmel_annot})",
                 description="Drosophila melanogaster protein sequences",
                 taxon_id="NCBITaxon:7227",
+                seqtype="prot",
             ),
         ]
     )

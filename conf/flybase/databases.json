@@ -19,7 +19,7 @@
       "description": "Drosophila grimshawi protein sequences",
       "genus": "Drosophila",
       "md5sum": "0d96f2bad4bb86a04bd6bb4850f8b93e",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "grimshawi",
       "taxon_id": "NCBITaxon:7222",
       "version": "GCF_018153295.1_ASM1815329v1"
@@ -43,7 +43,7 @@
       "description": "Drosophila albomicans protein sequences",
       "genus": "Drosophila",
       "md5sum": "e44d10e1879cd2570da60f800ad4fabd",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "albomicans",
       "taxon_id": "NCBITaxon:7291",
       "version": "GCF_009650485.1_drosAlbom15112-1751.03v1"
@@ -67,7 +67,7 @@
       "description": "Drosophila ananassae protein sequences",
       "genus": "Drosophila",
       "md5sum": "f46321c39a5530259f7d0e7bc71e8cb9",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "ananassae",
       "taxon_id": "NCBITaxon:7217",
       "version": "GCF_017639315.1_ASM1763931v2"
@@ -91,7 +91,7 @@
       "description": "Drosophila arizonae protein sequences",
       "genus": "Drosophila",
       "md5sum": "88155d6e116dd822dd1a1147f6ba19b9",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "arizonae",
       "taxon_id": "NCBITaxon:7263",
       "version": "GCF_001654025.1_ASM165402v1"
@@ -115,7 +115,7 @@
       "description": "Drosophila biarmipes protein sequences",
       "genus": "Drosophila",
       "md5sum": "9f10b18b41cadaab00c9265c0d125489",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "biarmipes",
       "taxon_id": "NCBITaxon:125945",
       "version": "GCF_018148935.1_ASM1814893v1"
@@ -139,7 +139,7 @@
       "description": "Drosophila bipectinata protein sequences",
       "genus": "Drosophila",
       "md5sum": "940e8c7893128ae1796b9a331cc0dd9d",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "bipectinata",
       "taxon_id": "NCBITaxon:42026",
       "version": "GCF_018153845.1_ASM1815384v1"
@@ -163,7 +163,7 @@
       "description": "Drosophila busckii protein sequences",
       "genus": "Drosophila",
       "md5sum": "b70be0883bd0add17c71d260e0da097c",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "busckii",
       "taxon_id": "NCBITaxon:30019",
       "version": "GCF_011750605.1_ASM1175060v1"
@@ -187,7 +187,7 @@
       "description": "Drosophila elegans protein sequences",
       "genus": "Drosophila",
       "md5sum": "78c490c43f5b74a09b38fefafa16eb04",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "elegans",
       "taxon_id": "NCBITaxon:30023",
       "version": "GCF_018152505.1_ASM1815250v1"
@@ -211,7 +211,7 @@
       "description": "Drosophila erecta protein sequences",
       "genus": "Drosophila",
       "md5sum": "0a6dde8c190ee8ddc526e12f29e0e174",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "erecta",
       "taxon_id": "NCBITaxon:7220",
       "version": "GCF_003286155.1_DereRS2"
@@ -235,7 +235,7 @@
       "description": "Drosophila eugracilis protein sequences",
       "genus": "Drosophila",
       "md5sum": "2416292c9b44d08fccbea900d0a73ea2",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "eugracilis",
       "taxon_id": "NCBITaxon:29029",
       "version": "GCF_018153835.1_ASM1815383v1"
@@ -259,7 +259,7 @@
       "description": "Drosophila ficusphila protein sequences",
       "genus": "Drosophila",
       "md5sum": "8ef44d53c230e44cda7ee233633f7a22",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "ficusphila",
       "taxon_id": "NCBITaxon:30025",
       "version": "GCF_018152265.1_ASM1815226v1"
@@ -283,7 +283,7 @@
       "description": "Drosophila grimshawi protein sequences",
       "genus": "Drosophila",
       "md5sum": "0d96f2bad4bb86a04bd6bb4850f8b93e",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "grimshawi",
       "taxon_id": "NCBITaxon:7222",
       "version": "GCF_018153295.1_ASM1815329v1"
@@ -307,7 +307,7 @@
       "description": "Drosophila guanche protein sequences",
       "genus": "Drosophila",
       "md5sum": "6dd8a178f35c4c51b4bb1b6fe3ee7e87",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "guanche",
       "taxon_id": "NCBITaxon:7266",
       "version": "GCF_900245975.1_DGUA_6"
@@ -331,7 +331,7 @@
       "description": "Drosophila hydei protein sequences",
       "genus": "Drosophila",
       "md5sum": "dfa4911328b418951b1abae0e2677169",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "hydei",
       "taxon_id": "NCBITaxon:7224",
       "version": "GCF_003285905.1_DhydRS2"
@@ -355,7 +355,7 @@
       "description": "Drosophila innubila protein sequences",
       "genus": "Drosophila",
       "md5sum": "da3bc14dbf3d0693f34cd688bfd5a0d6",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "innubila",
       "taxon_id": "NCBITaxon:198719",
       "version": "GCF_004354385.1_UK_Dinn_1.0"
@@ -379,7 +379,7 @@
       "description": "Drosophila kikkawai protein sequences",
       "genus": "Drosophila",
       "md5sum": "6c51040ed6c133aa91164aa91db59b77",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "kikkawai",
       "taxon_id": "NCBITaxon:30033",
       "version": "GCF_018152535.1_ASM1815253v1"
@@ -403,7 +403,7 @@
       "description": "Drosophila mauritiana protein sequences",
       "genus": "Drosophila",
       "md5sum": "6e5fd0981c34cc7df2e4d9f8925be6fc",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "mauritiana",
       "taxon_id": "NCBITaxon:7226",
       "version": "GCF_004382145.1_ASM438214v1"
@@ -427,7 +427,7 @@
       "description": "Drosophila miranda protein sequences",
       "genus": "Drosophila",
       "md5sum": "4e225a4a90bbe6b04f99bbffc53d0485",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "miranda",
       "taxon_id": "NCBITaxon:7229",
       "version": "GCF_003369915.1_D.miranda_PacBio2.1"
@@ -451,7 +451,7 @@
       "description": "Drosophila mojavensis protein sequences",
       "genus": "Drosophila",
       "md5sum": "b078964862d4940d04b609fb10087d75",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "mojavensis",
       "taxon_id": "NCBITaxon:7230",
       "version": "GCF_018153725.1_ASM1815372v1"
@@ -475,7 +475,7 @@
       "description": "Drosophila navojoa protein sequences",
       "genus": "Drosophila",
       "md5sum": "a263fd0b09d1e49ddce165590b735d5a",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "navojoa",
       "taxon_id": "NCBITaxon:7232",
       "version": "GCF_001654015.2_UFRJ_Dnav_4.2"
@@ -499,7 +499,7 @@
       "description": "Drosophila novamexicana protein sequences",
       "genus": "Drosophila",
       "md5sum": "ea40ecc1220306051ffbd4caae3adca4",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "novamexicana",
       "taxon_id": "NCBITaxon:47314",
       "version": "GCF_003285875.2_DnovRS2.1"
@@ -523,7 +523,7 @@
       "description": "Drosophila obscura protein sequences",
       "genus": "Drosophila",
       "md5sum": "2b4cfdfd6c17e51ec57d8262b7f7bd99",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "obscura",
       "taxon_id": "NCBITaxon:7282",
       "version": "GCF_018151105.1_ASM1815110v1"
@@ -547,7 +547,7 @@
       "description": "Drosophila persimilis protein sequences",
       "genus": "Drosophila",
       "md5sum": "f22f601e8223b04842463b6a4ea4759c",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "persimilis",
       "taxon_id": "NCBITaxon:7234",
       "version": "GCF_003286085.1_DperRS2"
@@ -571,7 +571,7 @@
       "description": "Drosophila pseudoobscura protein sequences",
       "genus": "Drosophila",
       "md5sum": "94ff3961707a60a37f26c31b1adc7d25",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "pseudoobscura",
       "taxon_id": "NCBITaxon:7237",
       "version": "GCF_009870125.1_UCI_Dpse_MV25"
@@ -595,7 +595,7 @@
       "description": "Drosophila rhopaloa protein sequences",
       "genus": "Drosophila",
       "md5sum": "62e394aef4ee801f84e2982ebe4d587b",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "rhopaloa",
       "taxon_id": "NCBITaxon:1041015",
       "version": "GCF_018152115.1_ASM1815211v1"
@@ -619,7 +619,7 @@
       "description": "Drosophila santomea protein sequences",
       "genus": "Drosophila",
       "md5sum": "f165da08501ef5c474477caa23d2eaa7",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "santomea",
       "taxon_id": "NCBITaxon:129105",
       "version": "GCF_016746245.2_Prin_Dsan_1.1"
@@ -643,7 +643,7 @@
       "description": "Drosophila sechellia protein sequences",
       "genus": "Drosophila",
       "md5sum": "4ec9e1bea767de58117fcc2eb898f5bf",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "sechellia",
       "taxon_id": "NCBITaxon:7238",
       "version": "GCF_004382195.1_ASM438219v1"
@@ -667,7 +667,7 @@
       "description": "Drosophila serrata protein sequences",
       "genus": "Drosophila",
       "md5sum": "55f35fc407baf7259db5f8182dd60dc0",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "serrata",
       "taxon_id": "NCBITaxon:7274",
       "version": "GCF_002093755.1_Dser1.0"
@@ -691,7 +691,7 @@
       "description": "Drosophila simulans protein sequences",
       "genus": "Drosophila",
       "md5sum": "89ae2c33bd8b4a23035e9c543e4e9db4",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "simulans",
       "taxon_id": "NCBITaxon:7240",
       "version": "GCF_016746395.2_Prin_Dsim_3.1"
@@ -715,7 +715,7 @@
       "description": "Drosophila subobscura protein sequences",
       "genus": "Drosophila",
       "md5sum": "d45462228a90765fd4fab888f0653c93",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "subobscura",
       "taxon_id": "NCBITaxon:7241",
       "version": "GCF_008121235.1_UCBerk_Dsub_1.0"
@@ -739,7 +739,7 @@
       "description": "Drosophila subpulchrella protein sequences",
       "genus": "Drosophila",
       "md5sum": "d478e474dd225e53709dc9efdb832ccf",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "subpulchrella",
       "taxon_id": "NCBITaxon:1486046",
       "version": "GCF_014743375.2_RU_Dsub_v1.1"
@@ -763,7 +763,7 @@
       "description": "Drosophila suzukii protein sequences",
       "genus": "Drosophila",
       "md5sum": "358b6087a4feca4582ae430a52e40d76",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "suzukii",
       "taxon_id": "NCBITaxon:28584",
       "version": "GCF_013340165.1_LBDM_Dsuz_2.1.pri"
@@ -787,7 +787,7 @@
       "description": "Drosophila takahashii protein sequences",
       "genus": "Drosophila",
       "md5sum": "a7ad72515125923d0a31104afa20b40e",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "takahashii",
       "taxon_id": "NCBITaxon:29030",
       "version": "GCF_018152695.1_ASM1815269v1"
@@ -811,7 +811,7 @@
       "description": "Drosophila teissieri protein sequences",
       "genus": "Drosophila",
       "md5sum": "e151fe51943dff229d2a85c2afb155b9",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "teissieri",
       "taxon_id": "NCBITaxon:7243",
       "version": "GCF_016746235.2_Prin_Dtei_1.1"
@@ -835,7 +835,7 @@
       "description": "Drosophila virilis protein sequences",
       "genus": "Drosophila",
       "md5sum": "084986a1a01fba64f4448091202af9d3",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "virilis",
       "taxon_id": "NCBITaxon:7244",
       "version": "GCF_003285735.1_DvirRS2"
@@ -859,7 +859,7 @@
       "description": "Drosophila willistoni protein sequences",
       "genus": "Drosophila",
       "md5sum": "632e3872e21da1b69ee37ab3e3df2b74",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "willistoni",
       "taxon_id": "NCBITaxon:7260",
       "version": "GCF_018902025.1_UCI_dwil_1.1"
@@ -883,7 +883,7 @@
       "description": "Drosophila yakuba protein sequences",
       "genus": "Drosophila",
       "md5sum": "d2b315b657e6699e18a14b455a52b801",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "yakuba",
       "taxon_id": "NCBITaxon:7245",
       "version": "GCF_016746365.2_Prin_Dyak_Tai18E2_2.1"
@@ -907,7 +907,7 @@
       "description": "Musca domestica protein sequences",
       "genus": "Musca",
       "md5sum": "42ba652857b961fc832fe892231b0b58",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "domestica",
       "taxon_id": "NCBITaxon:7370",
       "version": "GCF_000371365.1_Musca_domestica-2.0.2"
@@ -931,7 +931,7 @@
       "description": "Culex quinquefasciatus protein sequences",
       "genus": "Culex",
       "md5sum": "f8c0fff3aa26207d1768d0a66f4ababd",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "quinquefasciatus",
       "taxon_id": "NCBITaxon:7176",
       "version": "GCF_015732765.1_VPISU_Cqui_1.0_pri_paternal"
@@ -955,7 +955,7 @@
       "description": "Aedes aegypti protein sequences",
       "genus": "Aedes",
       "md5sum": "8f58517e0a31391ab5aa2cf5007ed4be",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "aegypti",
       "taxon_id": "NCBITaxon:7159",
       "version": "GCF_002204515.2_AaegL5.0"
@@ -979,7 +979,7 @@
       "description": "Anopheles gambiae protein sequences",
       "genus": "Anopheles",
       "md5sum": "64ba8bd0e90a681b5a04e5097c32ee74",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "gambiae",
       "taxon_id": "NCBITaxon:7165",
       "version": "GCF_000005575.2_AgamP3"
@@ -1003,7 +1003,7 @@
       "description": "Bombyx mori protein sequences",
       "genus": "Bombyx",
       "md5sum": "3d8ad6025f2dc987cd2918fe910962bf",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "mori",
       "taxon_id": "NCBITaxon:7091",
       "version": "GCF_014905235.1_Bmori_2016v1.0"
@@ -1027,7 +1027,7 @@
       "description": "Danaus plexippus protein sequences",
       "genus": "Danaus",
       "md5sum": "2dcf01e34342745d5755d2347e42e58b",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "plexippus",
       "taxon_id": "NCBITaxon:13037",
       "version": "GCF_009731565.1_Dplex_v4"
@@ -1051,7 +1051,7 @@
       "description": "Tribolium castaneum protein sequences",
       "genus": "Tribolium",
       "md5sum": "77d46be61b93a78218118d586f545d27",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "castaneum",
       "taxon_id": "NCBITaxon:7070",
       "version": "GCF_000002335.3_Tcas5.2"
@@ -1075,7 +1075,7 @@
       "description": "Nasonia vitripennis protein sequences",
       "genus": "Nasonia",
       "md5sum": "75d528408695a4463117f1750d0be9fa",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "vitripennis",
       "taxon_id": "NCBITaxon:7425",
       "version": "GCF_009193385.2_Nvit_psr_1.1"
@@ -1099,7 +1099,7 @@
       "description": "Apis mellifera protein sequences",
       "genus": "Apis",
       "md5sum": "a419ecb7b2b25a128a7dcd9884b61592",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "mellifera",
       "taxon_id": "NCBITaxon:7460",
       "version": "GCF_003254395.2_Amel_HAv3.1"
@@ -1123,7 +1123,7 @@
       "description": "Apis florea protein sequences",
       "genus": "Apis",
       "md5sum": "e902f4046b36621044d05bd723155a2d",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "florea",
       "taxon_id": "NCBITaxon:7463",
       "version": "GCF_000184785.3_Aflo_1.1"
@@ -1147,7 +1147,7 @@
       "description": "Bombus impatiens protein sequences",
       "genus": "Bombus",
       "md5sum": "4641ebe6d4d363eaf669f81e94a52af6",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "impatiens",
       "taxon_id": "NCBITaxon:132113",
       "version": "GCF_000188095.3_BIMP_2.2"
@@ -1171,7 +1171,7 @@
       "description": "Bombus terrestris protein sequences",
       "genus": "Bombus",
       "md5sum": "f8b91e36d87e21f3a56b431f84dc2699",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "terrestris",
       "taxon_id": "NCBITaxon:30195",
       "version": "GCF_000214255.1_Bter_1.0"
@@ -1195,7 +1195,7 @@
       "description": "Megachile rotundata protein sequences",
       "genus": "Megachile",
       "md5sum": "d0643a305e40cffb1ff4558d309ffd5c",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "rotundata",
       "taxon_id": "NCBITaxon:143995",
       "version": "GCF_000220905.1_MROT_1.0"
@@ -1219,7 +1219,7 @@
       "description": "Acromyrmex echinatior protein sequences",
       "genus": "Acromyrmex",
       "md5sum": "caf2507d18fd35c8c79b3f6b4a11c853",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "echinatior",
       "taxon_id": "NCBITaxon:103372",
       "version": "GCF_000204515.1_Aech_3.9"
@@ -1243,7 +1243,7 @@
       "description": "Atta cephalotes protein sequences",
       "genus": "Atta",
       "md5sum": "254f99f5df78d7c49bcb23f11ae9b3be",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "cephalotes",
       "taxon_id": "NCBITaxon:12957",
       "version": "GCF_000143395.1_Attacep1.0"
@@ -1267,7 +1267,7 @@
       "description": "Camponotus floridanus protein sequences",
       "genus": "Camponotus",
       "md5sum": "9ba15ebf2655fca558fab282013ad203",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "floridanus",
       "taxon_id": "NCBITaxon:104421",
       "version": "GCF_003227725.1_Cflo_v7.5"
@@ -1291,7 +1291,7 @@
       "description": "Harpegnathos saltator protein sequences",
       "genus": "Harpegnathos",
       "md5sum": "169752c196a537d04d202a93e609e833",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "saltator",
       "taxon_id": "NCBITaxon:610380",
       "version": "GCF_003227715.1_Hsal_v8.5"
@@ -1315,7 +1315,7 @@
       "description": "Linepithema humile protein sequences",
       "genus": "Linepithema",
       "md5sum": "19e95bbb8a78c6843d0674fcfe64dd22",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "humile",
       "taxon_id": "NCBITaxon:83485",
       "version": "GCF_000217595.1_Lhum_UMD_V04"
@@ -1339,7 +1339,7 @@
       "description": "Pogonomyrmex barbatus protein sequences",
       "genus": "Pogonomyrmex",
       "md5sum": "4f1c3d35fa5a6e1f179696e00c20c6b0",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "barbatus",
       "taxon_id": "NCBITaxon:144034",
       "version": "GCF_000187915.1_Pbar_UMD_V03"
@@ -1363,7 +1363,7 @@
       "description": "Solenopsis invicta protein sequences",
       "genus": "Solenopsis",
       "md5sum": "4b19f31f071af911fc46789994db314f",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "invicta",
       "taxon_id": "NCBITaxon:13686",
       "version": "GCF_016802725.1_UNIL_Sinv_3.0"
@@ -1387,7 +1387,7 @@
       "description": "Acyrthosiphon pisum protein sequences",
       "genus": "Acyrthosiphon",
       "md5sum": "14d6daa2b66b67c613d05e999ee9ed0c",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "pisum",
       "taxon_id": "NCBITaxon:7029",
       "version": "GCF_005508785.1_pea_aphid_22Mar2018_4r6ur"
@@ -1411,7 +1411,7 @@
       "description": "Ixodes scapularis protein sequences",
       "genus": "Ixodes",
       "md5sum": "75b9f1a16ae28cfd21ea07761239de4a",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "scapularis",
       "taxon_id": "NCBITaxon:6945",
       "version": "GCF_016920785.2_ASM1692078v2"
@@ -1435,7 +1435,7 @@
       "description": "Rhipicephalus microplus protein sequences",
       "genus": "Rhipicephalus",
       "md5sum": "23a1b687bc0af9c722f73a84b4729ddd",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "microplus",
       "taxon_id": "NCBITaxon:6941",
       "version": "GCF_013339725.1_ASM1333972v1"
@@ -1459,7 +1459,7 @@
       "description": "Drosophila melanogaster protein sequences",
       "genus": "Drosophila",
       "md5sum": "57912149894db436a70e0926c9364998",
-      "seqtype": "nucl",
+      "seqtype": "prot",
       "species": "melanogaster",
       "taxon_id": "NCBITaxon:7227",
       "version": "6.45"
@@ -1468,7 +1468,7 @@
   "metaData": {
     "contact": "jogoodma@iu.edu",
     "dataProvider": "FlyBase",
-    "dateProduced": "2022-04-29T16:55:54.993452",
+    "dateProduced": "2022-04-29T22:24:45.093407",
     "release": "FB2022_02"
   }
 }
