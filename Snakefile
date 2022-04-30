@@ -67,9 +67,11 @@ rule makeblastdb:
     params:
         # Fetch the database metadata object from the JSON file.
         db_info=lambda wildcards: agr_sm.get_blastdb_obj(meta_dir=META_DIR, fasta=wildcards.fasta, mod=wildcards.mod),
+        # Strip Taxon DB prefix.
+        taxid=lambda wildcards, params: params.db_info.taxon_id.replace('NCBITaxon:','')
         # Strip the '.gz.done' from the output name
         # TODO - This will fail with certain variations of filename extensions.
-        out=lambda wildcards, output: Path(output[0]).with_suffix('').with_suffix('')
+        out=lambda wildcards, output: Path(output[0]).with_suffix('').with_suffix(''),
     log: "logs/makeblastdb_{mod}_{org}_{fasta}.log"
     shell:
         # Create the BLAST DB directory and then pipe the FASTA file into makeblastdb.
@@ -77,7 +79,7 @@ rule makeblastdb:
         dirname {output} | xargs mkdir -p
         gunzip -c {input.fa} | {MAKEBLASTDB_BIN} -in - -dbtype {params.db_info.seqtype} \
             -title "{params.db_info.blast_title}" -parse_seqids -out {params.out} \
-            -taxid {params.db_info.taxon_id} -logfile {log} 2>&1
+            -taxid {params.taxid} -logfile {log} 2>&1
         """
 
 #============================================================================
