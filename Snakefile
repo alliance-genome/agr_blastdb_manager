@@ -1,7 +1,5 @@
 from pathlib import Path
-from agr_blastdb_manager.ncbi import genomes
 import agr_blastdb_manager.agr.snakemake as agr_sm
-import agr_blastdb_manager.agr.metadata as agr_meta
 
 
 configfile: "conf/global.yaml"
