@@ -6,6 +6,7 @@ MAKEBLASTDB_BIN: /usr/local/ncbi/blast/bin/makeblastdb
 mods:
   wormbase: conf/wormbase/databases.json
   flybase: conf/flybase/databases.json
+  sgd: conf/sgd/databases.json
   #test: conf/wormbase/databases_test.json
 
 # Uncomment to override workflow defaults.

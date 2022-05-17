@@ -13,6 +13,7 @@ Items marked with '(dev)' indicate dependencies that are only needed if running 
 * makeblastdb - NCBI BLAST 2.12.0+ (dev)
 * git
 * wget (dev)
+* jq (formatting database metadata from MOD)
 
 ## Getting Started
 

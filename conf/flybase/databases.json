@@ -1345,28 +1345,28 @@
       "version": "GCF_016802725.1_UNIL_Sinv_3.0"
     },
     {
-      "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Acyrthosiphon_pisum/latest_assembly_versions/GCF_005508785.1_pea_aphid_22Mar2018_4r6ur/GCF_005508785.1_pea_aphid_22Mar2018_4r6ur_genomic.fna.gz",
+      "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Acyrthosiphon_pisum/latest_assembly_versions/GCF_005508785.2_pea_aphid_22Mar2018_4r6ur_v2/GCF_005508785.2_pea_aphid_22Mar2018_4r6ur_v2_genomic.fna.gz",
       "bioproject": null,
-      "blast_title": "A. pisum Genome Assembly (GCF_005508785.1_pea_aphid_22Mar2018_4r6ur)",
+      "blast_title": "A. pisum Genome Assembly (GCF_005508785.2_pea_aphid_22Mar2018_4r6ur_v2)",
       "description": "Acyrthosiphon pisum genome assembly",
       "genus": "Acyrthosiphon",
-      "md5sum": "c8059371906df1a30dee0dcf84614562",
+      "md5sum": "000eeddf4991afc366387625598bb509",
       "seqtype": "nucl",
       "species": "pisum",
       "taxon_id": "NCBITaxon:7029",
-      "version": "GCF_005508785.1_pea_aphid_22Mar2018_4r6ur"
+      "version": "GCF_005508785.2_pea_aphid_22Mar2018_4r6ur_v2"
     },
     {
-      "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Acyrthosiphon_pisum/latest_assembly_versions/GCF_005508785.1_pea_aphid_22Mar2018_4r6ur/GCF_005508785.1_pea_aphid_22Mar2018_4r6ur_protein.faa.gz",
+      "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Acyrthosiphon_pisum/latest_assembly_versions/GCF_005508785.2_pea_aphid_22Mar2018_4r6ur_v2/GCF_005508785.2_pea_aphid_22Mar2018_4r6ur_v2_protein.faa.gz",
       "bioproject": null,
-      "blast_title": "A. pisum Protein Sequences (GCF_005508785.1_pea_aphid_22Mar2018_4r6ur)",
+      "blast_title": "A. pisum Protein Sequences (GCF_005508785.2_pea_aphid_22Mar2018_4r6ur_v2)",
       "description": "Acyrthosiphon pisum protein sequences",
       "genus": "Acyrthosiphon",
-      "md5sum": "14d6daa2b66b67c613d05e999ee9ed0c",
+      "md5sum": "9af8381fe4e0a1af85b059fc10a0b4f0",
       "seqtype": "prot",
       "species": "pisum",
       "taxon_id": "NCBITaxon:7029",
-      "version": "GCF_005508785.1_pea_aphid_22Mar2018_4r6ur"
+      "version": "GCF_005508785.2_pea_aphid_22Mar2018_4r6ur_v2"
     },
     {
       "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Ixodes_scapularis/latest_assembly_versions/GCF_016920785.2_ASM1692078v2/GCF_016920785.2_ASM1692078v2_genomic.fna.gz",
@@ -1444,7 +1444,7 @@
   "metaData": {
     "contact": "jogoodma@iu.edu",
     "dataProvider": "FlyBase",
-    "dateProduced": "2022-04-30T12:51:55.337805",
+    "dateProduced": "2022-05-13T17:13:46",
     "release": "FB2022_02"
   }
 }
