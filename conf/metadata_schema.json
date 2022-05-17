@@ -1,0 +1,127 @@
+{
+  "definitions": {
+    "AGRBlastMetadata": {
+      "description": "Top level Alliance BLAST database metadata section.",
+      "properties": {
+        "contact": {
+          "format": "email",
+          "title": "Contact",
+          "type": "string"
+        },
+        "dataProvider": {
+          "title": "Dataprovider",
+          "type": "string"
+        },
+        "dateProduced": {
+          "default": "2022-04-22T15:27:48.853248",
+          "format": "date-time",
+          "title": "Dateproduced",
+          "type": "string"
+        },
+        "release": {
+          "title": "Release",
+          "type": "string"
+        }
+      },
+      "required": [
+        "contact",
+        "dataProvider",
+        "release"
+      ],
+      "title": "AGRBlastMetadata",
+      "type": "object"
+    },
+    "BlastDBMetaData": {
+      "description": "BLAST database metadata.",
+      "properties": {
+        "URI": {
+          "format": "uri",
+          "maxLength": 65536,
+          "minLength": 1,
+          "title": "Uri",
+          "type": "string"
+        },
+        "bioproject": {
+          "title": "Bioproject",
+          "type": "string"
+        },
+        "blast_title": {
+          "title": "Blast Title",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "genus": {
+          "title": "Genus",
+          "type": "string"
+        },
+        "md5sum": {
+          "title": "Md5Sum",
+          "type": "string"
+        },
+        "seqtype": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/BlastDBType"
+            }
+          ],
+          "default": "nucl"
+        },
+        "species": {
+          "title": "Species",
+          "type": "string"
+        },
+        "taxon_id": {
+          "title": "Taxon Id",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "URI",
+        "blast_title",
+        "description",
+        "genus",
+        "species",
+        "md5sum",
+        "taxon_id",
+        "version"
+      ],
+      "title": "BlastDBMetaData",
+      "type": "object"
+    },
+    "BlastDBType": {
+      "description": "NCBI types for BLAST databases.\nTaken from the dbtype flag of the makeblastdb command line tool.",
+      "enum": [
+        "nucl",
+        "prot"
+      ],
+      "title": "BlastDBType",
+      "type": "string"
+    }
+  },
+  "description": "Alliance BLAST databases metadata file.\n\n:param data - List of BlastDBMetaData  objects\n:param metaData - Global metadata section.",
+  "properties": {
+    "data": {
+      "items": {
+        "$ref": "#/definitions/BlastDBMetaData"
+      },
+      "title": "Data",
+      "type": "array"
+    },
+    "metaData": {
+      "$ref": "#/definitions/AGRBlastMetadata"
+    }
+  },
+  "required": [
+    "data",
+    "metaData"
+  ],
+  "title": "AGRBlastDatabases",
+  "type": "object"
+}

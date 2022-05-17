@@ -39,7 +39,7 @@ class BlastDBType(str, Enum):
 
 class BlastDBMetaData(BaseModel):
     """
-    Class for representing the individual BLAST database metadata.
+    BLAST database metadata.
     """
 
     URI: AnyUrl
@@ -48,7 +48,7 @@ class BlastDBMetaData(BaseModel):
     genus: str
     species: str
     md5sum: str
-    taxon_id: int
+    taxon_id: str
     version: str
     bioproject: str = None
     seqtype: BlastDBType = BlastDBType.nucl
@@ -56,19 +56,18 @@ class BlastDBMetaData(BaseModel):
 
 class AGRBlastMetadata(BaseModel):
     """
-    Class for representing the AGR BLAST database top level
-    metadata section.
+    Top level Alliance BLAST database metadata section.
     """
 
     contact: EmailStr
     dataProvider: str
     release: str
-    dateProduced: datetime = None
+    dateProduced: str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S%z")
 
 
 class AGRBlastDatabases(BaseModel):
     """
-    Class for representing the entire AGR BLAST database metadata file.
+    Alliance BLAST databases metadata file.
 
     :param data - List of BlastDBMetaData  objects
     :param metaData - Global metadata section.

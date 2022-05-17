@@ -1,0 +1,131 @@
+{
+  "metaData": {
+    "dateProduced": "2022-05-17",
+    "dataProvider": "SGD",
+    "contact": "sweng@stanford.edu",
+    "release": "SGD:2022-05-17"
+  },
+  "data": [
+    {
+      "description": "S288C reference nuclear chromosome sequences",
+      "md5sum": "d223aa4e2a13da4a145eca5224de108f",
+      "URI": "https://sgd-dev-upload.s3.amazonaws.com/S000314612/Sc_nuclear_chr.fsa.gz",
+      "version": "64-3-1",
+      "genus": "Saccharomyces",
+      "blast_title": "S288C reference nuclear chromosome sequences",
+      "species": "cerevisiae",
+      "taxon_id": "NCBITaxon:4932",
+      "seqtype": "nucl"
+    },
+    {
+      "description": "S288C reference mitochrondrial chromosome sequence",
+      "md5sum": "6e287b7419cad7eb6de621daf6193bc7",
+      "URI": "https://sgd-dev-upload.s3.amazonaws.com/S000314613/Sc_mito_chr.fsa.gz",
+      "version": "64-3-1",
+      "genus": "Saccharomyces",
+      "blast_title": "S288C reference mitochrondrial chromosome sequence",
+      "species": "cerevisiae",
+      "taxon_id": "NCBITaxon:4932",
+      "seqtype": "nucl"
+    },
+    {
+      "description": "S288C reference 2-micron plasmid DNA sequence",
+      "md5sum": "c3c604bfb46862ef502b88474dc2e737",
+      "URI": "https://sgd-dev-upload.s3.amazonaws.com/S000314614/2-micron_chr.fsa.gz",
+      "version": "64-3-1",
+      "genus": "Saccharomyces",
+      "blast_title": "S288C reference 2-micron plasmid DNA sequence",
+      "species": "cerevisiae",
+      "taxon_id": "NCBITaxon:4932",
+      "seqtype": "nucl"
+    },
+    {
+      "description": "S288C reference ORF coding sequences",
+      "md5sum": "80cb56f52437874d688f3fe358d51753",
+      "URI": "https://sgd-dev-upload.s3.amazonaws.com/S000314615/YeastORF.fsa.gz",
+      "version": "64-3-1",
+      "genus": "Saccharomyces",
+      "blast_title": "S288C reference ORF coding sequences",
+      "species": "cerevisiae",
+      "taxon_id": "NCBITaxon:4932",
+      "seqtype": "nucl"
+    },
+    {
+      "description": "S288C reference protein sequences",
+      "md5sum": "e6d93d372db7cbcb4baa1a60c34872e2",
+      "URI": "https://sgd-dev-upload.s3.amazonaws.com/S000314616/YeastORF_pep.fsa.gz",
+      "version": "64-3-1",
+      "genus": "Saccharomyces",
+      "blast_title": "S288C reference protein sequences",
+      "species": "cerevisiae",
+      "taxon_id": "NCBITaxon:4932",
+      "seqtype": "prot"
+    },
+    {
+      "description": "S288C reference ORF genomic sequences",
+      "md5sum": "caefaae9e16955edfb11846af4a3c777",
+      "URI": "https://sgd-dev-upload.s3.amazonaws.com/S000314617/YeastORF-Genomic.fsa.gz",
+      "version": "64-3-1",
+      "genus": "Saccharomyces",
+      "blast_title": "S288C reference ORF genomic sequences",
+      "species": "cerevisiae",
+      "taxon_id": "NCBITaxon:4932",
+      "seqtype": "nucl"
+    },
+    {
+      "description": "S288C reference ORF genomic sequences +/- 1kb",
+      "md5sum": "ca96590099865dbf2455cf7b81660477",
+      "URI": "https://sgd-dev-upload.s3.amazonaws.com/S000314618/YeastORF-Genomic-1K.fsa.gz",
+      "version": "64-3-1",
+      "genus": "Saccharomyces",
+      "blast_title": "S288C reference ORF genomic sequences +/- 1kb",
+      "species": "cerevisiae",
+      "taxon_id": "NCBITaxon:4932",
+      "seqtype": "nucl"
+    },
+    {
+      "description": "S288C reference RNA genomic sequences",
+      "md5sum": "43cd5654e663dc3510104c76d701816c",
+      "URI": "https://sgd-dev-upload.s3.amazonaws.com/S000314619/YeastRNA-genomic.fsa.gz",
+      "version": "64-3-1",
+      "genus": "Saccharomyces",
+      "blast_title": "S288C reference RNA genomic sequences",
+      "species": "cerevisiae",
+      "taxon_id": "NCBITaxon:4932",
+      "seqtype": "nucl"
+    },
+    {
+      "description": "S288C reference RNA coding sequences",
+      "md5sum": "7b741fd2caa25837cd6ac8dafcde6493",
+      "URI": "https://sgd-dev-upload.s3.amazonaws.com/S000314620/YeastRNA-coding.fsa.gz",
+      "version": "64-3-1",
+      "genus": "Saccharomyces",
+      "blast_title": "S288C reference RNA coding sequences",
+      "species": "cerevisiae",
+      "taxon_id": "NCBITaxon:4932",
+      "seqtype": "nucl"
+    },
+    {
+      "description": "S288C reference RNA genomic sequences +/- 1kb",
+      "md5sum": "7ee2865f652cb788aff69904dddbf164",
+      "URI": "https://sgd-dev-upload.s3.amazonaws.com/S000314621/YeastRNA-genomic-1K.fsa.gz",
+      "version": "64-3-1",
+      "genus": "Saccharomyces",
+      "blast_title": "S288C reference RNA genomic sequences +/- 1kb",
+      "species": "cerevisiae",
+      "taxon_id": "NCBITaxon:4932",
+      "seqtype": "nucl"
+    },
+    {
+      "description": "S288C reference non-genic sequences (intergenic regions)",
+      "md5sum": "1306ffc81386b37004ca37c24bd2fc56",
+      "URI": "https://sgd-dev-upload.s3.amazonaws.com/S000314622/NotFeature.fsa.gz",
+      "version": "64-3-1",
+      "genus": "Saccharomyces",
+      "blast_title": "S288C reference non-genic sequences (intergenic regions)",
+      "species": "cerevisiae",
+      "taxon_id": "NCBITaxon:4932",
+      "seqtype": "nucl"
+    }
+  ]
+}
