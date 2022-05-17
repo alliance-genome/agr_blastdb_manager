@@ -539,7 +539,7 @@ python-versions = ">=3.6"
 
 [[package]]
 name = "snakemake"
-version = "7.6.2"
+version = "7.7.0"
 description = "Snakemake is a workflow management system that aims to reduce the complexity of creating workflows by providing a fast and comfortable execution environment, together with a clean and modern specification language in python style. Snakemake workflows are essentially Python scripts extended by declarative code to define rules. Rules describe how to create output files from input files."
 category = "main"
 optional = false
@@ -1151,7 +1151,7 @@ smmap = [
     {file = "smmap-5.0.0.tar.gz", hash = "sha256:c840e62059cd3be204b0c9c9f74be2c09d5648eddd4580d9314c3ecde0b30936"},
 ]
 snakemake = [
-    {file = "snakemake-7.6.2.tar.gz", hash = "sha256:80cb2d0ab0a2366010a1c0b288a90159cd640f942ae86e740021c15c9989f872"},
+    {file = "snakemake-7.7.0.tar.gz", hash = "sha256:1f9389b77b34ae16634c4fc91d07f9e593c99ab80ec30c4297e1c22ad00ff785"},
 ]
 stopit = [
     {file = "stopit-1.1.2.tar.gz", hash = "sha256:f7f39c583fd92027bd9d06127b259aee7a5b7945c1f1fa56263811e1e766996d"},
