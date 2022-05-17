@@ -62,7 +62,7 @@ class AGRBlastMetadata(BaseModel):
     contact: EmailStr
     dataProvider: str
     release: str
-    dateProduced: datetime = datetime.now()
+    dateProduced: str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S%z")
 
 
 class AGRBlastDatabases(BaseModel):
