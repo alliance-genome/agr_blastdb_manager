@@ -21,24 +21,8 @@ def write_db_metadata_files(mod: str, json_file: str, db_meta_dir: Path) -> list
     """
     try:
         mod_blast_metadata: AGRBlastDatabases = AGRBlastDatabases.parse_file(json_file)
-    except JSONDecodeError as jde:
-        print(
-            f"Error while decoding AGR BLAST metadata from JSON: {json_file}\n{jde}",
-            file=sys.stderr,
-        )
-    except FileNotFoundError as fnf:
-        print(
-            f"Couldn't open database metadata file: {json_file}\n{fnf}", file=sys.stderr
-        )
-    except IOError as io:
-        print(
-            f"IO Error while reading database metadata file: {json_file}\n{io}",
-            file=sys.stderr,
-        )
-
-    metadata_files: list[Path] = []
-    for db in mod_blast_metadata.data:
-        try:
+        metadata_files: list[Path] = []
+        for db in mod_blast_metadata.data:
             # Set up and create the directory to store the metadata files.
             db_dir = Path(db_meta_dir, mod)
             db_dir.mkdir(parents=True, exist_ok=True)
@@ -53,15 +37,28 @@ def write_db_metadata_files(mod: str, json_file: str, db_meta_dir: Path) -> list
             with metadata_file.open(mode="w", encoding="utf-8") as fp:
                 fp.write(db.json())
                 metadata_files.append(metadata_file)
-        except JSONEncodeError as jee:
-            print(
-                f"Error while encoding JSON file {metadata_file}:\n{jee}",
-                file=sys.stderr,
-            )
 
-        except IOError as ioe:
-            print(f"Error while writing to {metadata_file}: {ioe}")
-    return metadata_files
+        return metadata_files
+
+    except JSONEncodeError as jee:
+        print(
+            f"Error while encoding JSON file {metadata_file}:\n{jee}",
+            file=sys.stderr,
+        )
+    except JSONDecodeError as jde:
+        print(
+            f"Error while decoding AGR BLAST metadata from JSON: {json_file}\n{jde}",
+            file=sys.stderr,
+        )
+    except FileNotFoundError as fnf:
+        print(
+            f"Couldn't open database metadata file: {json_file}\n{fnf}", file=sys.stderr
+        )
+    except IOError as io:
+        print(
+            f"IO Error while reading database metadata file: {json_file}\n{io}",
+            file=sys.stderr,
+        )
 
 
 def extract_fasta_file(uri: str) -> str | None:
@@ -143,6 +140,9 @@ def file_md5_is_valid(fasta_file: Path, checksum: str) -> bool:
     :param checksum: MD5 checksum string.
     :return: boolean indicating if the file validates.
     """
+    md5_hash = hashlib.md5()
     with fasta_file.open(mode="rb") as fh:
-        actual_checksum = hashlib.md5(fh.read()).hexdigest()
-    return actual_checksum == checksum
+        # Read in small chunks to avoid memory overflow with large files.
+        while chunk := fh.read(8192):
+            md5_hash.update(chunk)
+    return md5_hash.hexdigest() == checksum
