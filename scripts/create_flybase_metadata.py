@@ -144,7 +144,7 @@ def create_flybase_metadata(options: argparse.Namespace) -> None:
             blast_metadata.BlastDBMetaData(
                 version=options.dmel_annot,
                 URI=f"ftp://ftp.flybase.org/genomes/Drosophila_melanogaster/dmel_r{options.dmel_annot}_{options.release}/fasta/dmel-all-chromosome-r{options.dmel_annot}.fasta.gz",
-                md5sum="8dd4464e993ffdcf8591719255a4a3d8",  # TODO - Hard coded for now, need to fetch this from the MD5SUM file
+                md5sum="b7bc17acfd655914c68326df8599a9ca",  # TODO - Hard coded for now, need to fetch this from the MD5SUM file
                 genus="Drosophila",
                 species="melanogaster",
                 blast_title=f"D. melanogaster Genome Assembly ({options.dmel_annot})",
@@ -156,7 +156,7 @@ def create_flybase_metadata(options: argparse.Namespace) -> None:
                 version=options.dmel_annot,
                 URI=f"ftp://ftp.flybase.org/genomes/Drosophila_melanogaster/dmel_r{options.dmel_annot}_{options.release}/fasta/dmel-all-translation-r{options.dmel_annot}.fasta.gz",
                 # TODO - Hard coded for now, need to fetch this from the MD5SUM file
-                md5sum="57912149894db436a70e0926c9364998",
+                md5sum="e3f959ab0e1026de56e1bd00490450e5",
                 genus="Drosophila",
                 species="melanogaster",
                 blast_title=f"D. melanogaster Protein Sequences ({options.dmel_annot})",
