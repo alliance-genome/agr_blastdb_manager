@@ -601,28 +601,28 @@
       "version": "GCF_016746245.2_Prin_Dsan_1.1"
     },
     {
-      "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Drosophila_sechellia/latest_assembly_versions/GCF_004382195.1_ASM438219v1/GCF_004382195.1_ASM438219v1_genomic.fna.gz",
+      "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Drosophila_sechellia/latest_assembly_versions/GCF_004382195.2_ASM438219v2/GCF_004382195.2_ASM438219v2_genomic.fna.gz",
       "bioproject": null,
-      "blast_title": "D. sechellia Genome Assembly (GCF_004382195.1_ASM438219v1)",
+      "blast_title": "D. sechellia Genome Assembly (GCF_004382195.2_ASM438219v2)",
       "description": "Drosophila sechellia genome assembly",
       "genus": "Drosophila",
-      "md5sum": "f7054cab097762d6a023e49e02e89bd2",
+      "md5sum": "628628d1b7c23de00b17b122b1df16f4",
       "seqtype": "nucl",
       "species": "sechellia",
       "taxon_id": "NCBITaxon:7238",
-      "version": "GCF_004382195.1_ASM438219v1"
+      "version": "GCF_004382195.2_ASM438219v2"
     },
     {
-      "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Drosophila_sechellia/latest_assembly_versions/GCF_004382195.1_ASM438219v1/GCF_004382195.1_ASM438219v1_protein.faa.gz",
+      "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Drosophila_sechellia/latest_assembly_versions/GCF_004382195.2_ASM438219v2/GCF_004382195.2_ASM438219v2_protein.faa.gz",
       "bioproject": null,
-      "blast_title": "D. sechellia Protein Sequences (GCF_004382195.1_ASM438219v1)",
+      "blast_title": "D. sechellia Protein Sequences (GCF_004382195.2_ASM438219v2)",
       "description": "Drosophila sechellia protein sequences",
       "genus": "Drosophila",
-      "md5sum": "4ec9e1bea767de58117fcc2eb898f5bf",
+      "md5sum": "cdbccc0f7c56e919ce5904afe3e33c0d",
       "seqtype": "prot",
       "species": "sechellia",
       "taxon_id": "NCBITaxon:7238",
-      "version": "GCF_004382195.1_ASM438219v1"
+      "version": "GCF_004382195.2_ASM438219v2"
     },
     {
       "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Drosophila_serrata/latest_assembly_versions/GCF_002093755.1_Dser1.0/GCF_002093755.1_Dser1.0_genomic.fna.gz",
@@ -1129,28 +1129,28 @@
       "version": "GCF_000188095.3_BIMP_2.2"
     },
     {
-      "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Bombus_terrestris/latest_assembly_versions/GCF_000214255.1_Bter_1.0/GCF_000214255.1_Bter_1.0_genomic.fna.gz",
+      "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Bombus_terrestris/latest_assembly_versions/GCF_910591885.1_iyBomTerr1.2/GCF_910591885.1_iyBomTerr1.2_genomic.fna.gz",
       "bioproject": null,
-      "blast_title": "B. terrestris Genome Assembly (GCF_000214255.1_Bter_1.0)",
+      "blast_title": "B. terrestris Genome Assembly (GCF_910591885.1_iyBomTerr1.2)",
       "description": "Bombus terrestris genome assembly",
       "genus": "Bombus",
-      "md5sum": "3b3afc88e3d9b1b65e5512b7784d0470",
+      "md5sum": "980ed8bdecbf5cde7a417108f2cce5b3",
       "seqtype": "nucl",
       "species": "terrestris",
       "taxon_id": "NCBITaxon:30195",
-      "version": "GCF_000214255.1_Bter_1.0"
+      "version": "GCF_910591885.1_iyBomTerr1.2"
     },
     {
-      "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Bombus_terrestris/latest_assembly_versions/GCF_000214255.1_Bter_1.0/GCF_000214255.1_Bter_1.0_protein.faa.gz",
+      "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Bombus_terrestris/latest_assembly_versions/GCF_910591885.1_iyBomTerr1.2/GCF_910591885.1_iyBomTerr1.2_protein.faa.gz",
       "bioproject": null,
-      "blast_title": "B. terrestris Protein Sequences (GCF_000214255.1_Bter_1.0)",
+      "blast_title": "B. terrestris Protein Sequences (GCF_910591885.1_iyBomTerr1.2)",
       "description": "Bombus terrestris protein sequences",
       "genus": "Bombus",
-      "md5sum": "f8b91e36d87e21f3a56b431f84dc2699",
+      "md5sum": "f26598016668b4b2b6312d2589d99315",
       "seqtype": "prot",
       "species": "terrestris",
       "taxon_id": "NCBITaxon:30195",
-      "version": "GCF_000214255.1_Bter_1.0"
+      "version": "GCF_910591885.1_iyBomTerr1.2"
     },
     {
       "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Megachile_rotundata/latest_assembly_versions/GCF_000220905.1_MROT_1.0/GCF_000220905.1_MROT_1.0_genomic.fna.gz",
@@ -1417,35 +1417,35 @@
       "version": "GCF_013339725.1_ASM1333972v1"
     },
     {
-      "URI": "ftp://ftp.flybase.org/genomes/Drosophila_melanogaster/dmel_r6.45_FB2022_02/fasta/dmel-all-chromosome-r6.45.fasta.gz",
+      "URI": "ftp://ftp.flybase.org/genomes/Drosophila_melanogaster/dmel_r6.46_FB2022_03/fasta/dmel-all-chromosome-r6.46.fasta.gz",
       "bioproject": null,
-      "blast_title": "D. melanogaster Genome Assembly (6.45)",
+      "blast_title": "D. melanogaster Genome Assembly (6.46)",
       "description": "Drosophila melanogaster genome assembly",
       "genus": "Drosophila",
-      "md5sum": "8dd4464e993ffdcf8591719255a4a3d8",
+      "md5sum": "b7bc17acfd655914c68326df8599a9ca",
       "seqtype": "nucl",
       "species": "melanogaster",
       "taxon_id": "NCBITaxon:7227",
-      "version": "6.45"
+      "version": "6.46"
     },
     {
-      "URI": "ftp://ftp.flybase.org/genomes/Drosophila_melanogaster/dmel_r6.45_FB2022_02/fasta/dmel-all-translation-r6.45.fasta.gz",
+      "URI": "ftp://ftp.flybase.org/genomes/Drosophila_melanogaster/dmel_r6.46_FB2022_03/fasta/dmel-all-translation-r6.46.fasta.gz",
       "bioproject": null,
-      "blast_title": "D. melanogaster Protein Sequences (6.45)",
+      "blast_title": "D. melanogaster Protein Sequences (6.46)",
       "description": "Drosophila melanogaster protein sequences",
       "genus": "Drosophila",
-      "md5sum": "57912149894db436a70e0926c9364998",
+      "md5sum": "e3f959ab0e1026de56e1bd00490450e5",
       "seqtype": "prot",
       "species": "melanogaster",
       "taxon_id": "NCBITaxon:7227",
-      "version": "6.45"
+      "version": "6.46"
     }
   ],
   "metaData": {
-    "contact": "jogoodma@iu.edu",
+    "contact": "iudev@morgan.harvard.edu",
     "dataProvider": "FlyBase",
-    "dateProduced": "2022-05-13T17:13:46",
-    "release": "FB2022_02"
+    "dateProduced": "2022-06-09T20:29:30",
+    "release": "FB2022_03"
   }
 }
 
