@@ -48,4 +48,15 @@ ls -l data/fasta/* data/blast/*
 
 A Snakemake pipeline for automating the aggregation of model organism datasets and production of BLAST databases.
 
+## How to add a new model organism database
+
+1. Create a new `databases.json` file and place it in `conf/<MOD_NAME>/databases.json`. e.g. `conf/flybase/databases.json`.
+
+See the [./conf/metadata_schema.json](metadata schema file) for full details on the format and other existing files for examples.
+
+2. Add a new entry under `mods` for the new configuration file to `conf/global.yaml`.
+
+This tells Snakemake to process this file.
+
+Follow the instructions under **Getting Started**.
 
