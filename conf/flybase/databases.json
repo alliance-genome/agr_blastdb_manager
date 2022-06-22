@@ -1249,28 +1249,28 @@
       "version": "GCF_003227725.1_Cflo_v7.5"
     },
     {
-      "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Harpegnathos_saltator/latest_assembly_versions/GCF_003227715.1_Hsal_v8.5/GCF_003227715.1_Hsal_v8.5_genomic.fna.gz",
+      "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Harpegnathos_saltator/latest_assembly_versions/GCF_003227715.2_Hsal_v8.6/GCF_003227715.2_Hsal_v8.6_genomic.fna.gz",
       "bioproject": null,
-      "blast_title": "H. saltator Genome Assembly (GCF_003227715.1_Hsal_v8.5)",
+      "blast_title": "H. saltator Genome Assembly (GCF_003227715.2_Hsal_v8.6)",
       "description": "Harpegnathos saltator genome assembly",
       "genus": "Harpegnathos",
-      "md5sum": "efb48881299bb738f13d3fa4dbbc395d",
+      "md5sum": "f6ce2090e4d3a27008152a69dc87393a",
       "seqtype": "nucl",
       "species": "saltator",
       "taxon_id": "NCBITaxon:610380",
-      "version": "GCF_003227715.1_Hsal_v8.5"
+      "version": "GCF_003227715.2_Hsal_v8.6"
     },
     {
-      "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Harpegnathos_saltator/latest_assembly_versions/GCF_003227715.1_Hsal_v8.5/GCF_003227715.1_Hsal_v8.5_protein.faa.gz",
+      "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Harpegnathos_saltator/latest_assembly_versions/GCF_003227715.2_Hsal_v8.6/GCF_003227715.2_Hsal_v8.6_protein.faa.gz",
       "bioproject": null,
-      "blast_title": "H. saltator Protein Sequences (GCF_003227715.1_Hsal_v8.5)",
+      "blast_title": "H. saltator Protein Sequences (GCF_003227715.2_Hsal_v8.6)",
       "description": "Harpegnathos saltator protein sequences",
       "genus": "Harpegnathos",
-      "md5sum": "169752c196a537d04d202a93e609e833",
+      "md5sum": "6a957c87caf7fa66548f48b8b6df6a1e",
       "seqtype": "prot",
       "species": "saltator",
       "taxon_id": "NCBITaxon:610380",
-      "version": "GCF_003227715.1_Hsal_v8.5"
+      "version": "GCF_003227715.2_Hsal_v8.6"
     },
     {
       "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Linepithema_humile/latest_assembly_versions/GCF_000217595.1_Lhum_UMD_V04/GCF_000217595.1_Lhum_UMD_V04_genomic.fna.gz",
@@ -1444,7 +1444,7 @@
   "metaData": {
     "contact": "iudev@morgan.harvard.edu",
     "dataProvider": "FlyBase",
-    "dateProduced": "2022-06-09T20:29:30",
+    "dateProduced": "2022-06-22T12:13:29",
     "release": "FB2022_03"
   }
 }
