@@ -16,7 +16,10 @@ jobs:
           cache: 'poetry'
       - run: poetry install
       - name: Update FlyBase metadata file
-        run: rm ./conf/flybase/databases.json && make conf/flybase/databases.json
+        run: |
+          poetry shell \
+          rm ./conf/flybase/databases.json \
+          make conf/flybase/databases.json
         env:
           FB_EMAIL: ${{ secrets.FB_EMAIL }}
           FB_RELEASE: ${{ secrets.FB_RELEASE }}
