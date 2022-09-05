@@ -17,7 +17,6 @@ jobs:
       - run: poetry install
       - name: Update FlyBase metadata file
         run: |
-          poetry shell && \
           rm ./conf/flybase/databases.json && \
           make conf/flybase/databases.json
         env:
