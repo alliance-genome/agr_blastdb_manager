@@ -1,4 +1,4 @@
-name: flybase-db-update
+name: Update FlyBase database metadata
 on:
   workflow_dispatch:
     inputs:
@@ -12,7 +12,6 @@ on:
       DMEL_RELEASE:
         description: "Dmel annotation release number (e.g. 6.47)"
         required: true
-
 jobs:
   update-flybase:
     runs-on: ubuntu-latest
