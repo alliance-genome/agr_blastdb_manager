@@ -29,15 +29,14 @@ jobs:
           rm ./conf/flybase/databases.json && \
           make conf/flybase/databases.json
         env:
-          FB_EMAIL: ${{ env.INPUT_FB_EMAIL }}
-          FB_RELEASE: ${{ env.INPUT_FB_RELEASE }}
-          DMEL_RELEASE: ${{ env.INPUT_DMEL_RELEASE }}
+          FB_EMAIL: ${{ inputs.FB_EMAIL }}
+          FB_RELEASE: ${{ inputs.FB_RELEASE }}
+          DMEL_RELEASE: ${{ inputs.DMEL_RELEASE }}
       - name: Create PR for DB metadata update
         uses: peter-evans/create-pull-request@v4
         with:
-          title: Update FlyBase DB metadata for ${{ env.INPUT_FB_RELEASE }}
+          title: Update FlyBase DB metadata for ${{ inputs.INPUT_FB_RELEASE }}
           body: Auto-generated PR for FlyBase DB metadata updates.
           add-paths: conf/flybase/databases.json
           branch: flybase-db-update
-
 
