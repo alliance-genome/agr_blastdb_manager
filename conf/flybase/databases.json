@@ -937,6 +937,30 @@
       "version": "GCF_002204515.2_AaegL5.0"
     },
     {
+      "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Anopheles_darlingi/latest_assembly_versions/GCF_943734745.1_idAnoDarlMG_H_01/GCF_943734745.1_idAnoDarlMG_H_01_genomic.fna.gz",
+      "bioproject": null,
+      "blast_title": "A. darlingi Genome Assembly (GCF_943734745.1_idAnoDarlMG_H_01)",
+      "description": "Anopheles darlingi genome assembly",
+      "genus": "Anopheles",
+      "md5sum": "303886de11bee5e8261e78cbcb2a6cd9",
+      "seqtype": "nucl",
+      "species": "darlingi",
+      "taxon_id": "NCBITaxon:43151",
+      "version": "GCF_943734745.1_idAnoDarlMG_H_01"
+    },
+    {
+      "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Anopheles_darlingi/latest_assembly_versions/GCF_943734745.1_idAnoDarlMG_H_01/GCF_943734745.1_idAnoDarlMG_H_01_protein.faa.gz",
+      "bioproject": null,
+      "blast_title": "A. darlingi Protein Sequences (GCF_943734745.1_idAnoDarlMG_H_01)",
+      "description": "Anopheles darlingi protein sequences",
+      "genus": "Anopheles",
+      "md5sum": "1af57d3f3ce58f0876c36d7fcc37cfad",
+      "seqtype": "prot",
+      "species": "darlingi",
+      "taxon_id": "NCBITaxon:43151",
+      "version": "GCF_943734745.1_idAnoDarlMG_H_01"
+    },
+    {
       "URI": "ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/invertebrate/Anopheles_gambiae/latest_assembly_versions/GCF_000005575.2_AgamP3/GCF_000005575.2_AgamP3_genomic.fna.gz",
       "bioproject": null,
       "blast_title": "A. gambiae Genome Assembly (GCF_000005575.2_AgamP3)",
@@ -1417,35 +1441,35 @@
       "version": "GCF_013339725.1_ASM1333972v1"
     },
     {
-      "URI": "ftp://ftp.flybase.org/genomes/Drosophila_melanogaster/dmel_r6.46_FB2022_03/fasta/dmel-all-chromosome-r6.46.fasta.gz",
+      "URI": "ftp://ftp.flybase.org/genomes/Drosophila_melanogaster/dmel_r6.47_FB2022_04/fasta/dmel-all-chromosome-r6.47.fasta.gz",
       "bioproject": null,
-      "blast_title": "D. melanogaster Genome Assembly (6.46)",
+      "blast_title": "D. melanogaster Genome Assembly (6.47)",
       "description": "Drosophila melanogaster genome assembly",
       "genus": "Drosophila",
       "md5sum": "b7bc17acfd655914c68326df8599a9ca",
       "seqtype": "nucl",
       "species": "melanogaster",
       "taxon_id": "NCBITaxon:7227",
-      "version": "6.46"
+      "version": "6.47"
     },
     {
-      "URI": "ftp://ftp.flybase.org/genomes/Drosophila_melanogaster/dmel_r6.46_FB2022_03/fasta/dmel-all-translation-r6.46.fasta.gz",
+      "URI": "ftp://ftp.flybase.org/genomes/Drosophila_melanogaster/dmel_r6.47_FB2022_04/fasta/dmel-all-translation-r6.47.fasta.gz",
       "bioproject": null,
-      "blast_title": "D. melanogaster Protein Sequences (6.46)",
+      "blast_title": "D. melanogaster Protein Sequences (6.47)",
       "description": "Drosophila melanogaster protein sequences",
       "genus": "Drosophila",
       "md5sum": "e3f959ab0e1026de56e1bd00490450e5",
       "seqtype": "prot",
       "species": "melanogaster",
       "taxon_id": "NCBITaxon:7227",
-      "version": "6.46"
+      "version": "6.47"
     }
   ],
   "metaData": {
     "contact": "iudev@morgan.harvard.edu",
     "dataProvider": "FlyBase",
-    "dateProduced": "2022-06-22T12:13:29",
-    "release": "FB2022_03"
+    "dateProduced": "2022-09-05T20:39:41",
+    "release": "FB2022_04"
   }
 }
 
