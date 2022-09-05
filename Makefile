@@ -19,7 +19,7 @@ conf/metadata_schema.json:
 	snakemake -c1 -f $@
 
 conf/flybase/databases.json:
-	python3 ./scripts/create_flybase_metadata.py --email $(FB_EMAIL) --release $(FB_RELEASE) --dmel-annot $(DMEL_RELEASE) > $@
+	poetry run ./scripts/create_flybase_metadata.py --email $(FB_EMAIL) --release $(FB_RELEASE) --dmel-annot $(DMEL_RELEASE) > $@
 
 conf/wormbase/databases.json:
 	wget ftp://ftp.ebi.ac.uk/pub/databases/wormbase/misc_datasets/AGR/blast_meta.wormbase.json -q -O - | jq '.' > $@
