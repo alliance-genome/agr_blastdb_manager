@@ -1,5 +1,8 @@
 name: flybase-metadata-update
-on: workflow_dispatch
+on:
+  push:
+    branches: ["flybase-gh-actions"]
+  workflow_dispatch:
 jobs:
   update-flybase:
     runs-on: ubuntu-latest
