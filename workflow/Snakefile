@@ -1,13 +1,14 @@
-from pathlib import Path
 import agr_blastdb_manager.agr.snakemake as agr_sm
+from agr_blastdb_manager.agr.utils import get_blast_files
+from pathlib import Path
 
-
-configfile: "conf/global.yaml"
+configfile: "/conf/global.yaml"
 
 DATA_DIR = Path(config.get("DATA_DIR", 'data'))
 # Use user specified directories or default to subdirectories of the data directory.
 FASTA_DIR = config.get("FASTA_DIR", Path(DATA_DIR,"fasta"))
 BLASTDB_DIR = config.get("BLASTDB_DIR", Path(DATA_DIR,"blast"))
+
 META_DIR = config.get("META_DIR", Path(DATA_DIR,"meta"))
 
 # Path to NCBI makeblastdb binary
@@ -16,25 +17,9 @@ MAKEBLASTDB_BIN = config.get("MAKEBLASTDB_BIN", Path("/usr","local","ncbi","blas
 # Build the list of BLAST indices that we are expecting from the pipeline.
 # This is used as the starting point for our pipeline. Snakemake uses this to
 # build a list of dependent rules (DAG) that need to be executed to produce them.
-blast_files = []
-# Loop over each MOD defined in conf/global.yaml.
-for mod, mod_json in config["mods"].items():
-        blast_files.append(
-            # Using the list of metadata files, returns a list of expected BLAST database files.
-            agr_sm.expected_blast_files(
-                # Reads the MOD metadata file and writes the individual database metadata
-                # to its own file that is used throughout the pipeline.
-                # Returns a list of files written.
-                db_files=agr_sm.write_db_metadata_files(
-                    mod=mod,
-                    json_file=mod_json,
-                    db_meta_dir=META_DIR
-                ),
-            mod=mod,
-            base_dir=BLASTDB_DIR
-            )
-        )
+blast_files = get_blast_files(config, META_DIR, BLASTDB_DIR)
 
+print(blast_files)
 
 #=========================================================
 # Global wildcard regex patterns.
@@ -58,19 +43,19 @@ rule all:
 # from the metadata validates the file that was mirrored.
 #============================================================================
 rule makeblastdb:
-    output: touch(Path(BLASTDB_DIR,"{mod}", "{genus}", "{org}", "{fasta}.done"))
+    output: touch(Path(BLASTDB_DIR, "{data_provider}", "{environment}", "{genus}", "{org}", "{fasta}.done"))
     input:
-        fa=lambda wildcards: Path(FASTA_DIR, wildcards.mod, wildcards.genus, wildcards.org, wildcards.fasta),
-        md5=lambda wildcards: Path(FASTA_DIR, wildcards.mod, wildcards.genus, wildcards.org, wildcards.fasta + '.md5_validated')
+        fa=lambda wildcards: Path(FASTA_DIR, wildcards.data_provider, wildcards.environment, wildcards.genus, wildcards.org, wildcards.fasta),
+        md5=lambda wildcards: Path(FASTA_DIR, wildcards.data_provider, wildcards.environment, wildcards.genus, wildcards.org, wildcards.fasta + '.md5_validated')
     params:
         # Fetch the database metadata object from the JSON file.
-        db_info=lambda wildcards: agr_sm.get_blastdb_obj(meta_dir=META_DIR, fasta=wildcards.fasta, mod=wildcards.mod),
+        db_info=lambda wildcards: agr_sm.get_blastdb_obj(meta_dir=META_DIR, fasta=wildcards.fasta, data_provider=wildcards.data_provider, environment=wildcards.environment),
         # Strip Taxon DB prefix.
-        taxid=lambda wildcards: agr_sm.get_blastdb_obj(meta_dir=META_DIR, fasta=wildcards.fasta, mod=wildcards.mod).taxon_id.replace('NCBITaxon:',''),
+        taxid=lambda wildcards: agr_sm.get_blastdb_obj(meta_dir=META_DIR, fasta=wildcards.fasta, data_provider=wildcards.data_provider, environment=wildcards.environment).taxon_id.replace('NCBITaxon:',''),
         # Strip the '.gz.done' from the output name
         # TODO - This will fail with certain variations of filename extensions.
         out=lambda wildcards, output: Path(output[0]).with_suffix('').with_suffix('')
-    log: "logs/makeblastdb_{mod}_{genus}_{org}_{fasta}.log"
+    log: "logs/makeblastdb_{data_provider}_{environment}_{genus}_{org}_{fasta}.log"
     shell:
         # Create the BLAST DB directory and then pipe the FASTA file into makeblastdb.
         """
@@ -85,10 +70,10 @@ rule makeblastdb:
 # database metadata. If it does not, an
 #============================================================================
 rule validate_fasta_md5:
-    output: touch(Path(FASTA_DIR, "{mod}", "{genus}", "{org}", "{fasta}.md5_validated"))
-    input: lambda wildcards: Path(FASTA_DIR, wildcards.mod, wildcards.genus, wildcards.org, wildcards.fasta)
+    output: touch(Path(FASTA_DIR, "{data_provider}", "{environment}", "{genus}", "{org}", "{fasta}.md5_validated"))
+    input: lambda wildcards: Path(FASTA_DIR, wildcards.data_provider, wildcards.environment, wildcards.genus, wildcards.org, wildcards.fasta)
     params:
-        db_info=lambda wildcards: agr_sm.get_blastdb_obj(meta_dir=META_DIR, fasta=wildcards.fasta, mod=wildcards.mod),
+        db_info=lambda wildcards: agr_sm.get_blastdb_obj(meta_dir=META_DIR, fasta=wildcards.fasta, data_provider=wildcards.data_provider, environment=wildcards.environment),
     run:
         is_valid = agr_sm.file_md5_is_valid(fasta_file=Path(input[0]), checksum=params.db_info.md5sum)
         if not is_valid:
@@ -99,13 +84,13 @@ rule validate_fasta_md5:
 # Retrieves the FASTA file from the remote source defined in the metadata file.
 #==============================================================================
 rule retrieve_fasta:
-    output: Path(FASTA_DIR, "{mod}", "{genus}", "{org}", "{fasta}")
+    output: Path(FASTA_DIR, "{data_provider}", "{environment}", "{genus}", "{org}", "{fasta}")
     params:
-        dir_prefix=lambda wildcards: Path(FASTA_DIR, wildcards.mod, wildcards.genus, wildcards.org),
-        db_info=lambda wildcards: agr_sm.get_blastdb_obj(meta_dir=META_DIR, fasta=wildcards.fasta, mod=wildcards.mod)
-    log: "logs/wget_{mod}_{genus}_{org}_{fasta}.log"
+        dir_prefix=lambda wildcards: Path(FASTA_DIR, wildcards.data_provider, wildcards.environment, wildcards.genus, wildcards.org),
+        db_info=lambda wildcards: agr_sm.get_blastdb_obj(meta_dir=META_DIR, fasta=wildcards.fasta, data_provider=wildcards.data_provider, environment=wildcards.environment)
+    log: "logs/wget_{data_provider}_{environment}_{genus}_{org}_{fasta}.log"
     run:
-        shell("wget -c --tries 3 --timestamping {params.db_info.URI} --directory-prefix {params.dir_prefix} -o {log}")
+        shell("wget -c --tries 3 --timestamping {params.db_info.uri} --directory-prefix {params.dir_prefix} -o {log}")
 
 
 
