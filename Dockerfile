@@ -1,11 +1,11 @@
 # Stage 1 - Poetry build process to build the wheel install file.
 FROM python:3.10 AS builder
-WORKDIR /app
+WORKDIR /workflow
 
 # Files required for the python package.
-COPY pyproject.toml poetry.lock README.md LICENSE /app/
-COPY agr_blastdb_manager /app/agr_blastdb_manager
-COPY scripts /app/scripts
+COPY pyproject.toml poetry.lock README.md LICENSE /workflow/
+COPY workflow/agr_blastdb_manager /workflow/agr_blastdb_manager
+COPY scripts /workflow/scripts
 
 # Setup poetry and run the build.
 RUN pip install -U pip wheel && \
@@ -29,24 +29,24 @@ RUN wget --quiet $BLAST_URI && \
     tar zxf $BLAST_TARBALL && \
     mv ncbi-blast-${BLAST_VERSION}+/* ./
 
-WORKDIR /app
+WORKDIR /workflow
 
 # Copy python wheel install file into the agr_blastdb_manager image.
-COPY --from=builder    /app/dist /app/dist/
+COPY --from=builder    /workflow/dist /workflow/dist/
 
 # Add BLAST binaries to PATH.
 ENV PATH=/blast/bin:${PATH}
 
 # Copy Snakemake pipeline files.
-COPY Snakefile ./
-COPY conf/ ./conf/
+#COPY Snakefile ./
+#COPY conf/ ./conf/
 
 # Install the wheel package.
 RUN pip install -U pip wheel && \
     pip install --no-cache-dir ./dist/*.whl && \
     mkdir logs .snakemake
 
-VOLUME ["/app/data", "/app/logs", "/app/.snakemake", "/.cache"]
+VOLUME ["/workflow/data", "/workflow/logs", "/workflow/.snakemake", "/.cache"]
 
 ENTRYPOINT [ "snakemake", "--config", "MAKEBLASTDB_BIN=/blast/bin/makeblastdb" ]
 CMD [ "-c1" ]
