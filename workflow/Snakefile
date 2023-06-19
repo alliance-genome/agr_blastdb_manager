@@ -19,7 +19,6 @@ MAKEBLASTDB_BIN = config.get("MAKEBLASTDB_BIN", Path("/usr","local","ncbi","blas
 # build a list of dependent rules (DAG) that need to be executed to produce them.
 blast_files = get_blast_files(config, META_DIR, BLASTDB_DIR)
 
-print(blast_files)
 
 #=========================================================
 # Global wildcard regex patterns.
