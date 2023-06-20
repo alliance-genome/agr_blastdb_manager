@@ -1,6 +1,8 @@
 import hashlib
 from pathlib import Path
+
 import agr_blastdb_manager.agr.snakemake as agr_sm
+
 
 def get_md5sum_hash(file_path):
     with open(file_path, "rb") as f:
@@ -9,6 +11,7 @@ def get_md5sum_hash(file_path):
             file_hash.update(chunk)
 
     return file_hash.hexdigest()
+
 
 def get_blast_files(config, meta_dir, blastdb_dir):
     # Build the list of BLAST indices that we are expecting from the pipeline.
@@ -43,9 +46,9 @@ def get_blast_files(config, meta_dir, blastdb_dir):
                     # to its own file that is used throughout the pipeline.
                     # Returns a list of files written.
                     db_files=agr_sm.write_db_metadata_files(
-                        data_provider=data_provider_name,
-                        environment=environment,
-                        json_file=config_path,
+                            data_provider=data_provider_name,
+                            environment=environment,
+                            json_file=config_path,
                             db_meta_dir=meta_dir
                         ),
                     data_provider=data_provider_name,

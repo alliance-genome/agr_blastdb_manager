@@ -1,10 +1,9 @@
-import sys
 import hashlib
+import sys
 from pathlib import Path
 
-from orjson import JSONEncodeError, JSONDecodeError
-
 from agr_blastdb_manager.agr.metadata import AGRBlastDatabases, BlastDBMetaData
+from orjson import JSONDecodeError, JSONEncodeError
 
 
 def write_db_metadata_files(data_provider: str, environment: str, json_file: str, db_meta_dir: Path) -> list[Path]:
@@ -68,7 +67,7 @@ def extract_fasta_file(uri: str) -> str | None:
     :param uri:  The URI string to process.
     :return: Returns any characters after the last character or None if no slash is present.
     """
-    return uri[uri.rindex("/") + 1 :] if "/" in uri else None
+    return uri[uri.rindex("/") + 1:] if "/" in uri else None
 
 
 def read_db_json(db_file: Path | str) -> BlastDBMetaData | None:

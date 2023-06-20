@@ -1,8 +1,11 @@
 from datetime import datetime
 from enum import Enum
-from typing import List, Any
+from typing import Any, List
+
 import orjson
-from pydantic import BaseModel as PydanticBaseModel, EmailStr, AnyUrl
+from pydantic import AnyUrl
+from pydantic import BaseModel as PydanticBaseModel
+from pydantic import EmailStr
 
 
 class BaseModel(PydanticBaseModel):
