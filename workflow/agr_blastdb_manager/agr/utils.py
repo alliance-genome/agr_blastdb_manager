@@ -5,6 +5,10 @@ import agr_blastdb_manager.agr.snakemake as agr_sm
 
 
 def get_md5sum_hash(file_path):
+    """"
+    Get the md5sum hash of a file
+    """
+
     with open(file_path, "rb") as f:
         file_hash = hashlib.md5()
         while chunk := f.read(8192):
@@ -13,10 +17,15 @@ def get_md5sum_hash(file_path):
     return file_hash.hexdigest()
 
 
-def get_blast_files(config, meta_dir, blastdb_dir):
-    # Build the list of BLAST indices that we are expecting from the pipeline.
-    # This is used as the starting point for our pipeline. Snakemake uses this to
-    # build a list of dependent rules (DAG) that need to be executed to produce them.
+def get_blast_files(config, meta_dir, blastdb_dir) -> list[Path]
+    """
+    Given a list of BLAST database metadata files, returns a list of '.done' files in the BLAST database
+
+    Build the list of BLAST indices that we are expecting from the pipeline.
+    This is used as the starting point for our pipeline. Snakemake uses this to
+    build a list of dependent rules (DAG) that need to be executed to produce them.
+    """
+
     blast_files = []
     print("Get blast files")
     print(config)
@@ -24,11 +33,11 @@ def get_blast_files(config, meta_dir, blastdb_dir):
     for data_provider in config["data_providers"]:
         data_provider_name = data_provider["name"]
         for environment in data_provider["environments"]:
-            filename = "databases." + data_provider_name + "." + environment + ".json"
+            filename = f"databases.{data_provider_name}.{environment}.json"
             config_path = Path("/conf", data_provider_name, filename)
             config_md5_path = Path("/conf", data_provider_name, filename + ".md5")
             if not config_path.exists():
-                print("config does not exist: " + config_path)
+                print(f"config does not exist: {config_path}")
                 print("Will not process")
 
             if config_md5_path.exists():
@@ -36,7 +45,7 @@ def get_blast_files(config, meta_dir, blastdb_dir):
                     md5contents = f.readline().strip()
                 config_md5sum = get_md5sum_hash(config_path)
                 if config_md5sum == md5contents:
-                    print("skipping:" + config_path)
+                    print(f"skipping: {config_path}")
                     continue
 
             blast_files.append(
@@ -46,14 +55,14 @@ def get_blast_files(config, meta_dir, blastdb_dir):
                     # to its own file that is used throughout the pipeline.
                     # Returns a list of files written.
                     db_files=agr_sm.write_db_metadata_files(
-                            data_provider=data_provider_name,
-                            environment=environment,
-                            json_file=config_path,
-                            db_meta_dir=meta_dir
-                        ),
+                        data_provider=data_provider_name,
+                        environment=environment,
+                        json_file=config_path,
+                        db_meta_dir=meta_dir,
+                    ),
                     data_provider=data_provider_name,
                     environment=environment,
-                    base_dir=blastdb_dir
+                    base_dir=blastdb_dir,
                 )
             )
 
