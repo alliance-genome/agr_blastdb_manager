@@ -6,7 +6,9 @@ from agr_blastdb_manager.agr.metadata import AGRBlastDatabases, BlastDBMetaData
 from orjson import JSONDecodeError, JSONEncodeError
 
 
-def write_db_metadata_files(data_provider: str, environment: str, json_file: str, db_meta_dir: Path) -> list[Path]:
+def write_db_metadata_files(
+    data_provider: str, environment: str, json_file: str, db_meta_dir: Path
+) -> list[Path]:
     """
     Parses a database metadata file with many databases into individual JSON files
     that are used as targets for snakemake to process.
@@ -67,7 +69,7 @@ def extract_fasta_file(uri: str) -> str | None:
     :param uri:  The URI string to process.
     :return: Returns any characters after the last character or None if no slash is present.
     """
-    return uri[uri.rindex("/") + 1:] if "/" in uri else None
+    return uri[uri.rindex("/") + 1 :] if "/" in uri else None
 
 
 def read_db_json(db_file: Path | str) -> BlastDBMetaData | None:
@@ -77,6 +79,7 @@ def read_db_json(db_file: Path | str) -> BlastDBMetaData | None:
     :param db_file:  Database metadata file.
     :return:  The metadata object or None
     """
+
     try:
         db_info: BlastDBMetaData = BlastDBMetaData.parse_file(db_file)
         return db_info
@@ -89,7 +92,9 @@ def read_db_json(db_file: Path | str) -> BlastDBMetaData | None:
     return None
 
 
-def expected_blast_files(db_files: list[Path], base_dir: Path, data_provider: str, environment: str) -> list[Path]:
+def expected_blast_files(
+    db_files: list[Path], base_dir: Path, data_provider: str, environment: str
+) -> list[Path]:
     """
     Given a list of BLAST database metadata files, returns a list of '.done' files in the BLAST database
     location that is expected based on the MOD and metadata.
@@ -99,10 +104,11 @@ def expected_blast_files(db_files: list[Path], base_dir: Path, data_provider: st
     :param data_provider: The model organism database being processed.
     :return: List of paths for the BLAST database '.done' files.
     """
+
     blast_files = []
     for db_file in db_files:
         db_info = read_db_json(db_file)
-        fasta = Path(extract_fasta_file(db_info.uri) + ".done")
+        fasta = Path(f"{extract_fasta_file(db_info.uri)}.done")
         blast_files.append(
             Path(
                 base_dir,
@@ -117,7 +123,9 @@ def expected_blast_files(db_files: list[Path], base_dir: Path, data_provider: st
     return blast_files
 
 
-def get_blastdb_obj(meta_dir: Path, fasta: str, data_provider: str, environment: str) -> BlastDBMetaData:
+def get_blastdb_obj(
+    meta_dir: Path, fasta: str, data_provider: str, environment: str
+) -> BlastDBMetaData:
     """
     Constructs the proper path for the BLAST database metadata file, loads the JSON, and
     returns the metadata object.
@@ -127,7 +135,10 @@ def get_blastdb_obj(meta_dir: Path, fasta: str, data_provider: str, environment:
     :param data_provider: The model organism database being processed.
     :return: The BLAST database metadata object.
     """
-    return read_db_json(Path(meta_dir, data_provider, environment, fasta).with_suffix(".json"))
+
+    return read_db_json(
+        Path(meta_dir, data_provider, environment, fasta).with_suffix(".json")
+    )
 
 
 def file_md5_is_valid(fasta_file: Path, checksum: str) -> bool:
