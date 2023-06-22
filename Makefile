@@ -8,7 +8,7 @@ NUM_CORES   := 2
 CURRENT_UID := $(shell id -u)
 CURRENT_GID := $(shell id -g)
 CURRENT_DIR := $(shell pwd)
-
+CONFIG_DIR := $(shell pwd)/../agr_blast_configuration/conf
 DIST_DIR    := dist
 DATA_DIR    := data
 
@@ -48,9 +48,15 @@ docker-buildx:
 	docker buildx build --platform linux/arm64,linux/amd64 --tag $(DOCKER_TAG):$(VERSION) --tag $(DOCKER_TAG):latest .
 
 docker-run:
-	docker run --user $(CURRENT_UID):$(CURRENT_GID) --rm -it -v $(CURRENT_DIR)/data:/app/data \
-               -v $(CURRENT_DIR)/logs:/app/logs -v $(CURRENT_DIR)/.snakemake:/app/.snakemake \
-               -v $(CURRENT_DIR)/.cache:/.cache $(DOCKER_TAG):$(VERSION)
+	docker run --user $(CURRENT_UID):$(CURRENT_GID) --rm -it \
+               -v $(CURRENT_DIR)/data:/workflow/data \
+               -v $(CURRENT_DIR)/logs:/workflow/logs \
+	       -v $(CURRENT_DIR)/.snakemake:/workflow/.snakemake \
+               -v $(CURRENT_DIR)/.cache:/.cache \
+	       -v $(CURRENT_DIR)/workflow/:/workflow/ \
+	       -v $(CONFIG_DIR):/conf \
+               $(DOCKER_TAG):$(VERSION) \
+
 
 build: $(DIST_DIR)/%.whl
 
