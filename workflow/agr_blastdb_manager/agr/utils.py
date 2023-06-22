@@ -17,7 +17,7 @@ def get_md5sum_hash(file_path):
     return file_hash.hexdigest()
 
 
-def get_blast_files(config, meta_dir, blastdb_dir) -> list[Path]
+def get_blast_files(config, meta_dir, blastdb_dir) -> list[Path]:
     """
     Given a list of BLAST database metadata files, returns a list of '.done' files in the BLAST database
 
