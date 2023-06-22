@@ -1,9 +1,11 @@
 from datetime import datetime
 from enum import Enum
-from typing import List
+from typing import Any, List
 
 import orjson
-from pydantic import BaseModel as PydanticBaseModel, EmailStr, AnyUrl
+from pydantic import AnyUrl
+from pydantic import BaseModel as PydanticBaseModel
+from pydantic import EmailStr
 
 
 class BaseModel(PydanticBaseModel):
@@ -42,7 +44,7 @@ class BlastDBMetaData(BaseModel):
     BLAST database metadata.
     """
 
-    URI: AnyUrl
+    uri: AnyUrl
     blast_title: str
     description: str
     genus: str
@@ -52,6 +54,7 @@ class BlastDBMetaData(BaseModel):
     version: str
     bioproject: str = None
     seqtype: BlastDBType = BlastDBType.nucl
+    genome_browser: Any = None
 
 
 class AGRBlastMetadata(BaseModel):
@@ -70,8 +73,8 @@ class AGRBlastDatabases(BaseModel):
     Alliance BLAST databases metadata file.
 
     :param data - List of BlastDBMetaData  objects
-    :param metaData - Global metadata section.
+    :param metadata - Global metadata section.
     """
 
     data: List[BlastDBMetaData]
-    metaData: AGRBlastMetadata
+    metadata: AGRBlastMetadata

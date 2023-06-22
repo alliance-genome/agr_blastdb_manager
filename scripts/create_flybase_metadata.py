@@ -168,7 +168,7 @@ def create_flybase_metadata(options: argparse.Namespace) -> None:
     )
 
     flybase_blast_metadata = blast_metadata.AGRBlastDatabases(
-        metaData=blast_metadata.AGRBlastMetadata(
+        metadata=blast_metadata.AGRBlastMetadata(
             contact=options.email, dataProvider="FlyBase", release=options.release
         ),
         data=dbs,
