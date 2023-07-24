@@ -48,5 +48,4 @@ RUN pip install -U pip wheel && \
 
 VOLUME ["/workflow/data", "/workflow/logs", "/workflow/.snakemake", "/.cache"]
 
-ENTRYPOINT [ "snakemake", "--config", "MAKEBLASTDB_BIN=/blast/bin/makeblastdb" ]
-CMD [ "-c1" ]
+ENTRYPOINT ["python", "blast_pipeline.py"]

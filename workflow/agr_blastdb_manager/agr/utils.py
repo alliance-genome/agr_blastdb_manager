@@ -1,4 +1,5 @@
 import hashlib
+from shutil import copyfile
 from pathlib import Path
 
 import agr_blastdb_manager.agr.snakemake as agr_sm
@@ -27,9 +28,6 @@ def get_blast_files(config, meta_dir, blastdb_dir) -> list[Path]:
     """
 
     blast_files = []
-    print("Get blast files")
-    print(config)
-    # Loop over each MOD defined in conf/global.yaml.
     for data_provider in config["data_providers"]:
         data_provider_name = data_provider["name"]
         for environment in data_provider["environments"]:
@@ -67,3 +65,45 @@ def get_blast_files(config, meta_dir, blastdb_dir) -> list[Path]:
             )
 
     return blast_files
+
+def copy_config_files_to_data_dir(config, blastdb_dir):
+    for data_provider in config["data_providers"]:
+        data_provider_name = data_provider["name"]
+        for environment in data_provider["environments"]:
+            filename = f"databases.{data_provider_name}.{environment}.json"
+            config_path = Path("/conf", data_provider_name, filename)
+            config_md5_path = Path("/conf", data_provider_name, filename + ".md5")
+            if not config_path.exists():
+                continue
+
+            if config_md5_path.exists():
+                with open(config_md5_path) as f:
+                    md5contents = f.readline().strip()
+                config_md5sum = get_md5sum_hash(config_path)
+                if config_md5sum == md5contents:
+                    continue
+
+            data_config_path = Path("data", "blast", data_provider_name, environment, "config")
+            data_config_path.mkdir(parents=True, exist_ok=True)
+            copyfile(config_path, f"{data_config_path}/environment.json")
+
+
+def add_md5_config_files(config):
+    for data_provider in config["data_providers"]:
+        data_provider_name = data_provider["name"]
+        for environment in data_provider["environments"]:
+            filename = f"databases.{data_provider_name}.{environment}.json"
+            config_path = Path("/conf", data_provider_name, filename)
+            config_md5_path = Path("/conf", data_provider_name, filename + ".md5")
+            if not config_path.exists():
+                continue
+
+            config_md5sum = get_md5sum_hash(config_path)
+
+            if config_md5_path.exists() and config_md5sum == open(config_md5_path).read().strip():
+                continue
+
+            with open(config_md5_path, "w") as config_fh:
+                config_fh.write(config_md5sum)
+
+

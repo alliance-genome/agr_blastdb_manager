@@ -1,8 +1,13 @@
 import agr_blastdb_manager.agr.snakemake as agr_sm
 from agr_blastdb_manager.agr.utils import get_blast_files
+from agr_blastdb_manager.agr.utils import copy_config_files_to_data_dir
+from agr_blastdb_manager.agr.utils import add_md5_config_files
+
 from pathlib import Path
 
 configfile: "/conf/global.yaml"
+
+print("starting pipeline")
 
 DATA_DIR = Path(config.get("DATA_DIR", 'data'))
 # Use user specified directories or default to subdirectories of the data directory.
@@ -18,7 +23,7 @@ MAKEBLASTDB_BIN = config.get("MAKEBLASTDB_BIN", Path("/usr","local","ncbi","blas
 # This is used as the starting point for our pipeline. Snakemake uses this to
 # build a list of dependent rules (DAG) that need to be executed to produce them.
 blast_files = get_blast_files(config, META_DIR, BLASTDB_DIR)
-
+copy_config_files_to_data_dir(config, BLASTDB_DIR)
 
 #=========================================================
 # Global wildcard regex patterns.
@@ -26,9 +31,12 @@ blast_files = get_blast_files(config, META_DIR, BLASTDB_DIR)
 wildcard_constraints:
     genus="[A-Za-z]+",
     species="[A-Za-z_]+",
+    category="[A-Za-z_\-\ ]+",
     org="[A-Za-z]+_[A-Za-z_]+",
     fasta="[\w\._\-]+(\.gz|\.bz2|\.fasta|\.fa|\.f[na]a)"
 
+print("blast_files")
+print(blast_files)
 
 #=========================================================
 # Start of pipeline.
@@ -42,7 +50,10 @@ rule all:
 # from the metadata validates the file that was mirrored.
 #============================================================================
 rule makeblastdb:
-    output: touch(Path(BLASTDB_DIR, "{data_provider}", "{environment}", "databases", "{genus}", "{org}", "{fasta}.done"))
+    output: if wildcards.category:
+               touch(Path(BLASTDB_DIR, "{data_provider}", "{environment}", "databases", "{category}", "{fasta}.done"))
+            else:
+               touch(Path(BLASTDB_DIR, "{data_provider}", "{environment}", "databases", "{genus}", "{org}", "{fasta}.done"))
     input:
         fa=lambda wildcards: Path(FASTA_DIR, wildcards.data_provider, wildcards.environment, wildcards.genus, wildcards.org, wildcards.fasta),
         md5=lambda wildcards: Path(FASTA_DIR, wildcards.data_provider, wildcards.environment, wildcards.genus, wildcards.org, wildcards.fasta + '.md5_validated')
@@ -101,3 +112,5 @@ rule generate_metatadata_schema:
     run:
         with Path(output[0]).open('w', encoding="utf-8") as f:
             f.write(agr_sm.AGRBlastDatabases.schema_json())
+
+add_md5_config_files(config)
