@@ -6,7 +6,7 @@ import agr_blastdb_manager.agr.snakemake as agr_sm
 
 
 def get_md5sum_hash(file_path):
-    """"
+    """ "
     Get the md5sum hash of a file
     """
 
