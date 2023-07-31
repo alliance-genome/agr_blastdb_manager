@@ -50,24 +50,42 @@ def get_files_ftp(fasta_uri, md5sum, dry_run) -> bool:
                         f.write(data)
             else:
                 console.log(f"{fasta_file} already exists")
-            check_md5sum(fasta_file, md5sum)
+            if not check_md5sum(fasta_file, md5sum):
+                console.log(f"MD5sums do not match: {md5sum} != {downloaded_md5sum}")
+                return False
         return True
     except Exception as e:
         console.log(f"Error downloading {fasta_uri}: {e}")
         return False
 
 
+def create_db_structure(environment, config_entry) -> bool:
+    """
+    Function that creates the database and folder structure
+    """
+
+    for item in config_entry:
+        print(environment)
+        print(item, config_entry[item])
+
+
 @click.command()
 @click.option("-j", "--input_json", help="JSON file input coordinates")
-@click.option("-d", "--dry_run", help="Don't download anything", is_flag=True)
-def create_dbs(input_json, dry_run=False):
+@click.option("-d", "--dry_run", help="Don't download anything", is_flag=True, default=False)
+@click.option("-e", "--environment", help="Environment", default="prod")
+def create_dbs(input_json, dry_run, environment):
 
     db_coordinates = json.load(open(input_json, "r"))
 
     for entry in db_coordinates["data"]:
-        get_files_ftp(entry["uri"], entry["md5sum"], dry_run)
+        if get_files_ftp(entry["uri"], entry["md5sum"], dry_run):
+            create_db_structure(environment, entry)
 
 
 if __name__ == "__main__":
 
     create_dbs()
+
+
+
+# data/blast/ZFIN/prod/databases/seqcol/ZFIN_RNA-cDNA/c_angaria.PRJNA51225.WS285.genomic.fa.gz.done
