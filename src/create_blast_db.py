@@ -2,7 +2,9 @@
 
 import json
 import click
+from rich import console
 
+console = console.Console()
 
 @click.command()
 @click.option('-j', '--input_json', help='JSON file input coordinates')
@@ -10,7 +12,8 @@ def create_dbs(input_json):
 
     db_coordinates = json.load(open(input_json, "r"))
 
-    print(db_coordinates)
+    for entry in db_coordinates:
+        console.log(entry)
 
 
 
