@@ -1,0 +1,12 @@
+black==23.7.0
+click==8.1.6
+isort==5.12.0
+markdown-it-py==3.0.0
+mdurl==0.1.2
+mypy-extensions==1.0.0
+packaging==23.1
+pathspec==0.11.2
+platformdirs==3.10.0
+Pygments==2.15.1
+rich==13.5.0
+tomli==2.0.1
