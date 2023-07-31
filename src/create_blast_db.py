@@ -14,9 +14,7 @@ def get_files_ftp(fasta_uri, dry_run):
     """
     Function that downloads the files from the FTP site
     :param fasta_url:
-    :param gff_url:
-    :param fasta_file:
-    :param gff_file:
+    :param dry_run:
     :return:
     """
 
