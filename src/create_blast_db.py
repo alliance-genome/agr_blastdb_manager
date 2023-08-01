@@ -59,33 +59,45 @@ def get_files_ftp(fasta_uri, md5sum, dry_run) -> bool:
         return False
 
 
-def create_db_structure(environment, config_entry) -> bool:
+def create_db_structure(environment, mod, config_entry) -> bool:
     """
     Function that creates the database and folder structure
     """
 
-    for item in config_entry:
-        print(environment)
-        print(item, config_entry[item])
+    if "seqcol" in config_entry.keys():
+        console.log(f"Directory '../data/blast/{mod}/{environment}/databases/{config_entry['seqcol']}"
+                    f"/{config_entry['blast_title']}/' will be created")
+        p = f"../data/blast/{mod}/{environment}/databases/{config_entry['seqcol']}/{config_entry['blast_title']}/"
+    else:
+        console.log(f"Directory '../data/blast/{mod}/{environment}/databases/{config_entry['genus']}"
+                f"{config_entry['species']}"
+                f"/{config_entry['blast_title']}/' will be created")
+        p = f"../data/blast/{mod}/{environment}/databases/{config_entry['genus']}{config_entry['species']}/{config_entry['blast_title']}/"
+
+    if Path(p).mkdir(parents=True, exist_ok=True):
+        console.log(f"Directory {p} created")
+        return True
+    else:
+        print(f"Directory {p} could not be created or already exists")
+        return False
+
+# data/blast/ZFIN/prod/databases/seqcol/ZFIN_RNA-cDNA/c_angaria.PRJNA51225.WS285.genomic.fa.gz.done
 
 
 @click.command()
 @click.option("-j", "--input_json", help="JSON file input coordinates")
 @click.option("-d", "--dry_run", help="Don't download anything", is_flag=True, default=False)
 @click.option("-e", "--environment", help="Environment", default="prod")
-def create_dbs(input_json, dry_run, environment):
+@click.option("-m", "--mod", help="Model organism")
+def create_dbs(input_json, dry_run, environment, mod):
 
     db_coordinates = json.load(open(input_json, "r"))
 
     for entry in db_coordinates["data"]:
         if get_files_ftp(entry["uri"], entry["md5sum"], dry_run):
-            create_db_structure(environment, entry)
+            create_db_structure(environment, mod, entry)
 
 
 if __name__ == "__main__":
 
     create_dbs()
-
-
-
-# data/blast/ZFIN/prod/databases/seqcol/ZFIN_RNA-cDNA/c_angaria.PRJNA51225.WS285.genomic.fa.gz.done
