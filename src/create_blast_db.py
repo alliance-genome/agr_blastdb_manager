@@ -13,6 +13,24 @@ console = Console()
 MAKEBLASTDB_BIN = "/usr/local/bin/makeblastdb"
 
 
+def extendable_logger(log_name, file_name,level=logging.INFO):
+    """
+    Function that creates a logger that can be extended
+    :param log_name:
+    :param file_name:
+    :param level:
+    """
+    formatter = logging.Formatter('[%(asctime)s] %(levelname)s %(message)s')
+    handler = logging.FileHandler(file_name)
+    handler.setFormatter(formatter)
+    specified_logger = logging.getLogger(log_name)
+    specified_logger.setLevel(level)
+    specified_logger.addHandler(handler)
+
+    return specified_logger
+
+
+
 def check_md5sum(fasta_file, md5sum) -> bool:
     """
     Function that checks the md5sum of the downloaded file
@@ -65,7 +83,7 @@ def get_files_ftp(fasta_uri, md5sum, dry_run) -> bool:
         return False
 
 
-def create_db_structure(environment, mod, config_entry, dry_run) -> bool:
+def create_db_structure(environment, mod, config_entry, dry_run, file_logger) -> bool:
     """
     Function that creates the database and folder structure
     :param environment:
@@ -75,12 +93,14 @@ def create_db_structure(environment, mod, config_entry, dry_run) -> bool:
     """
 
     if "seqcol" in config_entry.keys():
+        file_logger.info("seqcol found in config file")
         console.log(
             f"Directory '../data/blast/{mod}/{environment}/databases/{config_entry['seqcol']}"
             f"/{config_entry['blast_title']}/' will be created"
         )
         p = f"../data/blast/{mod}/{environment}/databases/{config_entry['seqcol']}/{config_entry['blast_title']}/"
     else:
+        file_logger.info("seqcol not found in config file")
         console.log(
             f"Directory '../data/blast/{mod}/{environment}/databases/{config_entry['genus']}"
             f"{config_entry['species']}"
@@ -97,7 +117,7 @@ def create_db_structure(environment, mod, config_entry, dry_run) -> bool:
     return p
 
 
-def run_makeblastdb(config_entry, output_dir, dry_run):
+def run_makeblastdb(config_entry, output_dir, dry_run, file_logger):
     """
     Function that runs makeblastdb
     """
