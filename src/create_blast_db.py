@@ -128,12 +128,10 @@ def run_makeblastdb(config_entry, output_dir, dry_run):
 
 
 @click.command()
-@click.option("-j", "--input_json", help="JSON file input coordinates")
-@click.option(
-    "-d", "--dry_run", help="Don't download anything", is_flag=True, default=False
-)
+@click.option("-j", "--input_json", help="JSON file input coordinates", required=True) # glob for multiple files or from the YAML file
+@click.option("-d", "--dry_run", help="Don't download anything", is_flag=True, default=False)
 @click.option("-e", "--environment", help="Environment", default="prod")
-@click.option("-m", "--mod", help="Model organism", required=True)
+@click.option("-m", "--mod", help="Model organism")
 def create_dbs(input_json, dry_run, environment, mod):
     db_coordinates = json.load(open(input_json, "r"))
 
