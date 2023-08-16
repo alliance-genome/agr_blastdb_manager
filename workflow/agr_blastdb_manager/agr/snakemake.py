@@ -114,7 +114,6 @@ def expected_blast_files(
                 base_dir,
                 data_provider,
                 environment,
-                "databases",
                 db_info.genus,
                 f"{db_info.genus}_{db_info.species}",
                 fasta,
