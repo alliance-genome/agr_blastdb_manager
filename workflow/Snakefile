@@ -42,7 +42,7 @@ rule all:
 # from the metadata validates the file that was mirrored.
 #============================================================================
 rule makeblastdb:
-    output: touch(Path(BLASTDB_DIR, "{data_provider}", "{environment}", "databases", "{genus}", "{org}", "{fasta}.done"))
+    output: touch(Path(BLASTDB_DIR, "{data_provider}", "{environment}", "{genus}", "{org}", "{fasta}.done"))
     input:
         fa=lambda wildcards: Path(FASTA_DIR, wildcards.data_provider, wildcards.environment, wildcards.genus, wildcards.org, wildcards.fasta),
         md5=lambda wildcards: Path(FASTA_DIR, wildcards.data_provider, wildcards.environment, wildcards.genus, wildcards.org, wildcards.fasta + '.md5_validated')
