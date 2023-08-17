@@ -159,6 +159,22 @@ def run_makeblastdb(config_entry, output_dir, dry_run, file_logger):
     return True
 
 
+def get_mod_from_json(input_json) -> str:
+    """
+    Function that gets the mod from the JSON file
+    :param input_json:
+    """
+
+    print(input_json)
+    filename = Path(input_json).name
+    mod = filename.split(".")[1]
+
+    console.log(f"Mod found: {mod}")
+
+    return mod
+
+
+
 @click.command()
 @click.option("-j", "--input_json", help="JSON file input coordinates", required=True)
 @click.option("-e", "--environment", help="Environment", default="prod")
@@ -177,6 +193,11 @@ def create_dbs(input_json, dry_run, environment, mod):
     """
 
     date_to_add = datetime.now().strftime("%Y_%b_%d")
+
+    if mod is None:
+        logger.info("Mod not provided")
+        mod = get_mod_from_json(input_json)
+        logger.info(f"Mod found: {mod}")
 
     if len(sys.argv) == 1:
         cli.main(["--help"])
