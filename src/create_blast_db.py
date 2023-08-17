@@ -8,6 +8,7 @@ import sys
 import urllib.request
 from pathlib import Path
 from subprocess import PIPE, Popen
+from datetime import datetime
 
 import click
 from rich.console import Console
@@ -16,14 +17,14 @@ console = Console()
 MAKEBLASTDB_BIN = "/usr/local/bin/makeblastdb"
 
 
-def extendable_logger(log_name, file_name,level=logging.INFO):
+def extendable_logger(log_name, file_name, level=logging.INFO):
     """
     Function that creates a logger that can be extended
     :param log_name:
     :param file_name:
     :param level:
     """
-    formatter = logging.Formatter('[%(asctime)s] %(levelname)s %(message)s')
+    formatter = logging.Formatter("[%(asctime)s] %(levelname)s %(message)s")
     handler = logging.FileHandler(file_name)
     handler.setFormatter(formatter)
     specified_logger = logging.getLogger(log_name)
@@ -31,7 +32,6 @@ def extendable_logger(log_name, file_name,level=logging.INFO):
     specified_logger.addHandler(handler)
 
     return specified_logger
-
 
 
 def check_md5sum(fasta_file, md5sum) -> bool:
@@ -123,6 +123,10 @@ def create_db_structure(environment, mod, config_entry, dry_run, file_logger) ->
 def run_makeblastdb(config_entry, output_dir, dry_run, file_logger):
     """
     Function that runs makeblastdb
+    :param config_entry:
+    :param output_dir:
+    :param dry_run:
+    :param file_logger:
     """
 
     fasta_file = Path(config_entry["uri"]).name
@@ -154,24 +158,43 @@ def run_makeblastdb(config_entry, output_dir, dry_run, file_logger):
 
     return True
 
+
 @click.command()
-@click.option("-j", "--input_json", help="JSON file input coordinates", required=True) # glob for multiple files or from the YAML file
+@click.option("-j", "--input_json", help="JSON file input coordinates", required=True)
 @click.option("-e", "--environment", help="Environment", default="prod")
 @click.option("-m", "--mod", help="Model organism")
-@click.option("-d", "--dry_run", help="Don't download anything", is_flag=True, default=False)
+@click.option(
+    "-d", "--dry_run", help="Don't download anything", is_flag=True, default=False
+)
 def create_dbs(input_json, dry_run, environment, mod):
+    """
+    Function that creates the databases
+    :param input_json:
+    :param dry_run:
+    :param environment:
+    :param mod:
+    :return:
+    """
+
+    date_to_add = datetime.now().strftime("%Y_%b_%d")
 
     if len(sys.argv) == 1:
-        cli.main(['--help'])
+        cli.main(["--help"])
     else:
         db_coordinates = json.load(open(input_json, "r"))
         for entry in db_coordinates["data"]:
-            file_logger = extendable_logger(entry["blast_title"], f"../logs/{entry['genus']}_{entry['species']}_{entry['seqtype']}.log")
+            file_logger = extendable_logger(
+                entry["blast_title"],
+                f"../logs/{entry['genus']}_{entry['species']}"
+                f"_{entry['seqtype']}_{date_to_add}.log",
+            )
             file_logger.info(f"Downloading {entry['uri']}")
             if get_files_ftp(entry["uri"], entry["md5sum"], dry_run):
                 file_logger.info(f"Downloaded {entry['uri']}")
                 file_logger.info("Creating database structure")
-                output_dir = create_db_structure(environment, mod, entry, dry_run, file_logger)
+                output_dir = create_db_structure(
+                    environment, mod, entry, dry_run, file_logger
+                )
                 file_logger.info(f"Created database structure at {output_dir}")
                 if Path(output_dir).exists():
                     file_logger.info("Running makeblastdb")
