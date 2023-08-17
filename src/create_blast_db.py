@@ -15,6 +15,7 @@ from rich.console import Console
 
 console = Console()
 MAKEBLASTDB_BIN = "/usr/local/bin/makeblastdb"
+MODS = ["FB", "SGD", "WB", "XB", "ZFIN"]
 
 
 def extendable_logger(log_name, file_name, level=logging.INFO):
@@ -169,10 +170,13 @@ def get_mod_from_json(input_json) -> str:
     filename = Path(input_json).name
     mod = filename.split(".")[1]
 
+    if mod not in MODS:
+        console.log(f"Mod {mod} not found in {MODS}")
+        return False
+
     console.log(f"Mod found: {mod}")
 
     return mod
-
 
 
 @click.command()
@@ -198,26 +202,31 @@ def create_dbs(input_json, dry_run, environment, mod):
         cli.main(["--help"])
     else:
         if mod is None:
-            mod = get_mod_from_json(input_json)
-        db_coordinates = json.load(open(input_json, "r"))
-        for entry in db_coordinates["data"]:
-            file_logger = extendable_logger(
-                entry["blast_title"],
-                f"../logs/{entry['genus']}_{entry['species']}"
-                f"_{entry['seqtype']}_{date_to_add}.log",
-            )
-            file_logger.info(f"Mod found/provided: {mod}")
-            file_logger.info(f"Downloading {entry['uri']}")
-            if get_files_ftp(entry["uri"], entry["md5sum"], dry_run):
-                file_logger.info(f"Downloaded {entry['uri']}")
-                file_logger.info("Creating database structure")
-                output_dir = create_db_structure(
-                    environment, mod, entry, dry_run, file_logger
+            mod_code = get_mod_from_json(input_json)
+
+        if mod_code is not False:
+            db_coordinates = json.load(open(input_json, "r"))
+            for entry in db_coordinates["data"]:
+                file_logger = extendable_logger(
+                    entry["blast_title"],
+                    f"../logs/{entry['genus']}_{entry['species']}"
+                    f"_{entry['seqtype']}_{date_to_add}.log",
                 )
-                file_logger.info(f"Created database structure at {output_dir}")
-                if Path(output_dir).exists():
-                    file_logger.info("Running makeblastdb")
-                    run_makeblastdb(entry, output_dir, dry_run, file_logger)
+                file_logger.info(f"Mod found/provided: {mod_code}")
+                file_logger.info(f"Downloading {entry['uri']}")
+                if get_files_ftp(entry["uri"], entry["md5sum"], dry_run):
+                    file_logger.info(f"Downloaded {entry['uri']}")
+                    file_logger.info("Creating database structure")
+                    output_dir = create_db_structure(
+                        environment, mod_code, entry, dry_run, file_logger
+                    )
+                    file_logger.info(f"Created database structure at {output_dir}")
+                    if Path(output_dir).exists():
+                        file_logger.info("Running makeblastdb")
+                        run_makeblastdb(entry, output_dir, dry_run, file_logger)
+        else:
+            console.log("Mod not found")
+            sys.exit(1)
 
 
 if __name__ == "__main__":
