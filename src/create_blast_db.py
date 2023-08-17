@@ -137,7 +137,7 @@ def run_makeblastdb(config_entry, output_dir, dry_run, file_logger):
         unzip_command = f"gunzip -v ../data/{fasta_file}"
         p = Popen(unzip_command, shell=True, stdout=PIPE, stderr=PIPE)
         p.wait()
-        console.log(f"Unzip: done")
+        console.log("Unzip: done")
         file_logger.info(f"Unzipping {fasta_file}: done")
         console.log("File already unzipped")
 
@@ -152,8 +152,8 @@ def run_makeblastdb(config_entry, output_dir, dry_run, file_logger):
     p = Popen(makeblast_command, shell=True, stdout=PIPE, stderr=PIPE)
     p.wait()
     stdout, stderr = p.communicate()
-    console.log(f"Makeblastdb: done")
-    file_logger.info(f"Makeblastdb: done")
+    console.log("Makeblastdb: done")
+    file_logger.info("Makeblastdb: done")
     console.log(f"stdout: {stdout}")
 
     return True
@@ -194,14 +194,11 @@ def create_dbs(input_json, dry_run, environment, mod):
 
     date_to_add = datetime.now().strftime("%Y_%b_%d")
 
-    if mod is None:
-        logger.info("Mod not provided")
-        mod = get_mod_from_json(input_json)
-        logger.info(f"Mod found: {mod}")
-
     if len(sys.argv) == 1:
         cli.main(["--help"])
     else:
+        if mod is None:
+            mod = get_mod_from_json(input_json)
         db_coordinates = json.load(open(input_json, "r"))
         for entry in db_coordinates["data"]:
             file_logger = extendable_logger(
@@ -209,6 +206,7 @@ def create_dbs(input_json, dry_run, environment, mod):
                 f"../logs/{entry['genus']}_{entry['species']}"
                 f"_{entry['seqtype']}_{date_to_add}.log",
             )
+            file_logger.info(f"Mod found/provided: {mod}")
             file_logger.info(f"Downloading {entry['uri']}")
             if get_files_ftp(entry["uri"], entry["md5sum"], dry_run):
                 file_logger.info(f"Downloaded {entry['uri']}")
