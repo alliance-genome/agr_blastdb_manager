@@ -53,7 +53,7 @@ def check_md5sum(fasta_file, md5sum) -> bool:
         return True
 
 
-def get_files_ftp(fasta_uri, md5sum, dry_run) -> bool:
+def get_files_ftp(fasta_uri, md5sum, dry_run, logger_file) -> bool:
     """
     Function that downloads the files from the FTP site
     :param fasta_uri:
@@ -61,6 +61,8 @@ def get_files_ftp(fasta_uri, md5sum, dry_run) -> bool:
     :param dry_run:
     :return:
     """
+
+    file_logger.info(f"Downloading {entry['uri']}")
 
     try:
         console.log(f"Downloading {fasta_uri}")
@@ -77,8 +79,10 @@ def get_files_ftp(fasta_uri, md5sum, dry_run) -> bool:
                         data = r.read()
                         with open(fasta_file, "wb") as f:
                             f.write(data)
+                            logger_file.info(f"Downloaded {fasta_uri}")
                 else:
                     console.log(f"{fasta_file} already exists")
+                    logger_file.info(f"{fasta_file} already exists")
                 if not check_md5sum(fasta_file, md5sum):
                     return False
             return True
@@ -95,6 +99,7 @@ def create_db_structure(environment, mod, config_entry, dry_run, file_logger) ->
     :param config_entry:
     :param dry_run:
     """
+    file_logger.info("Creating database structure")
 
     if "seqcol" in config_entry.keys():
         file_logger.info("seqcol found in config file")
@@ -117,6 +122,7 @@ def create_db_structure(environment, mod, config_entry, dry_run, file_logger) ->
 
     Path(p).mkdir(parents=True, exist_ok=True)
     console.log(f"Directory {p} created")
+    file_logger.info(f"Directory {p} created")
 
     return p
 
@@ -166,7 +172,6 @@ def get_mod_from_json(input_json) -> str:
     :param input_json:
     """
 
-    print(input_json)
     filename = Path(input_json).name
     mod = filename.split(".")[1]
 
@@ -180,12 +185,11 @@ def get_mod_from_json(input_json) -> str:
 
 
 @click.command()
-@click.option("-j", "--input_json", help="JSON file input coordinates", required=True)
+@click.option("-g", "--config_yaml", help="YAML file with all MODs configuration")
+@click.option("-j", "--input_json", help="JSON file input coordinates")
 @click.option("-e", "--environment", help="Environment", default="prod")
 @click.option("-m", "--mod", help="Model organism")
-@click.option(
-    "-d", "--dry_run", help="Don't download anything", is_flag=True, default=False
-)
+@click.option("-d", "--dry_run", help="Don't download anything", is_flag=True, default=False)
 def create_dbs(input_json, dry_run, environment, mod):
     """
     Function that creates the databases
@@ -199,7 +203,7 @@ def create_dbs(input_json, dry_run, environment, mod):
     date_to_add = datetime.now().strftime("%Y_%b_%d")
 
     if len(sys.argv) == 1:
-        cli.main(["--help"])
+        click.main(["--help"])
     else:
         if mod is None:
             mod_code = get_mod_from_json(input_json)
@@ -213,16 +217,12 @@ def create_dbs(input_json, dry_run, environment, mod):
                     f"_{entry['seqtype']}_{date_to_add}.log",
                 )
                 file_logger.info(f"Mod found/provided: {mod_code}")
-                file_logger.info(f"Downloading {entry['uri']}")
-                if get_files_ftp(entry["uri"], entry["md5sum"], dry_run):
-                    file_logger.info(f"Downloaded {entry['uri']}")
-                    file_logger.info("Creating database structure")
+
+                if get_files_ftp(entry["uri"], entry["md5sum"], dry_run, file_logger):
                     output_dir = create_db_structure(
                         environment, mod_code, entry, dry_run, file_logger
                     )
-                    file_logger.info(f"Created database structure at {output_dir}")
                     if Path(output_dir).exists():
-                        file_logger.info("Running makeblastdb")
                         run_makeblastdb(entry, output_dir, dry_run, file_logger)
         else:
             console.log("Mod not found")
