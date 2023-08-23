@@ -9,6 +9,7 @@ import urllib.request
 from pathlib import Path
 from subprocess import PIPE, Popen
 from datetime import datetime
+from shutil import copyfile
 
 import click
 from rich.console import Console
@@ -51,6 +52,21 @@ def check_md5sum(fasta_file, md5sum) -> bool:
         return True
 
 
+def store_fasta_files(fasta_file, file_logger) -> None:
+    """
+    """
+
+    date_to_add = datetime.now().strftime("%Y_%b_%d")
+
+    original_files_store = Path(f"../data/database_{date_to_add}")
+
+    if not Path(original_files_store).exists():
+        console.log(f"Creating {original_files_store}")
+        Path(original_files_store).mkdir(parents=True, exist_ok=True)
+
+    copyfile(fasta_file, original_files_store / Path(fasta_file).name)
+
+
 def get_files_ftp(fasta_uri, md5sum, dry_run, file_logger) -> bool:
     """
     Function that downloads the files from the FTP site
@@ -74,6 +90,7 @@ def get_files_ftp(fasta_uri, md5sum, dry_run, file_logger) -> bool:
                 with open(fasta_file, "wb") as f:
                     f.write(data)
                     file_logger.info(f"Downloaded {fasta_uri}")
+            store_fasta_files(fasta_file, file_logger)
         else:
             console.log(f"{fasta_file} already exists")
             file_logger.info(f"{fasta_file} already exists")
