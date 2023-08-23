@@ -54,6 +54,9 @@ def check_md5sum(fasta_file, md5sum) -> bool:
 
 def store_fasta_files(fasta_file, file_logger) -> None:
     """
+
+    :param fasta_file:
+    :param file_logger:
     """
 
     date_to_add = datetime.now().strftime("%Y_%b_%d")
@@ -160,20 +163,26 @@ def run_makeblastdb(config_entry, output_dir, dry_run, file_logger):
         file_logger.info(f"Unzipping {fasta_file}: done")
         console.log("File already unzipped")
 
-    # if not dry_run:
-    makeblast_command = (
-        f"{MAKEBLASTDB_BIN} -in ../data/{fasta_file.replace('.gz', '')} -dbtype {config_entry['seqtype']} "
-        f"-title '{config_entry['blast_title']}' -parse_seqids "
-        f"-out {output_dir}/{fasta_file.replace('fa.gz', 'db ')}"
-        f"-taxid {config_entry['taxon_id'].replace('NCBITaxon:', '')} "
-    )
-    file_logger.info(f"Running makeblastdb: {makeblast_command}")
-    p = Popen(makeblast_command, shell=True, stdout=PIPE, stderr=PIPE)
-    p.wait()
-    stdout, stderr = p.communicate()
-    console.log("Makeblastdb: done")
-    file_logger.info("Makeblastdb: done")
-    console.log(f"stdout: {stdout}")
+    try:
+        makeblast_command = (
+            f"{MAKEBLASTDB_BIN} -in ../data/{fasta_file.replace('.gz', '')} -dbtype {config_entry['seqtype']} "
+            f"-title '{config_entry['blast_title']}' -parse_seqids "
+            f"-out {output_dir}/{fasta_file.replace('fa.gz', 'db ')}"
+            f"-taxid {config_entry['taxon_id'].replace('NCBITaxon:', '')} "
+        )
+        file_logger.info(f"Running makeblastdb: {makeblast_command}")
+        p = Popen(makeblast_command, shell=True, stdout=PIPE, stderr=PIPE)
+        p.wait()
+        stdout, stderr = p.communicate()
+        console.log("Makeblastdb: done")
+        file_logger.info("Makeblastdb: done")
+        Path(f"../data/{fasta_file.replace('.gz', '')}").unlink()
+        file_logger.info(f"Removed {fasta_file.replace('.gz', '')}")
+        console.log("Removed unzipped file")
+    except Exception as e:
+        console.log(f"Error running makeblastdb: {e}")
+        file_logger.info(f"Error running makeblastdb: {e}")
+        return False
 
     return True
 
@@ -234,8 +243,8 @@ def create_dbs(input_json, dry_run, environment, mod):
                     output_dir = create_db_structure(
                         environment, mod_code, entry, dry_run, file_logger
                     )
-                    # if Path(output_dir).exists():
-                    #     run_makeblastdb(entry, output_dir, dry_run, file_logger)
+                    if Path(output_dir).exists():
+                        run_makeblastdb(entry, output_dir, dry_run, file_logger)
         else:
             console.log("Mod not found")
             sys.exit(1)
