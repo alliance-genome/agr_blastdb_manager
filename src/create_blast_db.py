@@ -43,8 +43,6 @@ def check_md5sum(fasta_file, md5sum) -> bool:
     """
 
     downloaded_md5sum = hashlib.md5(open(fasta_file, "rb").read()).hexdigest()
-    # console.log(f"Expected md5sum: {md5sum}")
-    # console.log(f"Downloaded md5sum: {downloaded_md5sum}")
     if downloaded_md5sum != md5sum:
         console.log(f"MD5sums do not match: {md5sum} != {downloaded_md5sum}")
         return False
@@ -53,7 +51,7 @@ def check_md5sum(fasta_file, md5sum) -> bool:
         return True
 
 
-def get_files_ftp(fasta_uri, md5sum, dry_run, logger_file) -> bool:
+def get_files_ftp(fasta_uri, md5sum, dry_run, file_logger) -> bool:
     """
     Function that downloads the files from the FTP site
     :param fasta_uri:
@@ -62,30 +60,27 @@ def get_files_ftp(fasta_uri, md5sum, dry_run, logger_file) -> bool:
     :return:
     """
 
-    file_logger.info(f"Downloading {entry['uri']}")
+    file_logger.info(f"Downloading {fasta_uri}")
 
     try:
         console.log(f"Downloading {fasta_uri}")
-        if dry_run:
-            console.log("Dry run, not downloading")
-
         fasta_file = f"../data/{Path(fasta_uri).name}"
         console.log(f"Saving to {fasta_file}")
+        file_logger.info(f"Saving to {fasta_file}")
 
-        if not dry_run:
-            if not Path(fasta_file.replace(".gz", "")).exists():
-                if not Path(fasta_file).exists():
-                    with urllib.request.urlopen(fasta_uri) as r:
-                        data = r.read()
-                        with open(fasta_file, "wb") as f:
-                            f.write(data)
-                            logger_file.info(f"Downloaded {fasta_uri}")
-                else:
-                    console.log(f"{fasta_file} already exists")
-                    logger_file.info(f"{fasta_file} already exists")
-                if not check_md5sum(fasta_file, md5sum):
-                    return False
+        if not Path(fasta_file).exists():
+            with urllib.request.urlopen(fasta_uri) as r:
+                data = r.read()
+                with open(fasta_file, "wb") as f:
+                    f.write(data)
+                    file_logger.info(f"Downloaded {fasta_uri}")
+        else:
+            console.log(f"{fasta_file} already exists")
+            file_logger.info(f"{fasta_file} already exists")
+        if check_md5sum(fasta_file, md5sum):
             return True
+        else:
+            file_logger.info("MD5sums do not match")
     except Exception as e:
         console.log(f"Error downloading {fasta_uri}: {e}")
         return False
@@ -185,14 +180,14 @@ def get_mod_from_json(input_json) -> str:
 
 
 @click.command()
-@click.option("-g", "--config_yaml", help="YAML file with all MODs configuration")
+# @click.option("-g", "--config_yaml", help="YAML file with all MODs configuration")
 @click.option("-j", "--input_json", help="JSON file input coordinates")
 @click.option("-e", "--environment", help="Environment", default="prod")
 @click.option("-m", "--mod", help="Model organism")
 @click.option("-d", "--dry_run", help="Don't download anything", is_flag=True, default=False)
 def create_dbs(input_json, dry_run, environment, mod):
     """
-    Function that creates the databases
+    Function that runs the pipeline
     :param input_json:
     :param dry_run:
     :param environment:
@@ -222,8 +217,8 @@ def create_dbs(input_json, dry_run, environment, mod):
                     output_dir = create_db_structure(
                         environment, mod_code, entry, dry_run, file_logger
                     )
-                    if Path(output_dir).exists():
-                        run_makeblastdb(entry, output_dir, dry_run, file_logger)
+                    # if Path(output_dir).exists():
+                    #     run_makeblastdb(entry, output_dir, dry_run, file_logger)
         else:
             console.log("Mod not found")
             sys.exit(1)
