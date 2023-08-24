@@ -7,15 +7,15 @@ import logging
 import sys
 import urllib.request
 from datetime import datetime
+from ftplib import FTP
 from pathlib import Path
 from shutil import copyfile
 from subprocess import PIPE, Popen
-from ftplib import FTP
-import wget
 
-from tqdm import tqdm
 import click
+import wget
 from rich.console import Console
+
 
 console = Console()
 MAKEBLASTDB_BIN = "/usr/local/bin/makeblastdb"
