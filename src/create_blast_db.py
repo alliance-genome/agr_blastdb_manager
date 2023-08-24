@@ -6,11 +6,13 @@ import json
 import logging
 import sys
 import urllib.request
-from pathlib import Path
-from subprocess import PIPE, Popen
 from datetime import datetime
+from pathlib import Path
 from shutil import copyfile
+from subprocess import PIPE, Popen
+from ftplib import FTP
 
+from tqdm import tqdm
 import click
 from rich.console import Console
 
@@ -70,6 +72,25 @@ def store_fasta_files(fasta_file, file_logger) -> None:
     copyfile(fasta_file, original_files_store / Path(fasta_file).name)
 
 
+def get_ftp_file_size(fasta_uri, file_logger) -> int:
+    """
+
+    :param fasta_uri:
+    :param file_logger:
+    """
+    size = 0
+
+    ftp = FTP(Path(fasta_uri).parts[1])
+    ftp.login()
+    ftp.cwd("/".join(Path(fasta_uri).parts[2:-1]))
+    filename = Path(fasta_uri).name
+    size = ftp.size(filename)
+    console.log(f"File size is {size} bytes")
+    file_logger.info(f"File size is {size} bytes")
+
+    return size
+
+
 def get_files_ftp(fasta_uri, md5sum, dry_run, file_logger) -> bool:
     """
     Function that downloads the files from the FTP site
@@ -81,17 +102,21 @@ def get_files_ftp(fasta_uri, md5sum, dry_run, file_logger) -> bool:
 
     file_logger.info(f"Downloading {fasta_uri}")
 
+    size = get_ftp_file_size(fasta_uri, file_logger)
+
     try:
         console.log(f"Downloading {fasta_uri}")
         fasta_file = f"../data/{Path(fasta_uri).name}"
         console.log(f"Saving to {fasta_file}")
         file_logger.info(f"Saving to {fasta_file}")
-
         if not Path(fasta_file).exists():
-            with urllib.request.urlopen(fasta_uri) as r:
-                data = r.read()
-                with open(fasta_file, "wb") as f:
+            with urllib.request.urlopen(fasta_uri) as r, tqdm(
+                    unit="B", unit_scale=True, unit_divisor=1024, miniters=1, desc="Downloading",
+                    file=sys.stdout, total=size) as progress, open(fasta_file, "wb") as f:
+                for data in r.iter_content(chunk_size=4096):
+                    datasize = len(data)
                     f.write(data)
+                    progress.update(datasize)
                     file_logger.info(f"Downloaded {fasta_uri}")
             store_fasta_files(fasta_file, file_logger)
         else:
@@ -210,7 +235,9 @@ def get_mod_from_json(input_json) -> str:
 @click.option("-j", "--input_json", help="JSON file input coordinates")
 @click.option("-e", "--environment", help="Environment", default="prod")
 @click.option("-m", "--mod", help="Model organism")
-@click.option("-d", "--dry_run", help="Don't download anything", is_flag=True, default=False)
+@click.option(
+    "-d", "--dry_run", help="Don't download anything", is_flag=True, default=False
+)
 def create_dbs(input_json, dry_run, environment, mod):
     """
     Function that runs the pipeline
