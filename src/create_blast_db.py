@@ -236,7 +236,10 @@ def process_yaml(config_yaml) -> bool:
         console.log(f"Processing {provider['name']}")
         for environment in provider["environments"]:
             console.log(f"Processing {environment}")
-            json_file = Path(config_yaml).parent / f"{provider['name']}/databases.{provider['name']}.{environment}.json"
+            json_file = (
+                Path(config_yaml).parent
+                / f"{provider['name']}/databases.{provider['name']}.{environment}.json"
+            )
             console.log(f"Processing {json_file}")
             process_json(json_file, environment, provider["name"])
 
