@@ -11,6 +11,7 @@ from pathlib import Path
 from shutil import copyfile
 from subprocess import PIPE, Popen
 from ftplib import FTP
+import wget
 
 from tqdm import tqdm
 import click
@@ -110,14 +111,7 @@ def get_files_ftp(fasta_uri, md5sum, dry_run, file_logger) -> bool:
         console.log(f"Saving to {fasta_file}")
         file_logger.info(f"Saving to {fasta_file}")
         if not Path(fasta_file).exists():
-            with urllib.request.urlopen(fasta_uri) as r, tqdm(
-                    unit="B", unit_scale=True, unit_divisor=1024, miniters=1, desc="Downloading",
-                    file=sys.stdout, total=size) as progress, open(fasta_file, "wb") as f:
-                for data in r.iter_content(chunk_size=4096):
-                    datasize = len(data)
-                    f.write(data)
-                    progress.update(datasize)
-                    file_logger.info(f"Downloaded {fasta_uri}")
+            wget.download(fasta_uri, fasta_file)
             store_fasta_files(fasta_file, file_logger)
         else:
             console.log(f"{fasta_file} already exists")
