@@ -5,14 +5,16 @@ import hashlib
 import json
 import logging
 import sys
-import urllib.request
-from pathlib import Path
-from subprocess import PIPE, Popen
 from datetime import datetime
+from ftplib import FTP
+from pathlib import Path
 from shutil import copyfile
+from subprocess import PIPE, Popen
 
 import click
+import wget
 from rich.console import Console
+import yaml
 
 console = Console()
 MAKEBLASTDB_BIN = "/usr/local/bin/makeblastdb"
@@ -70,7 +72,26 @@ def store_fasta_files(fasta_file, file_logger) -> None:
     copyfile(fasta_file, original_files_store / Path(fasta_file).name)
 
 
-def get_files_ftp(fasta_uri, md5sum, dry_run, file_logger) -> bool:
+def get_ftp_file_size(fasta_uri, file_logger) -> int:
+    """
+
+    :param fasta_uri:
+    :param file_logger:
+    """
+    size = 0
+
+    ftp = FTP(Path(fasta_uri).parts[1])
+    ftp.login()
+    ftp.cwd("/".join(Path(fasta_uri).parts[2:-1]))
+    filename = Path(fasta_uri).name
+    size = ftp.size(filename)
+    console.log(f"File size is {size} bytes")
+    file_logger.info(f"File size is {size} bytes")
+
+    return size
+
+
+def get_files_ftp(fasta_uri, md5sum, file_logger) -> bool:
     """
     Function that downloads the files from the FTP site
     :param fasta_uri:
@@ -81,18 +102,15 @@ def get_files_ftp(fasta_uri, md5sum, dry_run, file_logger) -> bool:
 
     file_logger.info(f"Downloading {fasta_uri}")
 
+    # size = get_ftp_file_size(fasta_uri, file_logger)
+
     try:
         console.log(f"Downloading {fasta_uri}")
         fasta_file = f"../data/{Path(fasta_uri).name}"
         console.log(f"Saving to {fasta_file}")
         file_logger.info(f"Saving to {fasta_file}")
-
         if not Path(fasta_file).exists():
-            with urllib.request.urlopen(fasta_uri) as r:
-                data = r.read()
-                with open(fasta_file, "wb") as f:
-                    f.write(data)
-                    file_logger.info(f"Downloaded {fasta_uri}")
+            wget.download(fasta_uri, fasta_file)
             store_fasta_files(fasta_file, file_logger)
         else:
             console.log(f"{fasta_file} already exists")
@@ -106,7 +124,7 @@ def get_files_ftp(fasta_uri, md5sum, dry_run, file_logger) -> bool:
         return False
 
 
-def create_db_structure(environment, mod, config_entry, dry_run, file_logger) -> bool:
+def create_db_structure(environment, mod, config_entry, file_logger) -> bool:
     """
     Function that creates the database and folder structure
     :param environment:
@@ -142,7 +160,7 @@ def create_db_structure(environment, mod, config_entry, dry_run, file_logger) ->
     return p
 
 
-def run_makeblastdb(config_entry, output_dir, dry_run, file_logger):
+def run_makeblastdb(config_entry, output_dir, file_logger):
     """
     Function that runs makeblastdb
     :param config_entry:
@@ -205,13 +223,68 @@ def get_mod_from_json(input_json) -> str:
     return mod
 
 
+def process_yaml(config_yaml) -> bool:
+    """
+    Function that processes the YAML file
+
+    :param config_yaml:
+    """
+
+    config = yaml.load(open(config_yaml), Loader=yaml.FullLoader)
+
+    for provider in config["data_providers"]:
+        console.log(f"Processing {provider['name']}")
+        for environment in provider["environments"]:
+            console.log(f"Processing {environment}")
+            json_file = (
+                Path(config_yaml).parent
+                / f"{provider['name']}/databases.{provider['name']}.{environment}.json"
+            )
+            console.log(f"Processing {json_file}")
+            process_json(json_file, environment, provider["name"])
+
+
+def process_json(json_file, environment, mod) -> bool:
+    """
+
+    :param json_file:
+    :param environment:
+    :param mod:
+
+    """
+
+    date_to_add = datetime.now().strftime("%Y_%b_%d")
+    console.log(f"Processing {json_file}")
+
+    if mod is None:
+        mod_code = get_mod_from_json(input_json)
+    else:
+        mod_code = mod
+
+    if mod_code is not False:
+        db_coordinates = json.load(open(json_file, "r"))
+        for entry in db_coordinates["data"]:
+            file_logger = extendable_logger(
+                entry["blast_title"],
+                f"../logs/{entry['genus']}_{entry['species']}"
+                f"_{entry['seqtype']}_{date_to_add}.log",
+            )
+            file_logger.info(f"Mod found/provided: {mod_code}")
+            if get_files_ftp(entry["uri"], entry["md5sum"], file_logger):
+                output_dir = create_db_structure(
+                    environment, mod_code, entry, file_logger
+                )
+                if Path(output_dir).exists():
+                    run_makeblastdb(entry, output_dir, file_logger)
+
+
 @click.command()
-# @click.option("-g", "--config_yaml", help="YAML file with all MODs configuration")
+@click.option("-g", "--config_yaml", help="YAML file with all MODs configuration")
 @click.option("-j", "--input_json", help="JSON file input coordinates")
-@click.option("-e", "--environment", help="Environment", default="prod")
+@click.option("-e", "--environment", help="Environment", default="dev")
 @click.option("-m", "--mod", help="Model organism")
-@click.option("-d", "--dry_run", help="Don't download anything", is_flag=True, default=False)
-def create_dbs(input_json, dry_run, environment, mod):
+# @click.option("-d", "--dry_run", help="Don't download anything", is_flag=True, default=False)
+def create_dbs(config_yaml, input_json, environment, mod):
     """
     Function that runs the pipeline
     :param input_json:
@@ -221,33 +294,12 @@ def create_dbs(input_json, dry_run, environment, mod):
     :return:
     """
 
-    date_to_add = datetime.now().strftime("%Y_%b_%d")
-
     if len(sys.argv) == 1:
         click.main(["--help"])
+    if config_yaml is not None:
+        process_yaml(config_yaml)
     else:
-        if mod is None:
-            mod_code = get_mod_from_json(input_json)
-
-        if mod_code is not False:
-            db_coordinates = json.load(open(input_json, "r"))
-            for entry in db_coordinates["data"]:
-                file_logger = extendable_logger(
-                    entry["blast_title"],
-                    f"../logs/{entry['genus']}_{entry['species']}"
-                    f"_{entry['seqtype']}_{date_to_add}.log",
-                )
-                file_logger.info(f"Mod found/provided: {mod_code}")
-
-                if get_files_ftp(entry["uri"], entry["md5sum"], dry_run, file_logger):
-                    output_dir = create_db_structure(
-                        environment, mod_code, entry, dry_run, file_logger
-                    )
-                    if Path(output_dir).exists():
-                        run_makeblastdb(entry, output_dir, dry_run, file_logger)
-        else:
-            console.log("Mod not found")
-            sys.exit(1)
+        process_json(input_json, environment, mod)
 
 
 if __name__ == "__main__":
