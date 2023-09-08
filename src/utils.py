@@ -3,11 +3,13 @@
 import hashlib
 import logging
 from ftplib import FTP
+from pathlib import Path
 
 from rich.console import Console
 
 console = Console()
 
+MODS = ["FB", "SGD", "WB", "XB", "ZFIN"]
 
 def extendable_logger(log_name, file_name, level=logging.INFO):
     """
@@ -24,7 +26,6 @@ def extendable_logger(log_name, file_name, level=logging.INFO):
     specified_logger.addHandler(handler)
 
     return specified_logger
-
 
 
 def check_md5sum(fasta_file, md5sum) -> bool:
