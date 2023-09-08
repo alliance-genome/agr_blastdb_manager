@@ -1,9 +1,7 @@
 # Paulo Nuin July 2023
 
 
-import hashlib
 import json
-import logging
 import sys
 from datetime import datetime
 
@@ -21,7 +19,6 @@ from utils import check_md5sum, extendable_logger, get_ftp_file_size, get_mod_fr
 
 console = Console()
 MAKEBLASTDB_BIN = "/usr/local/bin/makeblastdb"
-MODS = ["FB", "SGD", "WB", "XB", "ZFIN"]
 
 
 def store_fasta_files(fasta_file, file_logger) -> None:
@@ -40,25 +37,6 @@ def store_fasta_files(fasta_file, file_logger) -> None:
         Path(original_files_store).mkdir(parents=True, exist_ok=True)
 
     copyfile(fasta_file, original_files_store / Path(fasta_file).name)
-
-
-def get_ftp_file_size(fasta_uri, file_logger) -> int:
-    """
-
-    :param fasta_uri:
-    :param file_logger:
-    """
-    size = 0
-
-    ftp = FTP(Path(fasta_uri).parts[1])
-    ftp.login()
-    ftp.cwd("/".join(Path(fasta_uri).parts[2:-1]))
-    filename = Path(fasta_uri).name
-    size = ftp.size(filename)
-    console.log(f"File size is {size} bytes")
-    file_logger.info(f"File size is {size} bytes")
-
-    return size
 
 
 def get_files_ftp(fasta_uri, md5sum, file_logger) -> bool:
@@ -175,9 +153,6 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
     return True
 
 
-
-
-
 def process_yaml(config_yaml) -> bool:
     """
     Function that processes the YAML file
@@ -212,7 +187,7 @@ def process_json(json_file, environment, mod) -> bool:
     console.log(f"Processing {json_file}")
 
     if mod is None:
-        mod_code = get_mod_from_json(input_json)
+        mod_code = get_mod_from_json(json_file)
     else:
         mod_code = mod
 
