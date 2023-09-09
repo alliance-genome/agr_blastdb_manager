@@ -9,7 +9,6 @@ from rich.console import Console
 
 console = Console()
 
-MODS = ["FB", "SGD", "WB", "XB", "ZFIN"]
 
 def extendable_logger(log_name, file_name, level=logging.INFO):
     """
@@ -79,3 +78,10 @@ def get_mod_from_json(input_json) -> str:
     console.log(f"Mod found: {mod}")
 
     return mod
+
+
+def route53_check() -> bool:
+    """
+    Function that checks if the route53 record exists
+    """
+    pass
