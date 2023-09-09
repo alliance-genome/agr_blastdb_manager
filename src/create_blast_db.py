@@ -14,7 +14,7 @@ import wget
 from rich.console import Console
 import yaml
 
-from utils import check_md5sum, extendable_logger, get_ftp_file_size, get_mod_from_json
+from utils import check_md5sum, extendable_logger, get_ftp_file_size, get_mod_from_json, route53_check
 
 
 console = Console()
@@ -213,8 +213,9 @@ def process_json(json_file, environment, mod) -> bool:
 @click.option("-j", "--input_json", help="JSON file input coordinates")
 @click.option("-e", "--environment", help="Environment", default="dev")
 @click.option("-m", "--mod", help="Model organism")
+@click.option("-r", "--check-route53", help="Check Route53", is_flag=True, default=False)
 # @click.option("-d", "--dry_run", help="Don't download anything", is_flag=True, default=False)
-def create_dbs(config_yaml, input_json, environment, mod):
+def create_dbs(config_yaml, input_json, environment, mod, check_route53):
     """
     Function that runs the pipeline
     :param input_json:
@@ -228,6 +229,9 @@ def create_dbs(config_yaml, input_json, environment, mod):
         click.main(["--help"])
     if config_yaml is not None:
         process_yaml(config_yaml)
+    elif check_route53:
+        console.log("Checking Route53")
+        route53_check()
     else:
         process_json(input_json, environment, mod)
 
