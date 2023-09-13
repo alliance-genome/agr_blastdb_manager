@@ -7,6 +7,7 @@ from pathlib import Path
 
 from rich.console import Console
 
+import boto3
 console = Console()
 
 
@@ -84,4 +85,10 @@ def route53_check() -> bool:
     """
     Function that checks if the route53 record exists
     """
-    pass
+
+    client53 = boto3.client('route53')
+    response = client53.list_resource_record_sets(
+        HostedZoneId='alliancegenome.org',
+        StartRecordType='TXT'
+    )
+    print(response)
