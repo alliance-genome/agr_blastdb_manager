@@ -16,6 +16,9 @@ import yaml
 
 from utils import check_md5sum, extendable_logger, get_ftp_file_size, get_mod_from_json, route53_check
 
+import boto3
+
+
 
 console = Console()
 MAKEBLASTDB_BIN = "/usr/local/bin/makeblastdb"
