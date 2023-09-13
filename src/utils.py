@@ -84,11 +84,15 @@ def get_mod_from_json(input_json) -> str:
 def route53_check() -> bool:
     """
     Function that checks if the route53 record exists
+
+    just listing resour5ces for now, needs to be expanded
     """
 
     client53 = boto3.client('route53')
-    response = client53.list_resource_record_sets(
-        HostedZoneId='alliancegenome.org',
-        StartRecordType='TXT'
-    )
-    print(response)
+    for item in client53.list_hosted_zones_by_name()["HostedZones"]:
+        if item["Name"] == "alliancegenome.org.":
+            agr_hosted_zone_id = item["Id"]
+
+
+    for item in client53.list_resource_record_sets(HostedZoneId=agr_hosted_zone_id)["ResourceRecordSets"]:
+        print(item)
