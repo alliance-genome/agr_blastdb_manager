@@ -4,7 +4,6 @@ version = "0.1.0"
 description = ""
 authors = ["Adam Wright, Paulo Nuin and the Alliance of Genome Resources"]
 readme = "README.md"
-packages = [{include = "agr_blastdb_manager"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
