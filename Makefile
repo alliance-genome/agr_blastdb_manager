@@ -8,7 +8,7 @@ NUM_CORES   := 2
 CURRENT_UID := $(shell id -u)
 CURRENT_GID := $(shell id -g)
 CURRENT_DIR := $(shell pwd)
-CONFIG_DIR := $(shell pwd)/../agr_blast_configuration/conf
+CONFIG_DIR := $(shell pwd)/conf
 DIST_DIR    := dist
 DATA_DIR    := data
 
@@ -47,16 +47,12 @@ docker-build:
 docker-buildx:
 	docker buildx build --platform linux/arm64,linux/amd64 --tag $(DOCKER_TAG):$(VERSION) --tag $(DOCKER_TAG):latest .
 
-docker-run:
-	docker run --user $(CURRENT_UID):$(CURRENT_GID) --rm -it \
+docker-run-help:
+	docker run --user $(CURRENT_UID):$(CURRENT_GID) --rm \
                -v $(CURRENT_DIR)/data:/workflow/data \
                -v $(CURRENT_DIR)/logs:/workflow/logs \
-	       -v $(CURRENT_DIR)/.snakemake:/workflow/.snakemake \
-               -v $(CURRENT_DIR)/.cache:/.cache \
-	       -v $(CURRENT_DIR)/workflow/:/workflow/ \
 	       -v $(CONFIG_DIR):/conf \
-               $(DOCKER_TAG):$(VERSION) \
-
+               $(DOCKER_TAG):$(VERSION)
 
 build: $(DIST_DIR)/%.whl
 
@@ -65,6 +61,16 @@ $(DIST_DIR)/%.whl:
 
 format:
 	black agr_blastdb_manager scripts
+
+docker-run:
+	docker run --user $(CURRENT_UID):$(CURRENT_GID) --rm \
+               -v $(CURRENT_DIR)/data:/data \
+               -v $(CURRENT_DIR)/logs:/logs \
+	       -v $(CONFIG_DIR):/conf \
+               $(DOCKER_TAG):$(VERSION) \
+               /bin/bash -c "python src/create_blast_db.py --config_yaml=/conf/global.yaml"
+
+
 
 
 .PHONY: docker-build docker-run clean clean-fasta clean-blast clean-meta clean-all-blast build format
