@@ -22,8 +22,5 @@ RUN poetry config virtualenvs.create false
 RUN poetry lock --no-update
 RUN poetry install  --no-interaction --no-ansi
 
-RUN file="$(ls -1 .)" && echo $file
-RUN file="$(ls -1 src)" && echo $file
-
 VOLUME ["/workflow/data", "/workflow/logs", "/conf"]
 CMD ["python", "src/create_blast_db.py", "--help"]
