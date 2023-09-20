@@ -11,6 +11,9 @@ import boto3
 console = Console()
 
 
+# TODO: move to ENV
+MODS = ["FB", "SGD", "WB", "XB", "ZFIN"]
+
 def extendable_logger(log_name, file_name, level=logging.INFO):
     """
     Function that creates a logger that can be extended
@@ -92,3 +95,30 @@ def route53_check() -> bool:
         StartRecordType='TXT'
     )
     print(response)
+
+
+def edit_fasta(fasta_file: str, config_entry: dict) -> bool:
+    """
+
+    :param fasta_file:
+    """
+
+    original_file = []
+    with open(fasta_file, "r") as fh:
+        lines = fh.readlines()
+        for line in lines:
+            if line.startswith(">"):
+                line = line.strip()
+                if "seqcol" in config_entry.keys():
+                    line += f" {config_entry['seqcol']} {config_entry['genus']} {config_entry['species']}\n"
+                else:
+                    line += f" {config_entry['genus']} {config_entry['species']} {config_entry['version']}\n"
+                original_file.append(line)
+            else:
+                original_file.append(line)
+
+    edited_file = open(fasta_file, "w")
+    edited_file.writelines(original_file)
+    edited_file.close()
+
+    return True
