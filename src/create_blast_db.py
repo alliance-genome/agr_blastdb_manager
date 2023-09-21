@@ -4,21 +4,18 @@
 import json
 import sys
 from datetime import datetime
-
 from pathlib import Path
 from shutil import copyfile
 from subprocess import PIPE, Popen
 
+import boto3
 import click
 import wget
-from rich.console import Console
 import yaml
+from rich.console import Console
 
-from utils import check_md5sum, extendable_logger, get_ftp_file_size, get_mod_from_json, route53_check
-
-import boto3
-
-
+from utils import (check_md5sum, edit_fasta, extendable_logger,
+                   get_ftp_file_size, get_mod_from_json, route53_check)
 
 console = Console()
 MAKEBLASTDB_BIN = "/usr/local/bin/makeblastdb"
@@ -128,7 +125,8 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
         unzip_command = f"gunzip -v ../data/{fasta_file}"
         p = Popen(unzip_command, shell=True, stdout=PIPE, stderr=PIPE)
         p.wait()
-        console.log("Unzip: done")
+        console.log("Unzip: done\nEditing FASATA file")
+        edit_fasta(f"../data/{fasta_file.replace('.gz', '')}", config_entry)
         file_logger.info(f"Unzipping {fasta_file}: done")
         console.log("File already unzipped")
 
