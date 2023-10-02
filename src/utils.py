@@ -133,3 +133,21 @@ def validate_fasta(filename):
     with open(filename, "r") as handle:
         fasta = SeqIO.parse(handle, "fasta")
         return any(fasta)
+
+
+def split_zfin_fasta(filename):
+    """
+
+    """
+
+    fasta = open(filename).read().splitlines()
+    Path(f"{filename}.tmp").touch()
+
+    for line in fasta:
+        temp = line.split("\\n")
+        for item in temp:
+            with open(f"{filename}.tmp", "a") as fh:
+                fh.write(f"{item}\n")
+
+    Path(filename).unlink()
+    Path(f"{filename}.tmp").rename(filename)

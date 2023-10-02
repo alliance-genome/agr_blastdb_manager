@@ -16,7 +16,7 @@ from rich.console import Console
 
 from utils import (check_md5sum, edit_fasta, extendable_logger,
                    get_ftp_file_size, get_mod_from_json, route53_check,
-                   validate_fasta)
+                   validate_fasta, split_zfin_fasta)
 
 console = Console()
 MAKEBLASTDB_BIN = "/usr/local/bin/makeblastdb"
@@ -127,13 +127,16 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
         p = Popen(unzip_command, shell=True, stdout=PIPE, stderr=PIPE)
         p.wait()
         console.log("Unzip: done\nEditing FASATA file")
-
         file_logger.info(f"Unzipping {fasta_file}: done")
 
-        console.log("File already unzipped")
 
 
     print(validate_fasta(f"../data/{fasta_file.replace('.gz', '')}"))
+
+    if config_entry["taxon_id"] == "NCBITaxon:7955":
+        console.log("Editing ZFIN FASTA file")
+        split_zfin_fasta(f"../data/{fasta_file.replace('.gz', '')}")
+
     edit_fasta(f"../data/{fasta_file.replace('.gz', '')}", config_entry)
     try:
         makeblast_command = (
