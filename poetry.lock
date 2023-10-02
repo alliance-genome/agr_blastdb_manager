@@ -397,6 +397,16 @@ docs = ["furo (>=2023.7.26)", "proselint (>=0.13)", "sphinx (>=7.1.1)", "sphinx-
 test = ["appdirs (==1.4.4)", "covdefaults (>=2.3)", "pytest (>=7.4)", "pytest-cov (>=4.1)", "pytest-mock (>=3.11.1)"]
 
 [[package]]
+name = "py-fasta-validator"
+version = "0.6"
+description = "A small, lightweight, fast fasta validator written in C"
+optional = false
+python-versions = "*"
+files = [
+    {file = "py_fasta_validator-0.6.tar.gz", hash = "sha256:ca29c20e1be31ef190f923b62ddb7fccda8c1c3ba9cf699a6ccaccce10ea011a"},
+]
+
+[[package]]
 name = "pygments"
 version = "2.16.1"
 description = "Pygments is a syntax highlighting package written in Python."
@@ -621,4 +631,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "652268fa030d0320270a0b9d625d49a2d1cacefa2e2002a89498f4a52e4309cc"
+content-hash = "d3518a7656ded6d7e3f9a18ba622f6750c6435d5971dee656419f2aa58d16143"
