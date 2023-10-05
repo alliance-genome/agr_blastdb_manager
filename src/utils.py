@@ -4,6 +4,7 @@ import hashlib
 import logging
 from ftplib import FTP
 from pathlib import Path
+from subprocess import PIPE, Popen
 
 import boto3
 from Bio import SeqIO
@@ -151,3 +152,26 @@ def split_zfin_fasta(filename):
 
     Path(filename).unlink()
     Path(f"{filename}.tmp").rename(filename)
+
+    return True
+
+def s3_sync(path_to_copy: Path) -> bool:
+    """
+
+    """
+
+    console.log(f"Syncing {path_to_copy} to S3")
+    aws_bucket = "s3://agr-blast/blast-test/"
+    proc = Popen(["aws", "s3", "sync", str(path_to_copy), aws_bucket], stdout=PIPE, stderr=PIPE)
+    while True:
+        output = proc.stderr.readline().strip()
+        if output == b"":
+            break
+        else:
+            console.log(output.decode("utf-8"))
+    proc.wait()
+    console.log(f"Syncing {path_to_copy} to S3: done")
+
+    # aws s3 cp myfolder s3://mybucket/myfolder/ --recursive
+
+
