@@ -16,7 +16,7 @@ from rich.console import Console
 
 from utils import (check_md5sum, edit_fasta, extendable_logger,
                    get_ftp_file_size, get_mod_from_json, route53_check,
-                   validate_fasta, split_zfin_fasta)
+                   validate_fasta, split_zfin_fasta, s3_sync)
 
 console = Console()
 MAKEBLASTDB_BIN = "/usr/local/bin/makeblastdb"
@@ -129,10 +129,6 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
         console.log("Unzip: done\nEditing FASATA file")
         file_logger.info(f"Unzipping {fasta_file}: done")
 
-
-
-    print(validate_fasta(f"../data/{fasta_file.replace('.gz', '')}"))
-
     if config_entry["taxon_id"] == "NCBITaxon:7955":
         console.log("Editing ZFIN FASTA file")
         split_zfin_fasta(f"../data/{fasta_file.replace('.gz', '')}")
@@ -184,6 +180,7 @@ def process_yaml(config_yaml) -> bool:
             )
             console.log(f"Processing {json_file}")
             process_json(json_file, environment, provider["name"])
+
 
 
 def process_json(json_file, environment, mod) -> bool:
@@ -247,6 +244,7 @@ def create_dbs(config_yaml, input_json, environment, mod, check_route53):
     else:
         process_json(input_json, environment, mod)
 
+    s3_sync(Path("../data"))
 
 if __name__ == "__main__":
     create_dbs()
