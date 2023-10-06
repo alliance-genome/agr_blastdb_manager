@@ -16,6 +16,7 @@ pyyaml = "^6.0.1"
 boto3 = "^1.28.46"
 biopython = "^1.81"
 py-fasta-validator = "^0.6"
+python-dotenv = "^1.0.0"
 
 [tool.poetry.group.dev.dependencies]
 isort = "^5.12.0"
