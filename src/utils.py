@@ -8,6 +8,7 @@ from subprocess import PIPE, Popen
 
 import boto3
 from Bio import SeqIO
+from dotenv import dotenv_values
 from rich.console import Console
 
 console = Console()
@@ -160,9 +161,10 @@ def s3_sync(path_to_copy: Path) -> bool:
 
     """
 
+    env = dotenv_values(f"{Path.cwd()}/.env")
+
     console.log(f"Syncing {path_to_copy} to S3")
-    aws_bucket = "s3://agr-blast/blast-test/"
-    proc = Popen(["aws", "s3", "sync", str(path_to_copy), aws_bucket], stdout=PIPE, stderr=PIPE)
+    proc = Popen(["aws", "s3", "sync", str(path_to_copy), env['S3'], "--exclude", "*.tmp"], stdout=PIPE, stderr=PIPE)
     while True:
         output = proc.stderr.readline().strip()
         if output == b"":
@@ -171,7 +173,3 @@ def s3_sync(path_to_copy: Path) -> bool:
             console.log(output.decode("utf-8"))
     proc.wait()
     console.log(f"Syncing {path_to_copy} to S3: done")
-
-    # aws s3 cp myfolder s3://mybucket/myfolder/ --recursive
-
-

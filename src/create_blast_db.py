@@ -12,14 +12,15 @@ import boto3
 import click
 import wget
 import yaml
+from dotenv import dotenv_values
 from rich.console import Console
 
 from utils import (check_md5sum, edit_fasta, extendable_logger,
                    get_ftp_file_size, get_mod_from_json, route53_check,
-                   validate_fasta, split_zfin_fasta, s3_sync)
+                   s3_sync, split_zfin_fasta, validate_fasta)
 
 console = Console()
-MAKEBLASTDB_BIN = "/usr/local/bin/makeblastdb"
+
 
 
 def store_fasta_files(fasta_file, file_logger) -> None:
@@ -118,6 +119,8 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
     :param file_logger:
     """
 
+    env = dotenv_values(f"{Path.cwd()}/.env")
+
     fasta_file = Path(config_entry["uri"]).name
     console.log(f"Running makeblastdb for {fasta_file}")
 
@@ -136,7 +139,7 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
     edit_fasta(f"../data/{fasta_file.replace('.gz', '')}", config_entry)
     try:
         makeblast_command = (
-            f"{MAKEBLASTDB_BIN} -in ../data/{fasta_file.replace('.gz', '')} -dbtype {config_entry['seqtype']} "
+            f"{env['MAKEBLASTDB_BIN']} -in ../data/{fasta_file.replace('.gz', '')} -dbtype {config_entry['seqtype']} "
             f"-title '{config_entry['blast_title']}' -parse_seqids "
             f"-out {output_dir}/{fasta_file.replace('fa.gz', 'db ')} "
             f"-taxid {config_entry['taxon_id'].replace('NCBITaxon:', '')} "
