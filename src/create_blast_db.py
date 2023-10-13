@@ -102,12 +102,15 @@ def create_db_structure(environment, mod, config_entry, file_logger) -> bool:
             f"../data/blast/{mod}/{environment}/databases/{config_entry['genus']}/{config_entry['species']}/"
             f"{config_entry['blast_title'].replace(' ', '_')}/"
         )
+    c = f"../data/config/{mod}/{environment}"
 
     Path(p).mkdir(parents=True, exist_ok=True)
+    Path(c).mkdir(parents=True, exist_ok=True)
+
     console.log(f"Directory {p} created")
     file_logger.info(f"Directory {p} created")
 
-    return p
+    return p, c
 
 
 def run_makeblastdb(config_entry, output_dir, file_logger):
@@ -213,9 +216,10 @@ def process_json(json_file, environment, mod) -> bool:
             )
             file_logger.info(f"Mod found/provided: {mod_code}")
             if get_files_ftp(entry["uri"], entry["md5sum"], file_logger):
-                output_dir = create_db_structure(
+                output_dir, config_dir = create_db_structure(
                     environment, mod_code, entry, file_logger
                 )
+                copyfile(json_file, f"{config_dir}/environment.json")
                 if Path(output_dir).exists():
                     run_makeblastdb(entry, output_dir, file_logger)
 
