@@ -156,7 +156,7 @@ def split_zfin_fasta(filename):
 
     return True
 
-def s3_sync(path_to_copy: Path) -> bool:
+def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
     """
 
     """
@@ -173,3 +173,25 @@ def s3_sync(path_to_copy: Path) -> bool:
             console.log(output.decode("utf-8"))
     proc.wait()
     console.log(f"Syncing {path_to_copy} to S3: done")
+
+    if not skip_efs_sync:
+        sync_to_efs()
+
+
+def sync_to_efs():
+    """
+
+    """
+
+    env = dotenv_values(f"{Path.cwd()}/.env")
+
+    console.log(f"Syncing {env['S3']} to {env['EFS']}")
+    proc = Popen(["aws", "s3", "sync", env["S3"], env["EFS"], "--exclude", "*.tmp"], stdout=PIPE, stderr=PIPE)
+    while True:
+        output = proc.stderr.readline().strip()
+        if output == b"":
+            break
+        else:
+            console.log(output.decode("utf-8"))
+    proc.wait()
+    console.log(f"Syncing {env['EFS']} to {env['EFS']}: done")
