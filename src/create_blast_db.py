@@ -226,7 +226,7 @@ def process_json(json_file, environment, mod) -> bool:
 @click.option("-e", "--environment", help="Environment", default="dev")
 @click.option("-m", "--mod", help="Model organism")
 @click.option("-r", "--check_route53", help="Check Route53", is_flag=True, default=False)
-@click.option("-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=True)
+@click.option("-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=False)
 # @click.option("-d", "--dry_run", help="Don't download anything", is_flag=True, default=False)
 def create_dbs(config_yaml, input_json, environment, mod, check_route53, skip_efs_sync
     """
