@@ -185,7 +185,7 @@ def sync_to_efs():
 
     env = dotenv_values(f"{Path.cwd()}/.env")
 
-    console.log(f"Syncing {env['EFS']} to {env['FMS']}")
+    console.log(f"Syncing {env['S3']} to {env['EFS']}")
     proc = Popen(["aws", "s3", "sync", env["S3"], env["EFS"], "--exclude", "*.tmp"], stdout=PIPE, stderr=PIPE)
     while True:
         output = proc.stderr.readline().strip()
@@ -194,4 +194,4 @@ def sync_to_efs():
         else:
             console.log(output.decode("utf-8"))
     proc.wait()
-    console.log(f"Syncing {env['EFS']} to {env['FMS']}: done")
+    console.log(f"Syncing {env['EFS']} to {env['EFS']}: done")
