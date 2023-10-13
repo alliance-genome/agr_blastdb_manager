@@ -174,7 +174,7 @@ def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
     proc.wait()
     console.log(f"Syncing {path_to_copy} to S3: done")
 
-    if skip_efs_sync:
+    if not skip_efs_sync:
         sync_to_efs()
 
 
