@@ -225,9 +225,10 @@ def process_json(json_file, environment, mod) -> bool:
 @click.option("-j", "--input_json", help="JSON file input coordinates")
 @click.option("-e", "--environment", help="Environment", default="dev")
 @click.option("-m", "--mod", help="Model organism")
-@click.option("-r", "--check-route53", help="Check Route53", is_flag=True, default=False)
+@click.option("-r", "--check_route53", help="Check Route53", is_flag=True, default=False)
+@click.option("-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=True)
 # @click.option("-d", "--dry_run", help="Don't download anything", is_flag=True, default=False)
-def create_dbs(config_yaml, input_json, environment, mod, check_route53):
+def create_dbs(config_yaml, input_json, environment, mod, check_route53, skip_efs_sync
     """
     Function that runs the pipeline
     :param input_json:
@@ -247,7 +248,7 @@ def create_dbs(config_yaml, input_json, environment, mod, check_route53):
     else:
         process_json(input_json, environment, mod)
 
-    s3_sync(Path("../data"))
+    s3_sync(Path("../data"), skip_efs_sync)
 
 if __name__ == "__main__":
     create_dbs()
