@@ -102,12 +102,15 @@ def create_db_structure(environment, mod, config_entry, file_logger) -> bool:
             f"../data/blast/{mod}/{environment}/databases/{config_entry['genus']}/{config_entry['species']}/"
             f"{config_entry['blast_title'].replace(' ', '_')}/"
         )
+    c = f"../data/config/{mod}/{environment}"
 
     Path(p).mkdir(parents=True, exist_ok=True)
+    Path(c).mkdir(parents=True, exist_ok=True)
+
     console.log(f"Directory {p} created")
     file_logger.info(f"Directory {p} created")
 
-    return p
+    return p, c
 
 
 def run_makeblastdb(config_entry, output_dir, file_logger):
@@ -213,9 +216,10 @@ def process_json(json_file, environment, mod) -> bool:
             )
             file_logger.info(f"Mod found/provided: {mod_code}")
             if get_files_ftp(entry["uri"], entry["md5sum"], file_logger):
-                output_dir = create_db_structure(
+                output_dir, config_dir = create_db_structure(
                     environment, mod_code, entry, file_logger
                 )
+                copyfile(json_file, f"{config_dir}/environment.json")
                 if Path(output_dir).exists():
                     run_makeblastdb(entry, output_dir, file_logger)
 
@@ -225,9 +229,10 @@ def process_json(json_file, environment, mod) -> bool:
 @click.option("-j", "--input_json", help="JSON file input coordinates")
 @click.option("-e", "--environment", help="Environment", default="dev")
 @click.option("-m", "--mod", help="Model organism")
-@click.option("-r", "--check-route53", help="Check Route53", is_flag=True, default=False)
+@click.option("-r", "--check_route53", help="Check Route53", is_flag=True, default=False)
+@click.option("-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=False)
 # @click.option("-d", "--dry_run", help="Don't download anything", is_flag=True, default=False)
-def create_dbs(config_yaml, input_json, environment, mod, check_route53):
+def create_dbs(config_yaml, input_json, environment, mod, check_route53, skip_efs_sync):
     """
     Function that runs the pipeline
     :param input_json:
@@ -247,7 +252,7 @@ def create_dbs(config_yaml, input_json, environment, mod, check_route53):
     else:
         process_json(input_json, environment, mod)
 
-    s3_sync(Path("../data"))
+    s3_sync(Path("../data"), skip_efs_sync)
 
 if __name__ == "__main__":
     create_dbs()
