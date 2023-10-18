@@ -10,6 +10,7 @@ import boto3
 from Bio import SeqIO
 from dotenv import dotenv_values
 from rich.console import Console
+from rich.style import Style
 
 console = Console()
 
@@ -195,3 +196,18 @@ def sync_to_efs():
             console.log(output.decode("utf-8"))
     proc.wait()
     console.log(f"Syncing {env['EFS']} to {env['EFS']}: done")
+
+
+
+def check_output(stdout, stderr) -> bool:
+    """
+
+    """
+
+    if len (stderr.decode("utf-8")) > 1:
+        console.log(stderr.decode("utf-8"), style="blink bold white on red")
+        return False
+
+
+
+
