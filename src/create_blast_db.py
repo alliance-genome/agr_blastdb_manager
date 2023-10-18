@@ -17,7 +17,7 @@ from rich.console import Console
 
 from utils import (check_md5sum, edit_fasta, extendable_logger,
                    get_ftp_file_size, get_mod_from_json, route53_check,
-                   s3_sync, split_zfin_fasta, validate_fasta)
+                   s3_sync, split_zfin_fasta, validate_fasta, check_output)
 
 console = Console()
 
@@ -152,13 +152,16 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
         p = Popen(makeblast_command, shell=True, stdout=PIPE, stderr=PIPE)
         stdout, stderr = p.communicate()
         p.wait()
-
-        console.log(stdout.decode("utf-8"))
-        console.log("Makeblastdb: done")
-        file_logger.info("Makeblastdb: done")
-        Path(f"../data/{fasta_file.replace('.gz', '')}").unlink()
-        file_logger.info(f"Removed {fasta_file.replace('.gz', '')}")
-        console.log("Removed unzipped file")
+        if check_output(stdout, stderr):
+            console.log("Makeblastdb: done")
+            file_logger.info("Makeblastdb: done")
+            Path(f"../data/{fasta_file.replace('.gz', '')}").unlink()
+            file_logger.info(f"Removed {fasta_file.replace('.gz', '')}")
+            console.log("Removed unzipped file")
+        else:
+            console.log("Error running makeblastdb")
+            file_logger.info("Error running makeblastdb")
+            return False
     except Exception as e:
         console.log(f"Error running makeblastdb: {e}")
         file_logger.info(f"Error running makeblastdb: {e}")
