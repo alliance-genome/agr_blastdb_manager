@@ -217,7 +217,7 @@ def slack_post(message: str) -> bool:
     """ """
 
     # move to .env eventually
-    slack_channel = "https://hooks.slack.com/services/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"
+    slack_channel = "https://hooks.slack.com/services/"
     webhook = WebhookClient(slack_channel)
     response = webhook.send(text=message)
     assert response.status_code == 200
