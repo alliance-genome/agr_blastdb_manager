@@ -10,6 +10,7 @@ import boto3
 from Bio import SeqIO
 from dotenv import dotenv_values
 from rich.console import Console
+from slack_sdk.webhook import WebhookClient
 
 console = Console()
 
@@ -203,6 +204,23 @@ def sync_to_efs():
 def check_output(stdout, stderr) -> bool:
     """ """
 
-    if len(stderr.decode("utf-8")) > 1:
-        console.log(stderr.decode("utf-8"), style="blink bold white on red")
-        return False
+    stderr = stderr.decode("utf-8")
+    if len(stderr) > 1:
+        if stderr.find("Error") >= 1:
+            console.log(stderr.decode("utf-8"), style="blink bold white on red")
+            return False
+    else:
+        return True
+
+
+def slack_post(message: str) -> bool:
+    """ """
+
+    # move to .env eventually
+    slack_channel = "https://hooks.slack.com/services/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"
+    webhook = WebhookClient(slack_channel)
+    response = webhook.send(text=message)
+    assert response.status_code == 200
+    assert response.body == "ok"
+
+    return True
