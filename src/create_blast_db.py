@@ -5,22 +5,19 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
-from shutil import copyfile
+from shutil import copyfile, rmtree
 from subprocess import PIPE, Popen
 
-import boto3
 import click
 import wget
 import yaml
 from dotenv import dotenv_values
 from rich.console import Console
 
-from utils import (check_md5sum, edit_fasta, extendable_logger,
-                   get_ftp_file_size, get_mod_from_json, route53_check,
-                   s3_sync, split_zfin_fasta, validate_fasta, check_output)
+from utils import (check_md5sum, check_output, edit_fasta, extendable_logger,
+                   get_mod_from_json, route53_check, s3_sync, split_zfin_fasta)
 
 console = Console()
-
 
 
 def store_fasta_files(fasta_file, file_logger) -> None:
@@ -161,6 +158,8 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
         else:
             console.log("Error running makeblastdb")
             file_logger.info("Error running makeblastdb")
+            console.log("Removing folders")
+            rmtree(output_dir)
             return False
     except Exception as e:
         console.log(f"Error running makeblastdb: {e}")
@@ -189,7 +188,6 @@ def process_yaml(config_yaml) -> bool:
             )
             console.log(f"Processing {json_file}")
             process_json(json_file, environment, provider["name"])
-
 
 
 def process_json(json_file, environment, mod) -> bool:
@@ -232,8 +230,12 @@ def process_json(json_file, environment, mod) -> bool:
 @click.option("-j", "--input_json", help="JSON file input coordinates")
 @click.option("-e", "--environment", help="Environment", default="dev")
 @click.option("-m", "--mod", help="Model organism")
-@click.option("-r", "--check_route53", help="Check Route53", is_flag=True, default=False)
-@click.option("-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=False)
+@click.option(
+    "-r", "--check_route53", help="Check Route53", is_flag=True, default=False
+)
+@click.option(
+    "-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=False
+)
 # @click.option("-d", "--dry_run", help="Don't download anything", is_flag=True, default=False)
 def create_dbs(config_yaml, input_json, environment, mod, check_route53, skip_efs_sync):
     """
@@ -256,6 +258,7 @@ def create_dbs(config_yaml, input_json, environment, mod, check_route53, skip_ef
         process_json(input_json, environment, mod)
 
     s3_sync(Path("../data"), skip_efs_sync)
+
 
 if __name__ == "__main__":
     create_dbs()
