@@ -15,7 +15,8 @@ from dotenv import dotenv_values
 from rich.console import Console
 
 from utils import (check_md5sum, check_output, edit_fasta, extendable_logger,
-                   get_mod_from_json, route53_check, s3_sync, split_zfin_fasta)
+                   get_mod_from_json, route53_check, s3_sync, slack_post,
+                   split_zfin_fasta)
 
 console = Console()
 
@@ -155,11 +156,13 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
             Path(f"../data/{fasta_file.replace('.gz', '')}").unlink()
             file_logger.info(f"Removed {fasta_file.replace('.gz', '')}")
             console.log("Removed unzipped file")
+            slack_post(f"Makeblastdb done for {fasta_file}")
         else:
             console.log("Error running makeblastdb")
             file_logger.info("Error running makeblastdb")
             console.log("Removing folders")
             rmtree(output_dir)
+            slack_post(f"Error running makeblastdb for {fasta_file}")
             return False
     except Exception as e:
         console.log(f"Error running makeblastdb: {e}")
@@ -207,6 +210,7 @@ def process_json(json_file, environment, mod) -> bool:
     else:
         mod_code = mod
 
+    slack_post(f"Starting processing of file {Path(json_file).name}")
     if mod_code is not False:
         db_coordinates = json.load(open(json_file, "r"))
         for entry in db_coordinates["data"]:
