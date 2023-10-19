@@ -17,6 +17,7 @@ console = Console()
 # TODO: move to ENV
 MODS = ["FB", "SGD", "WB", "XB", "ZFIN"]
 
+
 def extendable_logger(log_name, file_name, level=logging.INFO):
     """
     Function that creates a logger that can be extended
@@ -92,10 +93,9 @@ def route53_check() -> bool:
     Function that checks if the route53 record exists
     """
 
-    client53 = boto3.client('route53')
+    client53 = boto3.client("route53")
     response = client53.list_resource_record_sets(
-        HostedZoneId='alliancegenome.org',
-        StartRecordType='TXT'
+        HostedZoneId="alliancegenome.org", StartRecordType="TXT"
     )
     print(response)
 
@@ -138,9 +138,7 @@ def validate_fasta(filename):
 
 
 def split_zfin_fasta(filename):
-    """
-
-    """
+    """ """
 
     fasta = open(filename).read().splitlines()
     Path(f"{filename}.tmp").touch()
@@ -156,15 +154,18 @@ def split_zfin_fasta(filename):
 
     return True
 
-def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
-    """
 
-    """
+def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
+    """ """
 
     env = dotenv_values(f"{Path.cwd()}/.env")
 
     console.log(f"Syncing {path_to_copy} to S3")
-    proc = Popen(["aws", "s3", "sync", str(path_to_copy), env['S3'], "--exclude", "*.tmp"], stdout=PIPE, stderr=PIPE)
+    proc = Popen(
+        ["aws", "s3", "sync", str(path_to_copy), env["S3"], "--exclude", "*.tmp"],
+        stdout=PIPE,
+        stderr=PIPE,
+    )
     while True:
         output = proc.stderr.readline().strip()
         if output == b"":
@@ -179,14 +180,16 @@ def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
 
 
 def sync_to_efs():
-    """
-
-    """
+    """ """
 
     env = dotenv_values(f"{Path.cwd()}/.env")
 
     console.log(f"Syncing {env['S3']} to {env['EFS']}")
-    proc = Popen(["aws", "s3", "sync", env["S3"], env["EFS"], "--exclude", "*.tmp"], stdout=PIPE, stderr=PIPE)
+    proc = Popen(
+        ["aws", "s3", "sync", env["S3"], env["EFS"], "--exclude", "*.tmp"],
+        stdout=PIPE,
+        stderr=PIPE,
+    )
     while True:
         output = proc.stderr.readline().strip()
         if output == b"":
@@ -195,3 +198,11 @@ def sync_to_efs():
             console.log(output.decode("utf-8"))
     proc.wait()
     console.log(f"Syncing {env['EFS']} to {env['EFS']}: done")
+
+
+def check_output(stdout, stderr) -> bool:
+    """ """
+
+    if len(stderr.decode("utf-8")) > 1:
+        console.log(stderr.decode("utf-8"), style="blink bold white on red")
+        return False
