@@ -214,7 +214,9 @@ def check_output(stdout, stderr) -> bool:
 
 
 def slack_post(message: str) -> bool:
-    """ """
+    """
+    deprecated as it uses webhooks
+    """
 
     env = dotenv_values(f"{Path.cwd()}/.env")
 
@@ -227,3 +229,29 @@ def slack_post(message: str) -> bool:
     assert response.body == "ok"
 
     return True
+
+
+def slack_message(messages: list) -> bool:
+    """
+    Function that sends a message to Slack
+    :param message:
+    """
+
+    env = dotenv_values(f"{Path.cwd()}/.env")
+    client = WebClient(token=env["SLACK"])
+
+    try:
+       # Call the chat.postMessage method using the WebClient
+       response = client.chat_postMessage(
+           channel='#blast-status', # Channel to send message to
+           text="Example of rich message", # Subject of the message
+           attachments=messages
+       )
+    except SlackApiError as e:
+       # You will get a SlackApiError if "ok" is False
+       assert e.response["ok"] is False
+       assert e.response["error"] # str like 'invalid_auth', 'channel_not_found'
+       print(f"Got an error: {e.response['error']}")
+
+
+
