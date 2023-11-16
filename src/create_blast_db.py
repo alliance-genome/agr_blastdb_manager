@@ -14,13 +14,22 @@ import yaml
 from dotenv import dotenv_values
 from rich.console import Console
 
-from utils import (check_md5sum, check_output, edit_fasta, extendable_logger,
-                   get_mod_from_json, route53_check, s3_sync, slack_message,
-                   split_zfin_fasta)
+from utils import (
+    check_md5sum,
+    check_output,
+    edit_fasta,
+    extendable_logger,
+    get_mod_from_json,
+    route53_check,
+    s3_sync,
+    slack_message,
+    split_zfin_fasta,
+)
 
 console = Console()
 
 slack_messages = []
+
 
 def store_fasta_files(fasta_file, file_logger) -> None:
     """
@@ -126,11 +135,7 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
     fasta_file = Path(config_entry["uri"]).name
     console.log(f"Running makeblastdb for {fasta_file}")
     slack_messages.append(
-        {
-            "title": "Running makeblastdb",
-            "text": fasta_file,
-            "color": "#36a64f"
-        },
+        {"title": "Running makeblastdb", "text": fasta_file, "color": "#36a64f"},
     )
 
     if not Path(f"../data/{fasta_file.replace('.gz', '')}").exists():
@@ -164,7 +169,7 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
                 {
                     "title": "Makeblastdb completed",
                     "text": fasta_file,
-                    "color": "#36a64f"
+                    "color": "#36a64f",
                 },
             )
             file_logger.info("Makeblastdb: done")
@@ -177,7 +182,7 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
                 {
                     "title": "Error running makeblastdb",
                     "text": fasta_file,
-                    "color": "#8D2707"
+                    "color": "#8D2707",
                 },
             )
             file_logger.info("Error running makeblastdb")
@@ -190,7 +195,7 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
             {
                 "title": "Error running makeblastdb",
                 "text": fasta_file,
-                "color": "#8D2707"
+                "color": "#8D2707",
             },
         )
         file_logger.info(f"Error running makeblastdb: {e}")
@@ -211,11 +216,7 @@ def process_yaml(config_yaml) -> bool:
     for provider in config["data_providers"]:
         console.log(f"Processing {provider['name']}")
         slack_messages.append(
-            {
-                "title": "Processing",
-                "text": provider['name'],
-                "color": "#36a64f"
-            },
+            {"title": "Processing", "text": provider["name"], "color": "#36a64f"},
         )
         for environment in provider["environments"]:
             console.log(f"Processing {environment}")
@@ -240,13 +241,8 @@ def process_json(json_file, environment, mod) -> bool:
     console.log(f"Processing {json_file}")
 
     slack_messages.append(
-        {
-            "title": "JSON processing",
-            "text": json_file,
-            "color": "#36a64f"
-        },
+        {"title": "JSON processing", "text": json_file, "color": "#36a64f"},
     )
-
 
     if mod is None:
         mod_code = get_mod_from_json(json_file)
