@@ -10,7 +10,9 @@ import boto3
 from Bio import SeqIO
 from dotenv import dotenv_values
 from rich.console import Console
-from slack_sdk.webhook import WebhookClient
+
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
 
 console = Console()
 
@@ -231,7 +233,7 @@ def slack_post(message: str) -> bool:
     return True
 
 
-def slack_message(messages: list) -> bool:
+def slack_message(messages: list, subject = "Update") -> bool:
     """
     Function that sends a message to Slack
     :param message:
@@ -244,7 +246,7 @@ def slack_message(messages: list) -> bool:
        # Call the chat.postMessage method using the WebClient
        response = client.chat_postMessage(
            channel='#blast-status', # Channel to send message to
-           text="Example of rich message", # Subject of the message
+           text= subject, # Subject of the message
            attachments=messages
        )
     except SlackApiError as e:
