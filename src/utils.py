@@ -10,7 +10,8 @@ import boto3
 from Bio import SeqIO
 from dotenv import dotenv_values
 from rich.console import Console
-from slack_sdk.webhook import WebhookClient
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
 
 console = Console()
 
@@ -214,10 +215,11 @@ def check_output(stdout, stderr) -> bool:
 
 
 def slack_post(message: str) -> bool:
-    """ """
+    """
+    deprecated as it uses webhooks
+    """
 
     env = dotenv_values(f"{Path.cwd()}/.env")
-
 
     # move to .env eventually
     slack_channel = f"https://hooks.slack.com/services/{env['SLACK']}"
@@ -227,3 +229,26 @@ def slack_post(message: str) -> bool:
     assert response.body == "ok"
 
     return True
+
+
+def slack_message(messages: list, subject="Update") -> bool:
+    """
+    Function that sends a message to Slack
+    :param message:
+    """
+
+    env = dotenv_values(f"{Path.cwd()}/.env")
+    client = WebClient(token=env["SLACK"])
+
+    try:
+        # Call the chat.postMessage method using the WebClient
+        response = client.chat_postMessage(
+            channel="#blast-status",  # Channel to send message to
+            text=subject,  # Subject of the message
+            attachments=messages,
+        )
+    except SlackApiError as e:
+        # You will get a SlackApiError if "ok" is False
+        assert e.response["ok"] is False
+        assert e.response["error"]  # str like 'invalid_auth', 'channel_not_found'
+        print(f"Got an error: {e.response['error']}")
