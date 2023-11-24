@@ -33,19 +33,24 @@ slack_messages = []
 
 def store_fasta_files(fasta_file, file_logger) -> None:
     """
+    Stores the given fasta file in a specific directory.
 
-    :param fasta_file:
-    :param file_logger:
+    :param fasta_file: The path to the fasta file to be stored.
+    :param file_logger: The logger to log the function's actions and errors.
     """
 
+    # Get the current date and format it as a string
     date_to_add = datetime.now().strftime("%Y_%b_%d")
 
+    # Define the path to the directory where the file will be stored
     original_files_store = Path(f"../data/database_{date_to_add}")
 
+    # If the directory does not exist, create it
     if not Path(original_files_store).exists():
         console.log(f"Creating {original_files_store}")
         Path(original_files_store).mkdir(parents=True, exist_ok=True)
 
+    # Copy the fasta file to the directory
     copyfile(fasta_file, original_files_store / Path(fasta_file).name)
 
 
@@ -90,6 +95,54 @@ def get_files_ftp(fasta_uri, md5sum, file_logger) -> bool:
         # If any error occurs, log the error and return False
         console.log(f"Error downloading {fasta_uri}: {e}")
         return False
+
+
+def create_db_structure(environment, mod, config_entry, file_logger) -> bool:
+    """
+    Function that creates the database and folder structure
+
+    :param environment: The environment in which the database is being created.
+    :param mod: The Model Organism.
+    :param config_entry: A JSON element containing information about the database being created.
+    :param file_logger: An external logger used to log the operations performed by the function.
+    :return: The paths of the created directories.
+    """
+    # Log the creation of the database structure
+    file_logger.info("Creating database structure")
+
+    # Check if 'seqcol' is in the config entry
+    if "seqcol" in config_entry.keys():
+        # If it is, log the fact and construct the directory path using 'seqcol'
+        file_logger.info("seqcol found in config file")
+        console.log(
+            f"Directory '../data/blast/{mod}/{environment}/databases/{config_entry['seqcol']}"
+            f"/{config_entry['blast_title']}/' will be created"
+        )
+        p = f"../data/blast/{mod}/{environment}/databases/{config_entry['seqcol']}/{config_entry['blast_title']}/"
+    else:
+        # If it's not, log the fact and construct the directory path using 'genus', 'species', and 'blast_title'
+        file_logger.info("seqcol not found in config file")
+        console.log(
+            f"Directory '../data/blast/{mod}/{environment}/databases/{config_entry['genus']}"
+            f"{config_entry['species']}"
+            f"/{config_entry['blast_title']}/' will be created"
+        )
+        p = (
+            f"../data/blast/{mod}/{environment}/databases/{config_entry['genus']}/{config_entry['species']}/"
+            f"{config_entry['blast_title'].replace(' ', '_')}/"
+        )
+    c = f"../data/config/{mod}/{environment}"
+
+    # Create the directory structure
+    Path(p).mkdir(parents=True, exist_ok=True)
+    Path(c).mkdir(parents=True, exist_ok=True)
+
+    # Log the creation of the directory
+    console.log(f"Directory {p} created")
+    file_logger.info(f"Directory {p} created")
+
+    # Return the paths of the created directories
+    return p, c
 
 
 def run_makeblastdb(config_entry, output_dir, file_logger):
