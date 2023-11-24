@@ -206,25 +206,43 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
 
 def process_yaml(config_yaml) -> bool:
     """
-    Function that processes the YAML file
+    This function processes a YAML file, extracts necessary data, and performs operations based on the provided arguments.
 
-    :param config_yaml:
+    :param config_yaml: The YAML file to be processed.
+    :return: Returns True if the process was successful, False otherwise.
     """
 
+    # Load the YAML file
     config = yaml.load(open(config_yaml), Loader=yaml.FullLoader)
 
+    # Iterate over each data provider in the YAML file
     for provider in config["data_providers"]:
+        # Log the name of the data provider
         console.log(f"Processing {provider['name']}")
+        # Add a message to the slack_messages list
         slack_messages.append(
-            {"title": "Processing", "text": provider["name"], "color": "#36a64f"},
+            {
+                "title": "YAML processing",
+                "text": f"{provider['name']} from {Path(config_yaml).stem}",
+                "color": "#36a64f",
+            }
         )
+
+        # Iterate over each environment in the data provider
         for environment in provider["environments"]:
+            # Log the name of the environment
             console.log(f"Processing {environment}")
+
+            # Construct the path to the JSON file
             json_file = (
                 Path(config_yaml).parent
                 / f"{provider['name']}/databases.{provider['name']}.{environment}.json"
             )
+
+            # Log the path to the JSON file
             console.log(f"Processing {json_file}")
+
+            # Process the JSON file
             process_json(json_file, environment, provider["name"])
 
 
