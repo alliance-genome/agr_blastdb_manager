@@ -52,82 +52,44 @@ def store_fasta_files(fasta_file, file_logger) -> None:
 def get_files_ftp(fasta_uri, md5sum, file_logger) -> bool:
     """
     Function that downloads the files from the FTP site
-    :param fasta_uri:
-    :param md5sum:
-    :param dry_run:
-    :return:
+    :param fasta_uri: The URL of the file to download
+    :param md5sum: The expected MD5 checksum of the file
+    :param file_logger: A logger to log the function's actions and errors
+    :return: True if the file was successfully downloaded and the checksum is correct, False otherwise
     """
 
+    # Log the file that is about to be downloaded
     file_logger.info(f"Downloading {fasta_uri}")
 
-    # size = get_ftp_file_size(fasta_uri, file_logger)
-
     try:
+        # Log the download process
         console.log(f"Downloading {fasta_uri}")
+
+        # Specify the location where the file should be saved
         fasta_file = f"../data/{Path(fasta_uri).name}"
         console.log(f"Saving to {fasta_file}")
-        file_logger.info(f"Saving to {fasta_file}")
+
+        # Check if the file already exists at the specified location
         if not Path(fasta_file).exists():
+            # If the file doesn't exist, download it
             wget.download(fasta_uri, fasta_file)
             store_fasta_files(fasta_file, file_logger)
         else:
+            # If the file does exist, log this fact and skip the download
             console.log(f"{fasta_file} already exists")
             file_logger.info(f"{fasta_file} already exists")
+
+        # Check the MD5 checksum of the downloaded file
         if check_md5sum(fasta_file, md5sum):
+            # If the checksum is correct, return True
             return True
         else:
+            # If the checksum is not correct, log this fact and return False
             file_logger.info("MD5sums do not match")
     except Exception as e:
+        # If any error occurs, log the error and return False
         console.log(f"Error downloading {fasta_uri}: {e}")
         return False
-
-
-def create_db_structure(environment, mod, config_entry, file_logger) -> bool:
-    """
-    Function that creates the database and folder structure
-
-    :param environment: The environment in which the database is being created.
-    :param mod: The Model Organism.
-    :param config_entry: A JSON element containing information about the database being created.
-    :param file_logger: An external logger used to log the operations performed by the function.
-    :return: The paths of the created directories.
-    """
-    # Log the creation of the database structure
-    file_logger.info("Creating database structure")
-
-    # Check if 'seqcol' is in the config entry
-    if "seqcol" in config_entry.keys():
-        # If it is, log the fact and construct the directory path using 'seqcol'
-        file_logger.info("seqcol found in config file")
-        console.log(
-            f"Directory '../data/blast/{mod}/{environment}/databases/{config_entry['seqcol']}"
-            f"/{config_entry['blast_title']}/' will be created"
-        )
-        p = f"../data/blast/{mod}/{environment}/databases/{config_entry['seqcol']}/{config_entry['blast_title']}/"
-    else:
-        # If it's not, log the fact and construct the directory path using 'genus', 'species', and 'blast_title'
-        file_logger.info("seqcol not found in config file")
-        console.log(
-            f"Directory '../data/blast/{mod}/{environment}/databases/{config_entry['genus']}"
-            f"{config_entry['species']}"
-            f"/{config_entry['blast_title']}/' will be created"
-        )
-        p = (
-            f"../data/blast/{mod}/{environment}/databases/{config_entry['genus']}/{config_entry['species']}/"
-            f"{config_entry['blast_title'].replace(' ', '_')}/"
-        )
-    c = f"../data/config/{mod}/{environment}"
-
-    # Create the directory structure
-    Path(p).mkdir(parents=True, exist_ok=True)
-    Path(c).mkdir(parents=True, exist_ok=True)
-
-    # Log the creation of the directory
-    console.log(f"Directory {p} created")
-    file_logger.info(f"Directory {p} created")
-
-    # Return the paths of the created directories
-    return p, c
 
 
 def run_makeblastdb(config_entry, output_dir, file_logger):
