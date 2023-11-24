@@ -281,31 +281,53 @@ def process_json(json_file, environment, mod) -> bool:
 @click.option("-u", "--update-slack", help="Update Slack", is_flag=True, default=False)
 @click.option("-s3", "--sync-s3", help="Sync to S3", is_flag=True, default=False)
 # @click.option("-d", "--dry_run", help="Don't download anything", is_flag=True, default=False)
-def create_dbs(config_yaml, input_json, environment, mod, check_route53, skip_efs_sync, update_slack, sync_s3
+def create_dbs(
+    config_yaml,
+    input_json,
+    environment,
+    mod,
+    check_route53,
+    skip_efs_sync,
+    update_slack,
+    sync_s3,
+) -> None:
     """
     Function that runs the pipeline
-    :param input_json:
-    :param dry_run:
-    :param environment:
-    :param mod:
-    :return:
+
+    :param config_yaml: YAML file with all MODs configuration
+    :param input_json: JSON file input coordinates
+    :param environment: Environment, defaults to 'dev'
+    :param mod: Model organism
+    :param check_route53: Check Route53, defaults to False
+    :param skip_efs_sync: Skip EFS sync, defaults to False
+    :param update_slack: Update Slack, defaults to False
+    :param sync_s3: Sync to S3, defaults to False
+    :return: None
     """
 
+    # If no arguments are passed, display the help message
     if len(sys.argv) == 1:
         click.main(["--help"])
+
+    # If a YAML configuration file is provided, process it
     if config_yaml is not None:
         process_yaml(config_yaml)
+
+    # If the Route53 check option is enabled, perform the check
     elif check_route53:
         console.log("Checking Route53")
         route53_check()
+
+    # If no YAML file is provided and Route53 check is not enabled, process the JSON input
     else:
         process_json(input_json, environment, mod)
-    print(slack_messages)
 
+    # If the Slack update option is enabled, update Slack with the messages
     if update_slack:
         slack_message(slack_messages)
 
-    if sync-s3:
+    # If the S3 sync option is enabled, sync the data to S3
+    if sync_s3:
         s3_sync(Path("../data"), skip_efs_sync)
 
 
