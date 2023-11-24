@@ -278,8 +278,10 @@ def process_json(json_file, environment, mod) -> bool:
 @click.option(
     "-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=False
 )
+@click.option("-u", "--update-slack", help="Update Slack", is_flag=True, default=False)
+@click.option("-s3", "--sync-s3", help="Sync to S3", is_flag=True, default=False)
 # @click.option("-d", "--dry_run", help="Don't download anything", is_flag=True, default=False)
-def create_dbs(config_yaml, input_json, environment, mod, check_route53, skip_efs_sync):
+def create_dbs(config_yaml, input_json, environment, mod, check_route53, skip_efs_sync, update_slack, sync_s3
     """
     Function that runs the pipeline
     :param input_json:
@@ -299,9 +301,12 @@ def create_dbs(config_yaml, input_json, environment, mod, check_route53, skip_ef
     else:
         process_json(input_json, environment, mod)
     print(slack_messages)
-    slack_message(slack_messages)
 
-    s3_sync(Path("../data"), skip_efs_sync)
+    if update_slack:
+        slack_message(slack_messages)
+
+    if sync-s3:
+        s3_sync(Path("../data"), skip_efs_sync)
 
 
 if __name__ == "__main__":
