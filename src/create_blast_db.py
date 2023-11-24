@@ -123,47 +123,75 @@ def create_db_structure(environment, mod, config_entry, file_logger) -> bool:
 
 def run_makeblastdb(config_entry, output_dir, file_logger):
     """
-    Function that runs makeblastdb
-    :param config_entry:
-    :param output_dir:
-    :param dry_run:
-    :param file_logger:
+    This function runs the makeblastdb command to create a BLAST database.
+
+    :param config_entry: A JSON element containing information about the database to be created.
+    :param output_dir: The directory where the BLAST databases will be created.
+    :param file_logger: An external file logger.
     """
 
+    # Load environment variables
     env = dotenv_values(f"{Path.cwd()}/.env")
 
+    # Get the name of the FASTA file
     fasta_file = Path(config_entry["uri"]).name
+
+    # Log the start of the makeblastdb process
     console.log(f"Running makeblastdb for {fasta_file}")
+
+    # Add a message to the slack_messages list
     slack_messages.append(
         {"title": "Running makeblastdb", "text": fasta_file, "color": "#36a64f"},
     )
 
+    # Check if the FASTA file exists in the data directory
     if not Path(f"../data/{fasta_file.replace('.gz', '')}").exists():
+        # Log the start of the unzipping process
         file_logger.info(f"Unzipping {fasta_file}")
+
+        # Construct the command to unzip the FASTA file
         unzip_command = f"gunzip -v ../data/{fasta_file}"
+
+        # Run the unzip command
         p = Popen(unzip_command, shell=True, stdout=PIPE, stderr=PIPE)
         p.wait()
+
+        # Log the end of the unzipping process
         console.log("Unzip: done\nEditing FASATA file")
         file_logger.info(f"Unzipping {fasta_file}: done")
 
+    # Check if the taxon ID is for ZFIN
     if config_entry["taxon_id"] == "NCBITaxon:7955":
+        # Log the start of the ZFIN FASTA file editing process
         console.log("Editing ZFIN FASTA file")
+
+        # Edit the ZFIN FASTA file
         split_zfin_fasta(f"../data/{fasta_file.replace('.gz', '')}")
 
+    # Edit the FASTA file
     edit_fasta(f"../data/{fasta_file.replace('.gz', '')}", config_entry)
+
     try:
+        # Construct the command to run makeblastdb
         makeblast_command = (
             f"{env['MAKEBLASTDB_BIN']} -in ../data/{fasta_file.replace('.gz', '')} -dbtype {config_entry['seqtype']} "
             f"-title '{config_entry['blast_title']}' -parse_seqids "
             f"-out {output_dir}/{fasta_file.replace('fa.gz', 'db ')} "
             f"-taxid {config_entry['taxon_id'].replace('NCBITaxon:', '')} "
         )
+
+        # Log the start of the makeblastdb process
         file_logger.info(f"Running makeblastdb: {makeblast_command}")
         console.log(f"Running makeblastdb: {makeblast_command}")
+
+        # Run the makeblastdb command
         p = Popen(makeblast_command, shell=True, stdout=PIPE, stderr=PIPE)
         stdout, stderr = p.communicate()
         p.wait()
+
+        # Check if the makeblastdb process was successful
         if check_output(stdout, stderr):
+            # Log the end of the makeblastdb process
             console.log("Makeblastdb: done")
             slack_messages.append(
                 {
@@ -173,10 +201,13 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
                 },
             )
             file_logger.info("Makeblastdb: done")
+
+            # Remove the unzipped FASTA file
             Path(f"../data/{fasta_file.replace('.gz', '')}").unlink()
             file_logger.info(f"Removed {fasta_file.replace('.gz', '')}")
             console.log("Removed unzipped file")
         else:
+            # Log an error message
             console.log("Error running makeblastdb")
             slack_messages.append(
                 {
@@ -186,10 +217,14 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
                 },
             )
             file_logger.info("Error running makeblastdb")
+
+            # Remove the folders
             console.log("Removing folders")
             rmtree(output_dir)
+
             return False
     except Exception as e:
+        # Log an error message
         console.log(f"Error running makeblastdb: {e}")
         slack_messages.append(
             {
@@ -199,6 +234,7 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
             },
         )
         file_logger.info(f"Error running makeblastdb: {e}")
+
         return False
 
     return True
