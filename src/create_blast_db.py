@@ -85,14 +85,19 @@ def get_files_ftp(fasta_uri, md5sum, file_logger) -> bool:
 def create_db_structure(environment, mod, config_entry, file_logger) -> bool:
     """
     Function that creates the database and folder structure
-    :param environment:
-    :param mod:
-    :param config_entry:
-    :param dry_run:
+
+    :param environment: The environment in which the database is being created.
+    :param mod: The Model Organism.
+    :param config_entry: A JSON element containing information about the database being created.
+    :param file_logger: An external logger used to log the operations performed by the function.
+    :return: The paths of the created directories.
     """
+    # Log the creation of the database structure
     file_logger.info("Creating database structure")
 
+    # Check if 'seqcol' is in the config entry
     if "seqcol" in config_entry.keys():
+        # If it is, log the fact and construct the directory path using 'seqcol'
         file_logger.info("seqcol found in config file")
         console.log(
             f"Directory '../data/blast/{mod}/{environment}/databases/{config_entry['seqcol']}"
@@ -100,6 +105,7 @@ def create_db_structure(environment, mod, config_entry, file_logger) -> bool:
         )
         p = f"../data/blast/{mod}/{environment}/databases/{config_entry['seqcol']}/{config_entry['blast_title']}/"
     else:
+        # If it's not, log the fact and construct the directory path using 'genus', 'species', and 'blast_title'
         file_logger.info("seqcol not found in config file")
         console.log(
             f"Directory '../data/blast/{mod}/{environment}/databases/{config_entry['genus']}"
@@ -112,12 +118,15 @@ def create_db_structure(environment, mod, config_entry, file_logger) -> bool:
         )
     c = f"../data/config/{mod}/{environment}"
 
+    # Create the directory structure
     Path(p).mkdir(parents=True, exist_ok=True)
     Path(c).mkdir(parents=True, exist_ok=True)
 
+    # Log the creation of the directory
     console.log(f"Directory {p} created")
     file_logger.info(f"Directory {p} created")
 
+    # Return the paths of the created directories
     return p, c
 
 
