@@ -230,39 +230,57 @@ def process_yaml(config_yaml) -> bool:
 
 def process_json(json_file, environment, mod) -> bool:
     """
+    This function processes a JSON file, extracts necessary data, and performs operations based on the provided arguments.
 
-    :param json_file:
-    :param environment:
-    :param mod:
-
+    :param json_file: The JSON file to be processed.
+    :param environment: The environment in which the process is running.
+    :param mod: The model organism for which the data is being processed.
+    :return: Returns True if the process was successful, False otherwise.
     """
 
+    # Get the current date and log it
     date_to_add = datetime.now().strftime("%Y_%b_%d")
     console.log(f"Processing {json_file}")
 
+    # Add a message to the slack_messages list
     slack_messages.append(
-        {"title": "JSON processing", "text": json_file, "color": "#36a64f"},
+        {"title": "JSON processing", "text": Path(json_file).stem, "color": "#36a64f"},
     )
 
+    # If a model organism is not provided, get it from the JSON file
     if mod is None:
         mod_code = get_mod_from_json(json_file)
     else:
         mod_code = mod
 
+    # If a model organism code is found, process the JSON file
     if mod_code is not False:
+        # Load the JSON file
         db_coordinates = json.load(open(json_file, "r"))
+
+        # Iterate over each entry in the JSON file
         for entry in db_coordinates["data"]:
+            # Create a logger for each entry
             file_logger = extendable_logger(
                 entry["blast_title"],
                 f"../logs/{entry['genus']}_{entry['species']}"
                 f"_{entry['seqtype']}_{date_to_add}.log",
             )
+
+            # Log the model organism code
             file_logger.info(f"Mod found/provided: {mod_code}")
+
+            # If files are found via FTP, get them
             if get_files_ftp(entry["uri"], entry["md5sum"], file_logger):
+                # Create the database structure
                 output_dir, config_dir = create_db_structure(
                     environment, mod_code, entry, file_logger
                 )
+
+                # Copy the JSON file to the configuration directory
                 copyfile(json_file, f"{config_dir}/environment.json")
+
+                # If the output directory exists, run makeblastdb
                 if Path(output_dir).exists():
                     run_makeblastdb(entry, output_dir, file_logger)
 
