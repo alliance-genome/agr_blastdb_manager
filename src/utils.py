@@ -164,7 +164,7 @@ def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
 
     console.log(f"Syncing {path_to_copy} to S3")
     proc = Popen(
-        ["aws", "s3", "sync", str(path_to_copy), env["S3"], "--exclude", "*.tmp"],
+        ["aws", "s3", "sync", str(path_to_copy), env["S3"], "--exclude", "*.tmp", "--verbose", "--progress"],
         stdout=PIPE,
         stderr=PIPE,
     )
