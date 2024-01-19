@@ -167,14 +167,12 @@ def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
     env = dotenv_values(f"{Path.cwd()}/.env")
 
     s3 = boto3.client('s3')
-    bucket_name = s3.Bucket(env["S3"])
-    bucket = env["S3_BUCKET"]
 
     for subdir, dirs, files in os.walk("../data"):
         for file in files:
             full_path = os.path.join(subdir, file)
             with open(full_path, 'rb') as data:
-                s3.upload_fileobj(data, bucket_name, os.path.join(bucket, full_path[len(local_dir)+1:]))
+                s3.upload_fileobj(data, env["S3"], os.path.join(env["S3_BUCKET"], full_path[len(local_dir)+1:]))
 
     console.log(f"Syncing {path_to_copy} to S3: done")
 
