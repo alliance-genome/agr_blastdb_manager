@@ -170,7 +170,7 @@ def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
     bucket_name = s3.Bucket(env["S3"])
     bucket = env["S3_BUCKET"]
 
-    for subdir, dirs, files in os.walk(local_dir):
+    for subdir, dirs, files in os.walk("../data"):
         for file in files:
             full_path = os.path.join(subdir, file)
             with open(full_path, 'rb') as data:
