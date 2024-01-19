@@ -1,5 +1,6 @@
 # Paulo Nuin Sep 2023
 
+import os
 import hashlib
 import logging
 from ftplib import FTP
@@ -12,6 +13,8 @@ from dotenv import dotenv_values
 from rich.console import Console
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
+
+import shlex
 
 console = Console()
 
@@ -158,23 +161,21 @@ def split_zfin_fasta(filename):
 
 
 def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
-    """ """
+
+    console.log(f"Syncing {path_to_copy} to S3")
 
     env = dotenv_values(f"{Path.cwd()}/.env")
 
-    console.log(f"Syncing {path_to_copy} to S3")
-    proc = Popen(
-        ["aws", "s3", "sync", str(path_to_copy), env["S3"], "--exclude", "*.tmp"],
-        stdout=PIPE,
-        stderr=PIPE,
-    )
-    while True:
-        output = proc.stderr.readline().strip()
-        if output == b"":
-            break
-        else:
-            console.log(output.decode("utf-8"))
-    proc.wait()
+    s3 = boto3.resource('s3')
+    bucket = s3.Bucket(env["S3"])
+
+    for subdir, dirs, files in os.walk("../data"):
+        for file in files:
+            full_path = os.path.join(subdir, file)
+            with open(full_path, 'rb') as data:
+                console.log(f"Syncing {full_path}")
+                bucket.put_object(Key=full_path[len("../data")+1:], Body=data)
+
     console.log(f"Syncing {path_to_copy} to S3: done")
 
     if not skip_efs_sync:

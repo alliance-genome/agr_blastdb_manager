@@ -6,7 +6,7 @@ authors = ["Adam Wright, Paulo Nuin and the Alliance of Genome Resources"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = "^3.9"
 rich = "^13.5.2"
 click = "^8.1.6"
 requests = "^2.31.0"
@@ -15,7 +15,7 @@ wget = "^3.2"
 pyyaml = "^6.0.1"
 boto3 = "^1.28.46"
 biopython = "^1.81"
-py-fasta-validator = "^0.6"
+#py-fasta-validator = "^0.6"
 python-dotenv = "^1.0.0"
 slack-sdk = "^3.23.0"
 

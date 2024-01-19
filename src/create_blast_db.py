@@ -198,7 +198,7 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
     try:
         # Construct the command to run makeblastdb
         makeblast_command = (
-            f"{env['MAKEBLASTDB_BIN']} -in ../data/{fasta_file.replace('.gz', '')} -dbtype {config_entry['seqtype']} "
+            f"makeblastdb -in ../data/{fasta_file.replace('.gz', '')} -dbtype {config_entry['seqtype']} "
             f"-title '{config_entry['blast_title']}' -parse_seqids "
             f"-out {output_dir}/{fasta_file.replace('fa.gz', 'db ')} "
             f"-taxid {config_entry['taxon_id'].replace('NCBITaxon:', '')} "
