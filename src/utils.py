@@ -166,7 +166,7 @@ def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
 
     env = dotenv_values(f"{Path.cwd()}/.env")
 
-    s3 = boto3.resource('s3')
+    s3 = boto3.client('s3')
     bucket_name = s3.Bucket(env["S3"])
     bucket = env["S3_BUCKET"]
 
