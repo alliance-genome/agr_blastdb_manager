@@ -186,20 +186,22 @@ def sync_to_efs():
 
     env = dotenv_values(f"{Path.cwd()}/.env")
 
-    console.log(f"Syncing {env['S3']} to {env['EFS']}")
-    proc = Popen(
-        ["aws", "s3", "sync", env["S3_FULL"], env["EFS"], "--exclude", "*.tmp"],
-        stdout=PIPE,
-        stderr=PIPE,
-    )
-    while True:
-        output = proc.stderr.readline().strip()
-        if output == b"":
-            break
-        else:
-            console.log(output.decode("utf-8"))
-    proc.wait()
-    console.log(f"Syncing {env['EFS']} to {env['EFS']}: done")
+    s3 = boto3.client('s3')
+
+    # List all objects in the S3 bucket
+    objects = s3.list_objects(Bucket=env["S3_BUCKET"])
+
+    # Download each object to the EFS file system
+    for object in objects['Contents']:
+        # Construct the full local filename
+        local_file = os.path.join(env["EFS"], object['Key'])
+        # Make sure the local directory exists
+        os.makedirs(os.path.dirname(local_file), exist_ok=True)
+        # Download the file from S3 to the local directory
+        console.log("Downloading file from S3: " + object['Key'])
+        s3.download_file(env["S3_BUCKET"], object['Key'], local_file)
+
+    console.log(f"Syncing {env['S3_BUCKET']} to {env['EFS']}: done")
 
 
 def check_output(stdout, stderr) -> bool:
