@@ -172,6 +172,7 @@ def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
         for file in files:
             full_path = os.path.join(subdir, file)
             with open(full_path, 'rb') as data:
+                console.log("Uploading file to S3: " + full_path[len("../data")+1:])
                 s3.upload_fileobj(data, env["S3"], os.path.join(env["S3_BUCKET"], full_path[len("../data")+1:]))
 
     console.log(f"Syncing {path_to_copy} to S3: done")
