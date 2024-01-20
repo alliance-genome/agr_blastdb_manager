@@ -188,7 +188,7 @@ def sync_to_efs():
 
     console.log(f"Syncing {env['S3']} to {env['EFS']}")
     proc = Popen(
-        ["aws", "s3", "sync", env["S3"], env["EFS"], "--exclude", "*.tmp"],
+        ["aws", "s3", "sync", env["S3_FULL"], env["EFS"], "--exclude", "*.tmp"],
         stdout=PIPE,
         stderr=PIPE,
     )
