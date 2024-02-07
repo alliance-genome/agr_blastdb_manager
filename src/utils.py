@@ -177,8 +177,8 @@ def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
 
     console.log(f"Syncing {path_to_copy} to S3: done")
 
-    if not skip_efs_sync:
-        sync_to_efs()
+    # if not skip_efs_sync:
+    #     sync_to_efs()
 
 
 def sync_to_efs():
