@@ -1,4 +1,14 @@
-# Paulo Nuin Sep 2023
+"""
+utils.py
+
+This module contains utility functions that are used across the project. These functions include, but are not limited to,
+functions for logging, checking MD5 checksums, editing FASTA files, and more. These functions are designed to be reusable
+and generic to improve the modularity and maintainability of the code.
+
+Author: Paulo Nuin, Adam Wrioght
+Date: started September 2023
+"""
+
 
 import hashlib
 import logging
@@ -16,11 +26,20 @@ MODS = ["FB", "SGD", "WB", "XB", "ZFIN"]
 
 def extendable_logger(log_name, file_name, level=logging.INFO):
     """
-    Function that creates a logger that can be extended
-    :param log_name:
-    :param file_name:
-    :param level:
+    Creates a logger that can be extended with additional handlers and configurations.
+
+    This function sets up a logger with a specified name, log file, and logging level. The logger uses a file handler to write log messages to a file. The log messages are formatted to include the timestamp, log level, and the log message.
+
+    :param log_name: The name of the logger.
+    :type log_name: str
+    :param file_name: The name of the file where the log messages will be written.
+    :type file_name: str
+    :param level: The logging level. By default, it's set to logging.INFO.
+    :type level: int, optional
+    :return: The configured logger.
+    :rtype: logging.Logger
     """
+
     formatter = logging.Formatter("[%(asctime)s] %(levelname)s %(message)s")
     handler = logging.FileHandler(file_name)
     handler.setFormatter(formatter)
@@ -33,9 +52,16 @@ def extendable_logger(log_name, file_name, level=logging.INFO):
 
 def check_md5sum(fasta_file, md5sum) -> bool:
     """
-    Function that checks the md5sum of the downloaded file
-    :param fasta_file:
-    :param md5sum:
+    Checks the MD5 checksum of a downloaded file.
+
+    This function calculates the MD5 checksum of the downloaded file and compares it with the expected checksum. If the checksums match, the function returns True. Otherwise, it returns False.
+
+    :param fasta_file: The path to the downloaded file.
+    :type fasta_file: str
+    :param md5sum: The expected MD5 checksum.
+    :type md5sum: str
+    :return: True if the checksums match, False otherwise.
+    :rtype: bool
     """
 
     downloaded_md5sum = hashlib.md5(open(fasta_file, "rb").read()).hexdigest()
@@ -68,10 +94,15 @@ def get_ftp_file_size(fasta_uri, file_logger) -> int:
 
 def get_mod_from_json(input_json) -> str:
     """
-    Function that gets the mod from the JSON file
-    :param input_json:
-    """
+    Retrieves the model organism (mod) from the input JSON file.
 
+    This function extracts the mod from the filename of the input JSON file. The mod is the second element when the filename is split by the "." character. If the mod is not found in the predefined list of mods, the function returns False. Otherwise, it returns the mod.
+
+    :param input_json: The path to the input JSON file.
+    :type input_json: str
+    :return: The model organism (mod) if found, False otherwise.
+    :rtype: str or bool
+    """
     filename = Path(input_json).name
     mod = filename.split(".")[1]
 
