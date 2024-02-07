@@ -1,4 +1,13 @@
-# Paulo Nuin July 2023
+"""
+create_blast_db.py
+
+This script is used to create BLAST databases from FASTA files. It includes functions to download files from an FTP site,
+store the downloaded FASTA files, create the database and folder structure, run the makeblastdb command, and process
+configuration files in YAML and JSON formats.
+
+Author: Paulo Nuin, Adam Wright
+Date: started July 2023
+"""
 
 
 import json
@@ -31,6 +40,12 @@ def store_fasta_files(fasta_file, file_logger) -> None:
 
     Returns:
     None
+
+
+    :param fasta_file: The path to the FASTA file that needs to be stored.
+    :type fasta_file: str
+    :param file_logger: The logger object used for logging the process of storing the FASTA files.
+    :type file_logger: logging.Logger
     """
 
     # Get the current date in the format "YYYY_MMM_DD"
@@ -59,6 +74,16 @@ def get_files_ftp(fasta_uri, md5sum, file_logger) -> bool:
 
     Returns:
     bool: True if the file was successfully downloaded and the MD5 checksum matches, False otherwise.
+
+
+    :param fasta_uri: The URI of the FASTA file that needs to be downloaded.
+    :type fasta_uri: str
+    :param md5sum: The MD5 checksum of the file.
+    :type md5sum: str
+    :param file_logger: The logger object used for logging the process of downloading the files.
+    :type file_logger: logging.Logger
+    :return: True if the file was successfully downloaded and the MD5 checksum matches, False otherwise.
+    :rtype: bool
     """
 
     # Log the start of the download process
@@ -112,6 +137,17 @@ def create_db_structure(environment, mod, config_entry, file_logger) -> bool:
 
     Returns:
     bool: True if the directory was successfully created, False otherwise.
+
+    :param environment: The current environment (like dev, prod, etc.).
+    :type environment: str
+    :param mod: The model organism.
+    :type mod: str
+    :param config_entry: A dictionary containing the configuration details.
+    :type config_entry: dict
+    :param file_logger: The logger object used for logging the process of creating the database structure.
+    :type file_logger: logging.Logger
+    :return: True if the directory was successfully created, False otherwise.
+    :rtype: bool
     """
 
     # Log the start of the database structure creation process
@@ -148,6 +184,14 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
 
     Returns:
     bool: True if the makeblastdb command was successfully executed, False otherwise.
+
+
+    :param config_entry: A dictionary containing the configuration details.
+    :type config_entry: dict
+    :param output_dir: The directory where the BLAST database will be stored.
+    :type output_dir: str
+    :param file_logger: The logger object used for logging the process of running makeblastdb.
+    :type file_logger: logging.Logger
     """
 
     # Get the name of the FASTA file from the URI in the configuration entry
@@ -202,6 +246,11 @@ def process_yaml(config_yaml) -> bool:
 
     Returns:
     bool: True if the YAML file was successfully processed, False otherwise.
+
+    :param config_yaml: The path to the YAML file that needs to be processed.
+    :type config_yaml: str
+    :return: True if the YAML file was successfully processed, False otherwise.
+    :rtype: bool
     """
 
     # Load the YAML file
@@ -236,6 +285,15 @@ def process_json(json_file, environment, mod) -> bool:
 
     Returns:
     bool: True if the JSON file was successfully processed, False otherwise.
+
+    :param json_file: The path to the JSON file that needs to be processed.
+    :type json_file: str
+    :param environment: The current environment (like dev, prod, etc.).
+    :type environment: str
+    :param mod: The model organism.
+    :type mod: str
+    :return: True if the JSON file was successfully processed, False otherwise.
+    :rtype: bool
     """
 
     # Get the current date in the format "YYYY_MMM_DD"
@@ -287,6 +345,17 @@ def create_dbs(config_yaml, input_json, environment, mod, check_route53):
 
     Returns:
     None
+
+    :param config_yaml: The path to the YAML file that contains configuration details for multiple data providers.
+    :type config_yaml: str
+    :param input_json: The path to the JSON file that contains configuration details for a specific data provider.
+    :type input_json: str
+    :param environment: The current environment (like dev, prod, etc.).
+    :type environment: str
+    :param mod: The model organism.
+    :type mod: str
+    :param check_route53: A flag that indicates whether to check Route53.
+    :type check_route53: bool
     """
 
     # If no arguments are provided, display the help message
