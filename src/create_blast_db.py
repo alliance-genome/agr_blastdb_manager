@@ -49,20 +49,22 @@ def get_files_ftp(fasta_uri, md5sum, file_logger) -> bool:
     """
 
     file_logger.info(f"Downloading {fasta_uri}")
-
+    today_date = datetime.now().strftime("%Y_%b_%d")
     # size = get_ftp_file_size(fasta_uri, file_logger)
 
     try:
         console.log(f"Downloading {fasta_uri}")
         fasta_file = f"../data/{Path(fasta_uri).name}"
+        fasta_name = f"{Path(fasta_uri).name}"
         console.log(f"Saving to {fasta_file}")
         file_logger.info(f"Saving to {fasta_file}")
-        if not Path(fasta_file).exists():
+        if not Path(f"../data/database_{today_date}/{fasta_name}").exists():
             wget.download(fasta_uri, fasta_file)
             store_fasta_files(fasta_file, file_logger)
         else:
-            console.log(f"{fasta_file} already exists")
-            file_logger.info(f"{fasta_file} already exists")
+            console.log(f"{fasta_name} already processed")
+            file_logger.info(f"{fasta_file} already processed")
+            return False
         if check_md5sum(fasta_file, md5sum):
             return True
         else:
