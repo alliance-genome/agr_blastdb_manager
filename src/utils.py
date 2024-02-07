@@ -14,15 +14,21 @@ import hashlib
 import logging
 from ftplib import FTP
 from pathlib import Path
-
-from rich.console import Console
+from subprocess import PIPE, Popen
 
 import boto3
+from Bio import SeqIO
+from dotenv import dotenv_values
+from rich.console import Console
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
+
 console = Console()
 
 
 # TODO: move to ENV
 MODS = ["FB", "SGD", "WB", "XB", "ZFIN"]
+
 
 def extendable_logger(log_name, file_name, level=logging.INFO):
     """
@@ -120,10 +126,9 @@ def route53_check() -> bool:
     Function that checks if the route53 record exists
     """
 
-    client53 = boto3.client('route53')
+    client53 = boto3.client("route53")
     response = client53.list_resource_record_sets(
-        HostedZoneId='alliancegenome.org',
-        StartRecordType='TXT'
+        HostedZoneId="alliancegenome.org", StartRecordType="TXT"
     )
     print(response)
 
@@ -153,3 +158,128 @@ def edit_fasta(fasta_file: str, config_entry: dict) -> bool:
     edited_file.close()
 
     return True
+
+
+def validate_fasta(filename):
+    """
+    Function that validates the FASTA file
+    """
+
+    with open(filename, "r") as handle:
+        fasta = SeqIO.parse(handle, "fasta")
+        return any(fasta)
+
+
+def split_zfin_fasta(filename):
+    """ """
+
+    fasta = open(filename).read().splitlines()
+    Path(f"{filename}.tmp").touch()
+
+    for line in fasta:
+        temp = line.split("\\n")
+        for item in temp:
+            with open(f"{filename}.tmp", "a") as fh:
+                fh.write(f"{item}\n")
+
+    Path(filename).unlink()
+    Path(f"{filename}.tmp").rename(filename)
+
+    return True
+
+
+def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
+    """ """
+
+    env = dotenv_values(f"{Path.cwd()}/.env")
+
+    console.log(f"Syncing {path_to_copy} to S3")
+    proc = Popen(
+        ["aws", "s3", "sync", str(path_to_copy), env["S3"], "--exclude", "*.tmp"],
+        stdout=PIPE,
+        stderr=PIPE,
+    )
+    while True:
+        output = proc.stderr.readline().strip()
+        if output == b"":
+            break
+        else:
+            console.log(output.decode("utf-8"))
+    proc.wait()
+    console.log(f"Syncing {path_to_copy} to S3: done")
+
+    if not skip_efs_sync:
+        sync_to_efs()
+
+
+def sync_to_efs():
+    """ """
+
+    env = dotenv_values(f"{Path.cwd()}/.env")
+
+    console.log(f"Syncing {env['S3']} to {env['EFS']}")
+    proc = Popen(
+        ["aws", "s3", "sync", env["S3"], env["EFS"], "--exclude", "*.tmp"],
+        stdout=PIPE,
+        stderr=PIPE,
+    )
+    while True:
+        output = proc.stderr.readline().strip()
+        if output == b"":
+            break
+        else:
+            console.log(output.decode("utf-8"))
+    proc.wait()
+    console.log(f"Syncing {env['EFS']} to {env['EFS']}: done")
+
+
+def check_output(stdout, stderr) -> bool:
+    """ """
+
+    stderr = stderr.decode("utf-8")
+    if len(stderr) > 1:
+        if stderr.find("Error") >= 1:
+            console.log(stderr.decode("utf-8"), style="blink bold white on red")
+            return False
+    else:
+        return True
+
+
+def slack_post(message: str) -> bool:
+    """
+    deprecated as it uses webhooks
+    """
+
+    env = dotenv_values(f"{Path.cwd()}/.env")
+
+    # move to .env eventually
+    slack_channel = f"https://hooks.slack.com/services/{env['SLACK']}"
+    webhook = WebhookClient(slack_channel)
+    response = webhook.send(text=message)
+    assert response.status_code == 200
+    assert response.body == "ok"
+
+    return True
+
+
+def slack_message(messages: list, subject="Update") -> bool:
+    """
+    Function that sends a message to Slack
+    :param message:
+    """
+
+    env = dotenv_values(f"{Path.cwd()}/.env")
+    client = WebClient(token=env["SLACK"])
+
+    try:
+        # Call the chat.postMessage method using the WebClient
+        response = client.chat_postMessage(
+            channel="#blast-status",  # Channel to send message to
+            text=subject,  # Subject of the message
+            attachments=messages,
+        )
+    except SlackApiError as e:
+        # You will get a SlackApiError if "ok" is False
+        assert e.response["ok"] is False
+        assert e.response["error"]  # str like 'invalid_auth', 'channel_not_found'
+        print(f"Got an error: {e.response['error']}")
