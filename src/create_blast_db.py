@@ -225,6 +225,8 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
     # Log the start of the makeblastdb process
     console.log(f"Running makeblastdb for {fasta_file}")
 
+    env = dotenv_values(f"{Path.cwd()}/.env")
+
     # If the FASTA file is not already unzipped, unzip it
     if not Path(f"../data/{fasta_file.replace('.gz', '')}").exists():
         # Log the start of the unzipping process
