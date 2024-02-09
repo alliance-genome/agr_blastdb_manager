@@ -142,6 +142,7 @@ def get_files_ftp(fasta_uri, md5sum, file_logger) -> bool:
         console.log(f"Error downloading {fasta_uri}: {e}")
         return False
 
+
 def create_db_structure(environment, mod, config_entry, file_logger) -> bool:
     """
     Function that creates the database and folder structure for storing the downloaded FASTA files.
@@ -197,6 +198,7 @@ def create_db_structure(environment, mod, config_entry, file_logger) -> bool:
 
     # Return the paths of the created directories
     return p, c
+
 
 def run_makeblastdb(config_entry, output_dir, file_logger):
     """
@@ -290,6 +292,7 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
 
     return True
 
+
 def process_yaml(config_yaml) -> bool:
     """
     Function that processes a YAML file containing configuration details for multiple data providers.
@@ -330,6 +333,7 @@ def process_yaml(config_yaml) -> bool:
 
             # Process the JSON file
             process_json(json_file, environment, provider["name"])
+
 
 def process_json(json_file, environment, mod) -> bool:
     """
@@ -394,6 +398,7 @@ def process_json(json_file, environment, mod) -> bool:
                 # If the output directory exists, run makeblastdb
                 if Path(output_dir).exists():
                     run_makeblastdb(entry, output_dir, file_logger)
+
 
 @click.command()
 @click.option("-g", "--config_yaml", help="YAML file with all MODs configuration")
