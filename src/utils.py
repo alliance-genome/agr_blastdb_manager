@@ -5,7 +5,7 @@ This module contains utility functions that are used across the project. These f
 functions for logging, checking MD5 checksums, editing FASTA files, and more. These functions are designed to be reusable
 and generic to improve the modularity and maintainability of the code.
 
-Author: Paulo Nuin, Adam Wrioght
+Author: Paulo Nuin, Adam Wright
 Date: started September 2023
 """
 
