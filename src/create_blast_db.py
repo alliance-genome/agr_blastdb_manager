@@ -14,7 +14,7 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
-from shutil import copyfile, rmtree
+from shutil import copyfile
 from subprocess import PIPE, Popen
 
 import click
@@ -25,7 +25,7 @@ from rich.console import Console
 
 from utils import (
     check_md5sum,
-    check_output,
+    # check_output,
     edit_fasta,
     extendable_logger,
     get_mod_from_json,
