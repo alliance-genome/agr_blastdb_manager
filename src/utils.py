@@ -22,6 +22,7 @@ from dotenv import dotenv_values
 from rich.console import Console
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
+from slack_sdk.webhook import WebhookClient
 
 console = Console()
 
@@ -91,14 +92,26 @@ def get_ftp_file_size(fasta_uri, file_logger) -> int:
     ftp.login()
     ftp.cwd("/".join(Path(fasta_uri).parts[2:-1]))
     filename = Path(fasta_uri).name
-    size = ftp.size(filename)
-    console.log(f"File size is {size} bytes")
-    file_logger.info(f"File size is {size} bytes")
+    if filename is not None:
+        size = ftp.size(filename)
+        if size is not None:
+            # Proceed with the value of size
+            print("File size:", size)
+        else:
+            # Handle the case where size is None
+            print("Error: File size is not available.")
+            return 0
+    else:
+        print("Error: Filename is None.")
+        size = ftp.size(filename)
+        console.log(f"File size is {size} bytes")
+        file_logger.info(f"File size is {size} bytes")
+        return 0
 
     return size
 
 
-def get_mod_from_json(input_json) -> str:
+def get_mod_from_json(input_json) -> str | bool:
     """
     Retrieves the model organism (mod) from the input JSON file.
 
@@ -132,6 +145,7 @@ def route53_check() -> bool:
     )
     print(response)
 
+    return True
 
 def edit_fasta(fasta_file: str, config_entry: dict) -> bool:
     """
@@ -211,9 +225,10 @@ def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
     if not skip_efs_sync:
         sync_to_efs()
 
+    return True
 
-def sync_to_efs():
-    """ """
+def sync_to_efs() -> bool:
+    """Sync files from an S3 bucket to an EFS volume."""
 
     env = dotenv_values(f"{Path.cwd()}/.env")
 
@@ -223,15 +238,21 @@ def sync_to_efs():
         stdout=PIPE,
         stderr=PIPE,
     )
-    while True:
-        output = proc.stderr.readline().strip()
-        if output == b"":
-            break
-        else:
-            console.log(output.decode("utf-8"))
-    proc.wait()
-    console.log(f"Syncing {env['EFS']} to {env['EFS']}: done")
 
+    while True:
+        # Read a line from stderr and decode it to utf-8
+        output = proc.stderr.readline().decode("utf-8").strip()
+        # If the output is empty, break the loop
+        if not output:
+            break
+        # Otherwise, log the output
+        console.log(output)
+
+    # Wait for the process to complete
+    proc.wait()
+    console.log(f"Syncing {env['S3']} to {env['EFS']}: done")
+
+    return True
 
 def check_output(stdout, stderr) -> bool:
     """ """
@@ -241,8 +262,8 @@ def check_output(stdout, stderr) -> bool:
         if stderr.find("Error") >= 1:
             console.log(stderr.decode("utf-8"), style="blink bold white on red")
             return False
-    else:
-        return True
+
+    return True
 
 
 def slack_post(message: str) -> bool:
@@ -283,3 +304,5 @@ def slack_message(messages: list, subject="Update") -> bool:
         assert e.response["ok"] is False
         assert e.response["error"]  # str like 'invalid_auth', 'channel_not_found'
         print(f"Got an error: {e.response['error']}")
+
+    return True
