@@ -18,7 +18,7 @@ from shutil import copyfile, rmtree
 from subprocess import PIPE, Popen
 
 import click
-import wget
+import wget # type: ignore
 import yaml
 from dotenv import dotenv_values
 from rich.console import Console
@@ -142,7 +142,9 @@ def get_files_ftp(fasta_uri, md5sum, file_logger) -> bool:
         console.log(f"Error downloading {fasta_uri}: {e}")
         return False
 
-def create_db_structure(environment, mod, config_entry, file_logger) -> bool:
+    return True
+
+def create_db_structure(environment, mod, config_entry, file_logger) -> tuple[str, str]:
     """
     Function that creates the database and folder structure for storing the downloaded FASTA files.
 
@@ -331,6 +333,8 @@ def process_yaml(config_yaml) -> bool:
             # Process the JSON file
             process_json(json_file, environment, provider["name"])
 
+    return True
+
 def process_json(json_file, environment, mod) -> bool:
     """
     Function that processes a JSON file containing configuration details for a specific data provider.
@@ -394,6 +398,7 @@ def process_json(json_file, environment, mod) -> bool:
                 # If the output directory exists, run makeblastdb
                 if Path(output_dir).exists():
                     run_makeblastdb(entry, output_dir, file_logger)
+    return True
 
 @click.command()
 @click.option("-g", "--config_yaml", help="YAML file with all MODs configuration")
@@ -446,7 +451,7 @@ def create_dbs(
 
     # If no arguments are provided, display the help message
     if len(sys.argv) == 1:
-        click.main(["--help"])
+        click.echo(create_dbs.get_help(ctx=None))
     # If a YAML configuration file is provided, process the YAML file
 
     if config_yaml is not None:
