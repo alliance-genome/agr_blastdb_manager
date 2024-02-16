@@ -9,6 +9,7 @@ Author: Paulo Nuin, Adam Wright
 Date: started September 2023
 """
 
+from typing import Any
 
 import hashlib
 import logging
@@ -17,7 +18,7 @@ from pathlib import Path
 from subprocess import PIPE, Popen
 
 import boto3
-from Bio import SeqIO
+from Bio import SeqIO # type: ignore
 from dotenv import dotenv_values
 from rich.console import Console
 from slack_sdk import WebClient
@@ -31,7 +32,7 @@ console = Console()
 MODS = ["FB", "SGD", "WB", "XB", "ZFIN"]
 
 
-def extendable_logger(log_name, file_name, level=logging.INFO):
+def extendable_logger(log_name, file_name, level=logging.INFO) -> Any:
     """
     Creates a logger that can be extended with additional handlers and configurations.
 
@@ -75,9 +76,10 @@ def check_md5sum(fasta_file, md5sum) -> bool:
     if downloaded_md5sum != md5sum:
         console.log(f"MD5sums do not match: {md5sum} != {downloaded_md5sum}")
         return False
-    else:
-        console.log(f"MD5sums match: {md5sum} {downloaded_md5sum}")
-        return True
+
+    console.log(f"MD5sums match: {md5sum} {downloaded_md5sum}")
+
+    return True
 
 
 def get_ftp_file_size(fasta_uri, file_logger) -> int:
@@ -174,7 +176,7 @@ def edit_fasta(fasta_file: str, config_entry: dict) -> bool:
     return True
 
 
-def validate_fasta(filename):
+def validate_fasta(filename) -> Any:
     """
     Function that validates the FASTA file
     """
@@ -184,7 +186,7 @@ def validate_fasta(filename):
         return any(fasta)
 
 
-def split_zfin_fasta(filename):
+def split_zfin_fasta(filename) -> Any:
     """ """
 
     fasta = open(filename).read().splitlines()
@@ -233,20 +235,28 @@ def sync_to_efs() -> bool:
     env = dotenv_values(f"{Path.cwd()}/.env")
 
     console.log(f"Syncing {env['S3']} to {env['EFS']}")
-    proc = Popen(
-        ["aws", "s3", "sync", env["S3"], env["EFS"], "--exclude", "*.tmp"],
-        stdout=PIPE,
-        stderr=PIPE,
-    )
+    s3_path = env.get("S3")
+    efs_path = env.get("EFS")
+
+    if s3_path is not None and efs_path is not None:
+        proc = Popen(
+            ["aws", "s3", "sync", s3_path, efs_path, "--exclude", "*.tmp"],
+            stdout=PIPE,
+            stderr=PIPE,
+        )
+    else:
+        console.log("S3 or EFS path is not defined in the environment variables")
 
     while True:
         # Read a line from stderr and decode it to utf-8
-        output = proc.stderr.readline().decode("utf-8").strip()
-        # If the output is empty, break the loop
-        if not output:
-            break
-        # Otherwise, log the output
-        console.log(output)
+        if proc.stderr is not None:
+            output = proc.stderr.readline().decode("utf-8").strip()
+            # Process output further if needed
+        else:
+            # Handle the case when proc.stderr is None
+            # For example:
+            output = "No output available"
+            console.log(output)
 
     # Wait for the process to complete
     proc.wait()
