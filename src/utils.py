@@ -9,6 +9,7 @@ Author: Paulo Nuin, Adam Wright
 Date: started September 2023
 """
 
+from typing import Any
 
 import hashlib
 import logging
@@ -17,11 +18,12 @@ from pathlib import Path
 from subprocess import PIPE, Popen
 
 import boto3
-from Bio import SeqIO
+from Bio import SeqIO # type: ignore
 from dotenv import dotenv_values
 from rich.console import Console
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
+from slack_sdk.webhook import WebhookClient
 
 console = Console()
 
@@ -30,7 +32,7 @@ console = Console()
 MODS = ["FB", "SGD", "WB", "XB", "ZFIN"]
 
 
-def extendable_logger(log_name, file_name, level=logging.INFO):
+def extendable_logger(log_name, file_name, level=logging.INFO) -> Any:
     """
     Creates a logger that can be extended with additional handlers and configurations.
 
@@ -74,9 +76,10 @@ def check_md5sum(fasta_file, md5sum) -> bool:
     if downloaded_md5sum != md5sum:
         console.log(f"MD5sums do not match: {md5sum} != {downloaded_md5sum}")
         return False
-    else:
-        console.log(f"MD5sums match: {md5sum} {downloaded_md5sum}")
-        return True
+
+    console.log(f"MD5sums match: {md5sum} {downloaded_md5sum}")
+
+    return True
 
 
 def get_ftp_file_size(fasta_uri, file_logger) -> int:
@@ -91,14 +94,26 @@ def get_ftp_file_size(fasta_uri, file_logger) -> int:
     ftp.login()
     ftp.cwd("/".join(Path(fasta_uri).parts[2:-1]))
     filename = Path(fasta_uri).name
-    size = ftp.size(filename)
-    console.log(f"File size is {size} bytes")
-    file_logger.info(f"File size is {size} bytes")
+    if filename is not None:
+        size = ftp.size(filename)
+        if size is not None:
+            # Proceed with the value of size
+            print("File size:", size)
+        else:
+            # Handle the case where size is None
+            print("Error: File size is not available.")
+            return 0
+    else:
+        print("Error: Filename is None.")
+        size = ftp.size(filename)
+        console.log(f"File size is {size} bytes")
+        file_logger.info(f"File size is {size} bytes")
+        return 0
 
     return size
 
 
-def get_mod_from_json(input_json) -> str:
+def get_mod_from_json(input_json) -> str | bool:
     """
     Retrieves the model organism (mod) from the input JSON file.
 
@@ -132,6 +147,7 @@ def route53_check() -> bool:
     )
     print(response)
 
+    return True
 
 def edit_fasta(fasta_file: str, config_entry: dict) -> bool:
     """
@@ -160,7 +176,7 @@ def edit_fasta(fasta_file: str, config_entry: dict) -> bool:
     return True
 
 
-def validate_fasta(filename):
+def validate_fasta(filename) -> Any:
     """
     Function that validates the FASTA file
     """
@@ -170,7 +186,7 @@ def validate_fasta(filename):
         return any(fasta)
 
 
-def split_zfin_fasta(filename):
+def split_zfin_fasta(filename) -> Any:
     """ """
 
     fasta = open(filename).read().splitlines()
@@ -211,27 +227,42 @@ def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
     if not skip_efs_sync:
         sync_to_efs()
 
+    return True
 
-def sync_to_efs():
-    """ """
+def sync_to_efs() -> bool:
+    """Sync files from an S3 bucket to an EFS volume."""
 
     env = dotenv_values(f"{Path.cwd()}/.env")
 
     console.log(f"Syncing {env['S3']} to {env['EFS']}")
-    proc = Popen(
-        ["aws", "s3", "sync", env["S3"], env["EFS"], "--exclude", "*.tmp"],
-        stdout=PIPE,
-        stderr=PIPE,
-    )
-    while True:
-        output = proc.stderr.readline().strip()
-        if output == b"":
-            break
-        else:
-            console.log(output.decode("utf-8"))
-    proc.wait()
-    console.log(f"Syncing {env['EFS']} to {env['EFS']}: done")
+    s3_path = env.get("S3")
+    efs_path = env.get("EFS")
 
+    if s3_path is not None and efs_path is not None:
+        proc = Popen(
+            ["aws", "s3", "sync", s3_path, efs_path, "--exclude", "*.tmp"],
+            stdout=PIPE,
+            stderr=PIPE,
+        )
+    else:
+        console.log("S3 or EFS path is not defined in the environment variables")
+
+    while True:
+        # Read a line from stderr and decode it to utf-8
+        if proc.stderr is not None:
+            output = proc.stderr.readline().decode("utf-8").strip()
+            # Process output further if needed
+        else:
+            # Handle the case when proc.stderr is None
+            # For example:
+            output = "No output available"
+            console.log(output)
+
+    # Wait for the process to complete
+    proc.wait()
+    console.log(f"Syncing {env['S3']} to {env['EFS']}: done")
+
+    return True
 
 def check_output(stdout, stderr) -> bool:
     """ """
@@ -241,8 +272,8 @@ def check_output(stdout, stderr) -> bool:
         if stderr.find("Error") >= 1:
             console.log(stderr.decode("utf-8"), style="blink bold white on red")
             return False
-    else:
-        return True
+
+    return True
 
 
 def slack_post(message: str) -> bool:
@@ -283,3 +314,5 @@ def slack_message(messages: list, subject="Update") -> bool:
         assert e.response["ok"] is False
         assert e.response["error"]  # str like 'invalid_auth', 'channel_not_found'
         print(f"Got an error: {e.response['error']}")
+
+    return True
