@@ -23,7 +23,7 @@ import yaml
 from dotenv import dotenv_values
 from rich.console import Console
 
-from utils import (
+from utils import (  # type: ignore
     check_md5sum,
     check_output,
     edit_fasta,
