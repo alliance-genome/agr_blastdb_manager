@@ -18,7 +18,7 @@ from shutil import copyfile, rmtree
 from subprocess import PIPE, Popen
 
 import click
-import wget # type: ignore
+import wget  # type: ignore
 import yaml
 from dotenv import dotenv_values
 from rich.console import Console
@@ -144,6 +144,7 @@ def get_files_ftp(fasta_uri, md5sum, file_logger) -> bool:
 
     return True
 
+
 def create_db_structure(environment, mod, config_entry, file_logger) -> tuple[str, str]:
     """
     Function that creates the database and folder structure for storing the downloaded FASTA files.
@@ -200,97 +201,85 @@ def create_db_structure(environment, mod, config_entry, file_logger) -> tuple[st
     # Return the paths of the created directories
     return p, c
 
+
 def run_makeblastdb(config_entry, output_dir, file_logger):
     """
     Function that runs the makeblastdb command to create a BLAST database from a FASTA file.
 
-    Parameters:
-    config_entry (dict): A dictionary containing the configuration details.
-    output_dir (str): The directory where the BLAST database will be stored.
-    file_logger (logging.Logger): The logger object used for logging the process of running makeblastdb.
-
-    Returns:
-    bool: True if the makeblastdb command was successfully executed, False otherwise.
-
-
-    :param config_entry: A dictionary containing the configuration details.
-    :type config_entry: dict
-    :param output_dir: The directory where the BLAST database will be stored.
-    :type output_dir: str
-    :param file_logger: The logger object used for logging the process of running makeblastdb.
-    :type file_logger: logging.Logger
+    :param dict config_entry: A dictionary containing the configuration details.
+    :param str output_dir: The directory where the BLAST database will be stored.
+    :param logging.Logger file_logger: The logger object used for logging the process of running makeblastdb.
+    :return: True if the makeblastdb command was successfully executed, False otherwise.
+    :rtype: bool
     """
 
-    # Get the name of the FASTA file from the URI in the configuration entry
+    # Load environment variables from .env file
+    env = dotenv_values(f"{Path.cwd()}/.env")
+
+    # Get the name of the FASTA file
     fasta_file = Path(config_entry["uri"]).name
 
     # Log the start of the makeblastdb process
     console.log(f"Running makeblastdb for {fasta_file}")
 
-    env = dotenv_values(f"{Path.cwd()}/.env")
+    # Add a message to the slack_messages list
+    slack_messages.append(
+        {"title": "Running makeblastdb", "text": fasta_file, "color": "#36a64f"},
+    )
 
-    # If the FASTA file is not already unzipped, unzip it
+    # Check if the FASTA file exists in the data directory
     if not Path(f"../data/{fasta_file.replace('.gz', '')}").exists():
-        # Log the start of the unzipping process
+        # If not, unzip the FASTA file
         file_logger.info(f"Unzipping {fasta_file}")
-
-        # Construct the command to unzip the FASTA file
         unzip_command = f"gunzip -v ../data/{fasta_file}"
-
-        # Run the unzip command
         p = Popen(unzip_command, shell=True, stdout=PIPE, stderr=PIPE)
         p.wait()
-
-        # Log the end of the unzipping process
-        console.log("Unzip: done\nEditing FASATA file")
         file_logger.info(f"Unzipping {fasta_file}: done")
 
     # Check if the taxon ID is for ZFIN
     if config_entry["taxon_id"] == "NCBITaxon:7955":
-        # Log the start of the ZFIN FASTA file editing process
+        # If so, edit the ZFIN FASTA file
         console.log("Editing ZFIN FASTA file")
-
-        # Edit the ZFIN FASTA file
         split_zfin_fasta(f"../data/{fasta_file.replace('.gz', '')}")
 
     # Edit the FASTA file
     edit_fasta(f"../data/{fasta_file.replace('.gz', '')}", config_entry)
 
     try:
-        # Define the makeblastdb command
+        # Construct the command to run makeblastdb
         makeblast_command = (
-            f"{env['MAKEBLASTDB_BIN']} -in ../data/{fasta_file.replace('.gz', '')} -dbtype {config_entry['seqtype']} "
+            f"makeblastdb -in ../data/{fasta_file.replace('.gz', '')} -dbtype {config_entry['seqtype']} "
             f"-title '{config_entry['blast_title']}' -parse_seqids "
             f"-out {output_dir}/{fasta_file.replace('fa.gz', 'db ')} "
             f"-taxid {config_entry['taxon_id'].replace('NCBITaxon:', '')} "
         )
-        # Log the makeblastdb command
-        file_logger.info(f"Running makeblastdb: {makeblast_command}")
-        # Execute the makeblastdb command
+
+        # Run the makeblastdb command
         p = Popen(makeblast_command, shell=True, stdout=PIPE, stderr=PIPE)
         stdout, stderr = p.communicate()
-        console.log("Makeblastdb: done")
-        file_logger.info("Makeblastdb: done")
-        # Remove the unzipped FASTA file
-        Path(f"../data/{fasta_file.replace('.gz', '')}").unlink()
-        file_logger.info(f"Removed {fasta_file.replace('.gz', '')}")
-        console.log("Removed unzipped file")
+        p.wait()
 
+        # Check if the makeblastdb process was successful
+        if check_output(stdout, stderr):
+            # If successful, remove the unzipped FASTA file
+            Path(f"../data/{fasta_file.replace('.gz', '')}").unlink()
+            file_logger.info(f"Removed {fasta_file.replace('.gz', '')}")
+            console.log("Removed unzipped file")
+        else:
+            # If not successful, remove the folders
+            console.log("Removing folders")
+            rmtree(output_dir)
+
+            return False
     except Exception as e:
-        # If an error occurs during the makeblastdb process, log the error and return False
+        # If an error occurs, log the error
         console.log(f"Error running makeblastdb: {e}")
-        slack_messages.append(
-            {
-                "title": "Error running makeblastdb",
-                "text": fasta_file,
-                "color": "#8D2707",
-            },
-        )
         file_logger.info(f"Error running makeblastdb: {e}")
 
         return False
 
     return True
+
 
 def process_yaml(config_yaml) -> bool:
     """
@@ -334,6 +323,7 @@ def process_yaml(config_yaml) -> bool:
             process_json(json_file, environment, provider["name"])
 
     return True
+
 
 def process_json(json_file, environment, mod) -> bool:
     """
@@ -399,6 +389,7 @@ def process_json(json_file, environment, mod) -> bool:
                 if Path(output_dir).exists():
                     run_makeblastdb(entry, output_dir, file_logger)
     return True
+
 
 @click.command()
 @click.option("-g", "--config_yaml", help="YAML file with all MODs configuration")
