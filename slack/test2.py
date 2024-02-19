@@ -2,7 +2,7 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
 # Create a client instance
-client = WebClient(token='xoxb-32867833447-6153585617507-jPHvbqxoHnUYCOuxezF8BrFZ')
+client = WebClient(token='')
 
 try:
    # Call the chat.postMessage method using the WebClient
