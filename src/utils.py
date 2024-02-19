@@ -9,13 +9,12 @@ Author: Paulo Nuin, Adam Wright
 Date: started September 2023
 """
 
-from typing import Any
-
 import hashlib
 import logging
 from ftplib import FTP
 from pathlib import Path
 from subprocess import PIPE, Popen
+from typing import Any
 
 from Bio import SeqIO  # type: ignore
 from dotenv import dotenv_values
@@ -135,18 +134,18 @@ def get_mod_from_json(input_json) -> str | bool:
     return mod
 
 
-def route53_check() -> bool:
-    """
-    Function that checks if the route53 record exists
-    """
-
-    client53 = boto3.client("route53")
-    response = client53.list_resource_record_sets(
-        HostedZoneId="alliancegenome.org", StartRecordType="TXT"
-    )
-    print(response)
-
-    return True
+# def route53_check() -> bool:
+#     """
+#     Function that checks if the route53 record exists
+#     """
+#
+#     client53 = boto3.client("route53")
+#     response = client53.list_resource_record_sets(
+#         HostedZoneId="alliancegenome.org", StartRecordType="TXT"
+#     )
+#     print(response)
+#
+#     return True
 
 
 def edit_fasta(fasta_file: str, config_entry: dict) -> bool:
@@ -321,6 +320,7 @@ def slack_message(messages: list, subject="Update") -> bool:
             text=subject,  # Subject of the message
             attachments=messages,
         )
+        console.log(response)
     except SlackApiError as e:
         # You will get a SlackApiError if "ok" is False
         assert e.response["ok"] is False
