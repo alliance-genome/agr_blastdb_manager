@@ -17,8 +17,7 @@ from ftplib import FTP
 from pathlib import Path
 from subprocess import PIPE, Popen
 
-import boto3
-from Bio import SeqIO # type: ignore
+from Bio import SeqIO  # type: ignore
 from dotenv import dotenv_values
 from rich.console import Console
 from slack_sdk import WebClient
@@ -149,6 +148,7 @@ def route53_check() -> bool:
 
     return True
 
+
 def edit_fasta(fasta_file: str, config_entry: dict) -> bool:
     """
 
@@ -211,7 +211,17 @@ def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
 
     console.log(f"Syncing {path_to_copy} to S3")
     proc = Popen(
-        ["aws", "s3", "sync", str(path_to_copy), env["S3"], "--exclude", "*.tmp", "--verbose", "--progress"],
+        [
+            "aws",
+            "s3",
+            "sync",
+            str(path_to_copy),
+            env["S3"],
+            "--exclude",
+            "*.tmp",
+            "--verbose",
+            "--progress",
+        ],
         stdout=PIPE,
         stderr=PIPE,
     )
@@ -228,6 +238,7 @@ def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
         sync_to_efs()
 
     return True
+
 
 def sync_to_efs() -> bool:
     """Sync files from an S3 bucket to an EFS volume."""
@@ -263,6 +274,7 @@ def sync_to_efs() -> bool:
     console.log(f"Syncing {env['S3']} to {env['EFS']}: done")
 
     return True
+
 
 def check_output(stdout, stderr) -> bool:
     """ """
@@ -314,5 +326,3 @@ def slack_message(messages: list, subject="Update") -> bool:
         assert e.response["ok"] is False
         assert e.response["error"]  # str like 'invalid_auth', 'channel_not_found'
         print(f"Got an error: {e.response['error']}")
-
-    return True
