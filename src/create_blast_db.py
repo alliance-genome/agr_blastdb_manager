@@ -25,7 +25,7 @@ from rich.console import Console
 
 from utils import edit_fasta  # type: ignore
 from utils import (check_md5sum, check_output, extendable_logger,
-                   get_mod_from_json, route53_check, s3_sync, slack_message,
+                   get_mod_from_json, s3_sync, slack_message,
                    split_zfin_fasta)
 
 console = Console()
