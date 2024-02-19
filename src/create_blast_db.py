@@ -20,20 +20,13 @@ from subprocess import PIPE, Popen
 import click
 import wget  # type: ignore
 import yaml
-from dotenv import dotenv_values
+# from dotenv import dotenv_values
 from rich.console import Console
 
-from utils import (  # type: ignore
-    check_md5sum,
-    check_output,
-    edit_fasta,
-    extendable_logger,
-    get_mod_from_json,
-    route53_check,
-    s3_sync,
-    slack_message,
-    split_zfin_fasta,
-)
+from utils import edit_fasta  # type: ignore
+from utils import (check_md5sum, check_output, extendable_logger,
+                   get_mod_from_json, route53_check, s3_sync, slack_message,
+                   split_zfin_fasta)
 
 console = Console()
 
@@ -214,7 +207,7 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
     """
 
     # Load environment variables from .env file
-    env = dotenv_values(f"{Path.cwd()}/.env")
+    # env = dotenv_values(f"{Path.cwd()}/.env")
 
     # Get the name of the FASTA file
     fasta_file = Path(config_entry["uri"]).name
