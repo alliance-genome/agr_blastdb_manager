@@ -29,10 +29,8 @@ from utils import (  # type: ignore
     edit_fasta,
     extendable_logger,
     get_mod_from_json,
-    route53_check,
     s3_sync,
     slack_message,
-    split_zfin_fasta,
 )
 
 console = Console()
