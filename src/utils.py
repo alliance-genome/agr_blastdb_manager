@@ -470,11 +470,3 @@ def slack_post(message: str) -> bool:
     assert response.body == "ok"
 
     return True
-
-
-def slack_message(messages: list, subject="Update") -> bool:
-    """
-    Function that sends a message to Slack
-    :param message:
-    """
-
