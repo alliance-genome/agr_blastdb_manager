@@ -454,3 +454,27 @@ def slack_message(messages: list, subject="Update") -> bool:
         print(f"Got an error: {e.response['error']}")
 
     return True
+
+def slack_post(message: str) -> bool:
+    """
+    deprecated as it uses webhooks
+    """
+
+    env = dotenv_values(f"{Path.cwd()}/.env")
+
+    # move to .env eventually
+    slack_channel = f"https://hooks.slack.com/services/{env['SLACK']}"
+    webhook = WebhookClient(slack_channel)
+    response = webhook.send(text=message)
+    assert response.status_code == 200
+    assert response.body == "ok"
+
+    return True
+
+
+def slack_message(messages: list, subject="Update") -> bool:
+    """
+    Function that sends a message to Slack
+    :param message:
+    """
+
