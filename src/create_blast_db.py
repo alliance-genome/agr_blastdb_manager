@@ -5,12 +5,12 @@ This script is used to create BLAST databases from FASTA files. It includes func
 store the downloaded FASTA files, create the database and folder structure, run the makeblastdb command, and process
 configuration files in YAML and JSON formats.
 
-Author: Paulo Nuin, Adam Wright
+Authors: Paulo Nuin, Adam Wright
 Date: started July 2023
 """
 
-
 import json
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -18,20 +18,14 @@ from shutil import copyfile, rmtree
 from subprocess import PIPE, Popen
 
 import click
-import wget # type: ignore
+import wget  # type: ignore
 import yaml
 from dotenv import dotenv_values
 from rich.console import Console
 
-from utils import (  # type: ignore
-    check_md5sum,
-    check_output,
-    edit_fasta,
-    extendable_logger,
-    get_mod_from_json,
-    s3_sync,
-    slack_message,
-)
+from utils import (check_md5sum, check_output, edit_fasta,  # type: ignore
+                   extendable_logger, get_mod_from_json, s3_sync,
+                   slack_message)
 
 console = Console()
 
@@ -142,6 +136,7 @@ def get_files_ftp(fasta_uri, md5sum, file_logger) -> bool:
 
     return True
 
+
 def create_db_structure(environment, mod, config_entry, file_logger) -> tuple[str, str]:
     """
     Function that creates the database and folder structure for storing the downloaded FASTA files.
@@ -167,23 +162,28 @@ def create_db_structure(environment, mod, config_entry, file_logger) -> tuple[st
     :rtype: bool
     """
 
+    # Get the blast_title from the config_entry
+    blast_title = config_entry["blast_title"]
+
+    # Use a regular expression to replace non-alphanumeric characters with an underscore
+    sanitized_blast_title = re.sub(r"\W+", "_", blast_title)
+
     # Log the start of the database structure creation process
     file_logger.info("Creating database structure")
 
     # Check if 'seqcol' is present in the configuration entry
-
     if "seqcol" in config_entry.keys():
         # If it is, log the fact and construct the directory path using 'seqcol'
         file_logger.info("seqcol found in config file")
         # Define the directory path if 'seqcol' is present
-        p = f"../data/blast/{mod}/{environment}/databases/{config_entry['seqcol']}/{config_entry['blast_title']}/"
+        p = f"../data/blast/{mod}/{environment}/databases/{config_entry['seqcol']}/{sanitized_blast_title}/"
     else:
         # If it's not, log the fact and construct the directory path using 'genus', 'species', and 'blast_title'
         file_logger.info("seqcol not found in config file")
         # Define the directory path if 'seqcol' is not present
         p = (
             f"../data/blast/{mod}/{environment}/databases/{config_entry['genus']}/{config_entry['species']}/"
-            f"{config_entry['blast_title'].replace(' ', '_')}/"
+            f"{sanitized_blast_title.replace(' ', '_')}/"
         )
     c = f"../data/config/{mod}/{environment}"
 
@@ -197,6 +197,7 @@ def create_db_structure(environment, mod, config_entry, file_logger) -> tuple[st
 
     # Return the paths of the created directories
     return p, c
+
 
 def run_makeblastdb(config_entry, output_dir, file_logger):
     """
@@ -238,28 +239,37 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
         file_logger.info(f"Unzipping {fasta_file}: done")
 
     # Check if the taxon ID is for ZFIN
-    if config_entry["taxon_id"] == "NCBITaxon:7955":
-        # Log the start of the ZFIN FASTA file editing process
-        console.log("Editing ZFIN FASTA file")
-
-        # Edit the ZFIN FASTA file
-        split_zfin_fasta(f"../data/{fasta_file.replace('.gz', '')}")
+    # if config_entry["taxon_id"] == "NCBITaxon:7955":
+    #     # Log the start of the ZFIN FASTA file editing process
+    #     console.log("Editing ZFIN FASTA file")
+    #
+    #     # Edit the ZFIN FASTA file
+    #     split_zfin_fasta(f"../data/{fasta_file.replace('.gz', '')}")
 
     # Edit the FASTA file
-    edit_fasta(f"../data/{fasta_file.replace('.gz', '')}", config_entry)
+    # edit_fasta(f"../data/{fasta_file.replace('.gz', '')}", config_entry)
+
+    # Get the blast_title from the config_entry
+    blast_title = config_entry["blast_title"]
+
+    # Use a regular expression to replace non-alphanumeric characters with an underscore
+    sanitized_blast_title = re.sub(r"\W+", "_", blast_title)
+
+    extensions = "".join(Path(fasta_file).suffixes)
 
     try:
         # Construct the command to run makeblastdb
         makeblast_command = (
             f"makeblastdb -in ../data/{fasta_file.replace('.gz', '')} -dbtype {config_entry['seqtype']} "
-            f"-title '{config_entry['blast_title']}' -parse_seqids "
-            f"-out {output_dir}/{fasta_file.replace('fa.gz', 'db ')} "
+            # f"-title '{config_entry['blast_title']}' -parse_seqids "
+            f"-title '{sanitized_blast_title}' "
+            f"-out {output_dir}/{fasta_file.replace(extensions, 'db')} "
             f"-taxid {config_entry['taxon_id'].replace('NCBITaxon:', '')} "
         )
 
         # Log the start of the makeblastdb process
         file_logger.info(f"Running makeblastdb: {makeblast_command}")
-        console.log(f"Running makeblastdb: {makeblast_command}")
+        console.log(f"Running makeblastdb:\n {makeblast_command}")
 
         # Run the makeblastdb command
         p = Popen(makeblast_command, shell=True, stdout=PIPE, stderr=PIPE)
@@ -360,6 +370,7 @@ def process_yaml(config_yaml) -> bool:
 
     return True
 
+
 def process_json(json_file, environment, mod) -> bool:
     """
     Function that processes a JSON file containing configuration details for a specific data provider.
@@ -424,6 +435,7 @@ def process_json(json_file, environment, mod) -> bool:
                 if Path(output_dir).exists():
                     run_makeblastdb(entry, output_dir, file_logger)
     return True
+
 
 @click.command()
 @click.option("-g", "--config_yaml", help="YAML file with all MODs configuration")
