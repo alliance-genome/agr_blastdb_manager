@@ -9,30 +9,23 @@ Authors: Paulo Nuin, Adam Wright
 Date: started July 2023
 """
 
-
 import json
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
 from shutil import copyfile, rmtree
 from subprocess import PIPE, Popen
-import re
 
 import click
-import wget # type: ignore
+import wget  # type: ignore
 import yaml
 from dotenv import dotenv_values
 from rich.console import Console
 
-from utils import (  # type: ignore
-    check_md5sum,
-    check_output,
-    edit_fasta,
-    extendable_logger,
-    get_mod_from_json,
-    s3_sync,
-    slack_message,
-)
+from utils import (check_md5sum, check_output, edit_fasta,  # type: ignore
+                   extendable_logger, get_mod_from_json, s3_sync,
+                   slack_message)
 
 console = Console()
 
@@ -143,6 +136,7 @@ def get_files_ftp(fasta_uri, md5sum, file_logger) -> bool:
 
     return True
 
+
 def create_db_structure(environment, mod, config_entry, file_logger) -> tuple[str, str]:
     """
     Function that creates the database and folder structure for storing the downloaded FASTA files.
@@ -169,10 +163,10 @@ def create_db_structure(environment, mod, config_entry, file_logger) -> tuple[st
     """
 
     # Get the blast_title from the config_entry
-    blast_title = config_entry['blast_title']
+    blast_title = config_entry["blast_title"]
 
     # Use a regular expression to replace non-alphanumeric characters with an underscore
-    sanitized_blast_title = re.sub(r'\W+', '_', blast_title)
+    sanitized_blast_title = re.sub(r"\W+", "_", blast_title)
 
     # Log the start of the database structure creation process
     file_logger.info("Creating database structure")
@@ -203,6 +197,7 @@ def create_db_structure(environment, mod, config_entry, file_logger) -> tuple[st
 
     # Return the paths of the created directories
     return p, c
+
 
 def run_makeblastdb(config_entry, output_dir, file_logger):
     """
@@ -255,12 +250,12 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
     # edit_fasta(f"../data/{fasta_file.replace('.gz', '')}", config_entry)
 
     # Get the blast_title from the config_entry
-    blast_title = config_entry['blast_title']
+    blast_title = config_entry["blast_title"]
 
     # Use a regular expression to replace non-alphanumeric characters with an underscore
-    sanitized_blast_title = re.sub(r'\W+', '_', blast_title)
+    sanitized_blast_title = re.sub(r"\W+", "_", blast_title)
 
-    extensions = ''.join(Path(fasta_file).suffixes)
+    extensions = "".join(Path(fasta_file).suffixes)
 
     try:
         # Construct the command to run makeblastdb
@@ -375,6 +370,7 @@ def process_yaml(config_yaml) -> bool:
 
     return True
 
+
 def process_json(json_file, environment, mod) -> bool:
     """
     Function that processes a JSON file containing configuration details for a specific data provider.
@@ -439,6 +435,7 @@ def process_json(json_file, environment, mod) -> bool:
                 if Path(output_dir).exists():
                     run_makeblastdb(entry, output_dir, file_logger)
     return True
+
 
 @click.command()
 @click.option("-g", "--config_yaml", help="YAML file with all MODs configuration")

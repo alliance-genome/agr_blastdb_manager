@@ -302,7 +302,6 @@ def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
     return True
 
 
-
 def sync_to_efs() -> bool:
     """
     Syncs files from an S3 bucket to an EFS volume.
@@ -353,7 +352,6 @@ def sync_to_efs() -> bool:
     console.log(f"Syncing {env['S3']} to {env['EFS']}: done")
 
     return True
-
 
 
 def check_output(stdout, stderr) -> bool:
@@ -454,6 +452,7 @@ def slack_message(messages: list, subject="Update") -> bool:
         print(f"Got an error: {e.response['error']}")
 
     return True
+
 
 def slack_post(message: str) -> bool:
     """
