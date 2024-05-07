@@ -437,14 +437,16 @@ def slack_message(messages: list, subject="Update") -> bool:
     client = WebClient(token=env["SLACK"])
 
     try:
-        # Call the chat.postMessage method using the WebClient
-        # This sends the message to the Slack channel
-        response = client.chat_postMessage(
-            channel="#blast-status",  # Channel to send message to
-            text=subject,  # Subject of the message
-            attachments=messages,
-        )
-        console.log("Done sending message to Slack channel")
+        # TODO check len of messages and send bulk depending on the number of messages
+        for message in messages:
+            # Call the chat.postMessage method using the WebClient
+            # This sends the message to the Slack channel
+            response = client.chat_postMessage(
+                channel="#blast-status",  # Channel to send message to
+                text=subject,  # Subject of the message
+                attachments=message,
+            )
+            console.log("Done sending message to Slack channel")
     except SlackApiError as e:
         # You will get a SlackApiError if "ok" is False
         assert e.response["ok"] is False
