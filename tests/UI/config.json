@@ -1,0 +1,33 @@
+{
+  "SGD": {
+
+      "main":{
+        "url": "https://blast.alliancegenome.org/blast/SGD/main",
+        "nucl": "ATGGATTCTGGTATGTTCTAGCGCTTGCACCATCCCATTTAACTGTAAGAAGAATTGCACGGTCCCAATTGCTCGAGAGATTTCTCTTTTACCTTTTTTTACTATTTTTCACTCTCCCATAACCTCCTATATTGACTGATCTGTAATAACCACGATATTATTGGAATAAATAGGGGCTTGAAATTTGGAAAAAAAAAAAAAACTGAAATATTTTCGTGATAAGTGATAGTGATATTCTTCTTTTATTTGCTACTGTTACTAAGTCTCATGTACTAACATCGATTGCTTCATTCTTTTTGTTGCTATATTATATGTTTAGAGGTTGCTGCTTTGGTTATTGATAACGGTTCTGGTATGTGTAAAGCCGGTTTTGCCGGTGACGACGCTCCTCGTGCTGTCTTCCCATCTATCGTCGGTAGACCAAGACACCAAGGTATCATGGTCGGTATGGGTCAAAAAGACTCCTACGTTGGTGATGAAGCTCAATCCAAGAGAGGTATCTTGACTTTACGTTACCCAATTGAACACGGTATTGTCACCAACTGGGACGATATGGAAAAGATCTGGCATCATACCTTCTACAACGAATTGAGAGTTGCCCCAGAAGAACACCCTGTTCTTTTGACTGAAGCTCCAATGAACCCTAAATCAAACAGAGAAAG",
+        "prot": "MDSEVAALVIDNGSGMCKAGFAGDDAPRAVFPSIVGRPRHQGIMVGMGQKDSYVGDEAQSKRGILTLRYPIEHGIVTNWDDMEKIWHHTFYNELRVAPEEHPVLLTEAPMNPKSNREKMTQIMFETFNVPAFYVSIQAVLSLYSSGRTTGIVLDSGDGVTHVVPIYAGFSLPHAILRIDLAGRDLTDYLMKILSERGYSFSTTAEREIVRDIKEKLCYVALDFEQEMQTAAQSSSIEKSYELPDGQVITIGNERFRAPEALFHPSVLGLESAGIDQTTYNSIMKCDVDVRKELYGNIVMSGGTTMFPGIAERMQKEITALAPSSMKVKIIAPPERKYSVWIGGSILASLTTFQQMWISKQEYDESGPSIVHHKCF",
+        "items": []
+      },
+      "fungal": {
+        "url": "https://blast.alliancegenome.org/blast/SGD/main",
+        "nucl": "ATGGATTCTGGTATGTTCTAGCGCTTGCACCATCCCATTTAACTGTAAGAAGAATTGCACGGTCCCAATTGCTCGAGAGATTTCTCTTTTACCTTTTTTTACTATTTTTCACTCTCCCATAACCTCCTATATTGACTGATCTGTAATAACCACGATATTATTGGAATAAATAGGGGCTTGAAATTTGGAAAAAAAAAAAAAACTGAAATATTTTCGTGATAAGTGATAGTGATATTCTTCTTTTATTTGCTACTGTTACTAAGTCTCATGTACTAACATCGATTGCTTCATTCTTTTTGTTGCTATATTATATGTTTAGAGGTTGCTGCTTTGGTTATTGATAACGGTTCTGGTATGTGTAAAGCCGGTTTTGCCGGTGACGACGCTCCTCGTGCTGTCTTCCCATCTATCGTCGGTAGACCAAGACACCAAGGTATCATGGTCGGTATGGGTCAAAAAGACTCCTACGTTGGTGATGAAGCTCAATCCAAGAGAGGTATCTTGACTTTACGTTACCCAATTGAACACGGTATTGTCACCAACTGGGACGATATGGAAAAGATCTGGCATCATACCTTCTACAACGAATTGAGAGTTGCCCCAGAAGAACACCCTGTTCTTTTGACTGAAGCTCCAATGAACCCTAAATCAAACAGAGAAAG",
+        "prot": "MDSEVAALVIDNGSGMCKAGFAGDDAPRAVFPSIVGRPRHQGIMVGMGQKDSYVGDEAQSKRGILTLRYPIEHGIVTNWDDMEKIWHHTFYNELRVAPEEHPVLLTEAPMNPKSNREKMTQIMFETFNVPAFYVSIQAVLSLYSSGRTTGIVLDSGDGVTHVVPIYAGFSLPHAILRIDLAGRDLTDYLMKILSERGYSFSTTAEREIVRDIKEKLCYVALDFEQEMQTAAQSSSIEKSYELPDGQVITIGNERFRAPEALFHPSVLGLESAGIDQTTYNSIMKCDVDVRKELYGNIVMSGGTTMFPGIAERMQKEITALAPSSMKVKIIAPPERKYSVWIGGSILASLTTFQQMWISKQEYDESGPSIVHHKCF",
+        "items": ['Akanthomyces_anchor', 'Akanthomyces-muscarius_anchor', 'Ascochyta_anchor', 'Aspergillus_anchor', 'Botrytis_anchor', 'Brettanomyces_anchor', 'Candida_anchor', 'Cercospora_anchor', 'Colletotrichum_anchor', 'Cryptococcus_anchor', 'Cutaneotrichosporon_anchor', 'Debaryomyces_anchor', 'Drechmeria_anchor', 'Encephalitozoon_anchor', 'Eremothecium_anchor', 'Fulvia_anchor', 'Fusarium_anchor', 'Kazachstania_anchor', 'Kluyveromyces_anchor', 'Komagataella_anchor', 'Kwoniella_anchor', 'Lachancea_anchor', 'Lodderomyces_anchor', 'Malassezia_anchor', 'Marasmius_anchor', 'Nakaseomyces_anchor', 'Naumovozyma_anchor', 'Neurospora_anchor', 'Ogataea_anchor', 'Penicillium_anchor', 'Pichia_anchor', 'Pochonia_anchor', 'Podospora_anchor', 'Psilocybe_anchor', 'Puccinia_anchor', 'Purpureocillium_anchor', 'Pyricularia_anchor', 'Rhizoctonia_anchor', 'Saccharomyces_anchor', 'Saccharomycodes_anchor', 'Scheffersomyces_anchor', 'Schizosaccharomyces_anchor', 'Sporisorium_anchor', 'Sugiyamaella_anchor', 'Talaromyces_anchor', 'Tetrapisispora_anchor', 'Thermothelomyces_anchor', 'Thermothielavioides_anchor', 'Torulaspora_anchor', 'Trichoderma_anchor', 'Ustilaginoidea_anchor', 'Ustilago_anchor', 'Vanrija_anchor', 'Yarrowia_anchor', 'Zygosaccharomyces_anchor', 'Zygotorulaspora_anchor', 'Zymoseptoria_anchor', 'Akanthomyces_anchor', 'Ascochyta_anchor', 'Aspergillus_anchor', 'Botrytis_anchor', 'Brettanomyces_anchor', 'Candida_anchor', 'Cercospora_anchor', 'Colletotrichum_anchor', 'Cryptococcus_anchor', 'Cutaneotrichosporon_anchor', 'Debaryomyces_anchor', 'Drechmeria_anchor', 'Encephalitozoon_anchor', 'Eremothecium_anchor', 'Fulvia_anchor', 'Fusarium_anchor', 'Kazachstania_anchor', 'Kluyveromyces_anchor', 'Komagataella_anchor', 'Kwoniella_anchor', 'Lachancea_anchor', 'Lodderomyces_anchor', 'Malassezia_anchor', 'Marasmius_anchor', 'Nakaseomyces_anchor', 'Naumovozyma_anchor', 'Neurospora_anchor', 'Ogataea_anchor', 'Penicillium_anchor', 'Pichia_anchor', 'Pochonia_anchor', 'Podospora_anchor', 'Psilocybe_anchor', 'Puccinia_anchor', 'Purpureocillium_anchor', 'Pyricularia_anchor', 'Rhizoctonia_anchor', 'Saccharomyces_anchor', 'Saccharomycodes_anchor', 'Scheffersomyces_anchor', 'Schizosaccharomyces_anchor', 'Sporisorium_anchor', 'Sugiyamaella_anchor', 'Talaromyces_anchor', 'Tetrapisispora_anchor', 'Thermothelomyces_anchor', 'Thermothielavioides_anchor', 'Torulaspora_anchor', 'Trichoderma_anchor', 'Ustilaginoidea_anchor', 'Ustilago_anchor', 'Vanrija_anchor', 'Yarrowia_anchor', 'Zygosaccharomyces_anchor', 'Zygotorulaspora_anchor', 'Zymoseptoria_anchor']
+      }
+    },
+  "WB": {
+
+  },
+  "RGD": {
+
+  },
+  "ZFIN": {
+
+  },
+    "MGI": {
+
+    },
+    "FB": {
+
+    }
+
+}

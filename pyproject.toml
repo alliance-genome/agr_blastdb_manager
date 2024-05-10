@@ -20,6 +20,7 @@ python-dotenv = "^1.0.0"
 slack-sdk = "^3.23.0"
 numpy = "^1.26.4"
 selenium = "^4.20.0"
+beautifulsoup4 = "^4.12.3"
 
 [tool.poetry.group.dev.dependencies]
 isort = "^5.12.0"
