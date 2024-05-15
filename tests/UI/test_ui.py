@@ -7,6 +7,10 @@ from selenium.webdriver.support import expected_conditions as EC
 import time
 from tqdm import tqdm
 import json
+from rich import Console
+
+
+console = Console()
 
 def run_test(mod, items, db_type, sequence):
 
@@ -29,29 +33,23 @@ def run_test(mod, items, db_type, sequence):
         )
         input_box.send_keys(sequence)
 
-        # new_tab = WebDriverWait(browser, 10).until(
-        #     EC.element_to_be_clickable((By.ID, "toggleNewTab"))
-        # )
-        # new_tab.click()
-
 
         element = browser.find_element(By.ID, "method")
         element.click()
 
         print("clicked")
-        for _ in tqdm(range(20)):  # Pauses the script for 10 seconds
+        for _ in tqdm(range(10)):  # Pauses the script for 10 seconds
             time.sleep(1)
 
         try:
             next_page_element = WebDriverWait(browser, 600).until(
                 EC.presence_of_element_located((By.ID, "view"))
             )
-            print("found")
             browser.save_screenshot(f'{item}.png')
             for _ in tqdm(range(10)):  # Pauses the script for 10 seconds
                 time.sleep(1)
         except Exception as e:
-            print(e)
+            console.log(e)
             browser.quit()
 
 @click.command()
@@ -62,8 +60,7 @@ def run_test(mod, items, db_type, sequence):
 def prepare_test(mod, type, single_item, number_of_items):
 
     data = json.loads(open("config.json").read())
-    print(data)
-
+    run_test(mod, data[mod][type]["items"], db_type, data[mod][type][sequence])
 
 if __name__ == "__main__":
     prepare_test()
