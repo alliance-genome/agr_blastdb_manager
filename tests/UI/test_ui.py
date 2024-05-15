@@ -1,19 +1,18 @@
-import click
+import json
+import time
 
+import click
+from rich import Console
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import time
+from selenium.webdriver.support.ui import WebDriverWait
 from tqdm import tqdm
-import json
-from rich import Console
-
 
 console = Console()
 
-def run_test(mod, items, db_type, sequence):
 
+def run_test(mod, items, db_type, sequence):
     # Set up the browser (replace "chrome" with "firefox" for Firefox)
     browser = webdriver.Chrome()
 
@@ -33,7 +32,6 @@ def run_test(mod, items, db_type, sequence):
         )
         input_box.send_keys(sequence)
 
-
         element = browser.find_element(By.ID, "method")
         element.click()
 
@@ -45,22 +43,29 @@ def run_test(mod, items, db_type, sequence):
             next_page_element = WebDriverWait(browser, 600).until(
                 EC.presence_of_element_located((By.ID, "view"))
             )
-            browser.save_screenshot(f'{item}.png')
+            browser.save_screenshot(f"{item}.png")
             for _ in tqdm(range(10)):  # Pauses the script for 10 seconds
                 time.sleep(1)
         except Exception as e:
             console.log(e)
             browser.quit()
 
+
 @click.command()
 @click.option("-m", "--mod", help="The MOD to test")
 @click.option("-t", "--type", help="The DB type to test, i.e. fungal for SGD")
 @click.option("-s", "--single_item", help="How many items to test", default=1)
-@click.option("-n", "--number_of_items", help="number of items to test, random, default all, cannot be used with single item")
+@click.option(
+    "-n",
+    "--number_of_items",
+    help="number of items to test, random, default all, cannot be used with single item",
+)
 def prepare_test(mod, type, single_item, number_of_items):
+    """ """
 
     data = json.loads(open("config.json").read())
-    run_test(mod, data[mod][type]["items"], db_type, data[mod][type][sequence])
+    run_test(mod, data[mod][type]["items"], type, data[mod][type]["sequence"])
+
 
 if __name__ == "__main__":
     prepare_test()
