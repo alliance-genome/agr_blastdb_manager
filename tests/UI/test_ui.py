@@ -37,17 +37,18 @@ def run_test(mod, items, type, sequence):
 
         element = browser.find_element(By.ID, "method")
         element.click()
+        element.click()
         console.log("Clicked button")
 
-        for _ in tqdm(range(5)):  # Pauses the script for 10 seconds
+        for _ in tqdm(range(20)):  # Pauses the script for 10 seconds
             time.sleep(1)
 
         try:
             next_page_element = WebDriverWait(browser, 600).until(
                 EC.presence_of_element_located((By.ID, "view"))
             )
-            browser.save_screenshot(f"{item}.png")
-            for _ in tqdm(range(15)):  # Pauses the script for 10 seconds
+            browser.save_screenshot(f"SGD/{item}.png")
+            for _ in tqdm(range(20)):  # Pauses the script for 10 seconds
                 time.sleep(1)
         except Exception as e:
             console.log(e)
