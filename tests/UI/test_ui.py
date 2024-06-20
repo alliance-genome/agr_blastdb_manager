@@ -15,6 +15,7 @@ console = Console()
 def run_test(mod, items, type, sequence):
 
     # Locate and click the checkbox
+    # Locate and click the checkbox
     for item in items:
         # Set up the browser (replace "chrome" with "firefox" for Firefox)
         browser = webdriver.Chrome()
@@ -35,8 +36,10 @@ def run_test(mod, items, type, sequence):
         input_box.send_keys(sequence)
         console.log(f"Sent sequence")
 
-        element = browser.find_element(By.ID, "method")
-        element.click()
+        # Locate the element right before interacting with it
+        element = WebDriverWait(browser, 10).until(
+            EC.element_to_be_clickable((By.ID, "method"))
+        )
         element.click()
         console.log("Clicked button")
 
@@ -47,14 +50,13 @@ def run_test(mod, items, type, sequence):
             next_page_element = WebDriverWait(browser, 600).until(
                 EC.presence_of_element_located((By.ID, "view"))
             )
-            browser.save_screenshot(f"SGD/{item}.png")
+            browser.save_screenshot(f"output/{mod}/{item}.png")
             for _ in tqdm(range(20)):  # Pauses the script for 10 seconds
                 time.sleep(1)
         except Exception as e:
             console.log(e)
 
         browser.quit()
-
 
 @click.command()
 @click.option("-m", "--mod", help="The MOD to test")
