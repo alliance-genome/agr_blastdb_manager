@@ -28,7 +28,7 @@ from rich.progress import (BarColumn, Progress, SpinnerColumn, TaskID,
                            TextColumn)
 from rich.style import Style
 from rich.table import Table
-
+import subprocess
 from utils import (check_md5sum, check_output, edit_fasta, get_ftp_file_size,
                    get_mod_from_json, run_command, s3_sync,
                    setup_logger, slack_message)

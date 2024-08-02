@@ -15,7 +15,7 @@ import logging
 from ftplib import FTP
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from subprocess import PIPE, Popen
+from subprocess import PIPE, Popen, run, CalledProcessError
 from typing import Any, List, Tuple
 
 from dotenv import dotenv_values
@@ -308,4 +308,158 @@ def sync_to_efs() -> bool:
     proc.wait()
 
     # Log the completion of the EFS sync process
-    console.log(f"Syncing {env['S3']}
+    console.log(f"Syncing {env['S3']}to {env['EFS']}: done")
+
+    return True
+
+
+def check_output(stdout: bytes, stderr: bytes) -> bool:
+    """
+    Check the output of a subprocess for errors.
+
+    Args:
+        stdout (bytes): Standard output from the subprocess.
+        stderr (bytes): Standard error from the subprocess.
+
+    Returns:
+        bool: True if no errors were found, False otherwise.
+    """
+    stderr_str = stderr.decode("utf-8")
+    if stderr_str and "Error" in stderr_str:
+        console.log(
+            f"Error in subprocess output: {stderr_str}", style="blink bold white on red"
+        )
+        return False
+    return True
+
+
+def run_command(command: List[str]) -> Tuple[bool, str]:
+    """
+    Run a shell command and return its output.
+
+    Args:
+        command (List[str]): The command to run as a list of strings.
+
+    Returns:
+        Tuple[bool, str]: A tuple containing a boolean indicating success and the command output.
+    """
+    try:
+        result = run(command, check=True, capture_output=True, text=True)
+        return True, result.stdout
+    except CalledProcessError as e:
+        return False, f"Command failed with error: {e.stderr}"
+
+
+def needs_parse_id(fasta_file: Path) -> bool:
+    """
+    Determine if the FASTA file needs parse_id option for makeblastdb.
+
+    Args:
+        fasta_file (Path): Path to the gzipped FASTA file
+
+    Returns:
+        bool: True if parse_id is needed, False otherwise
+    """
+    open_func = gzip.open if fasta_file.suffix == ".gz" else open
+    mode = "rt" if fasta_file.suffix == ".gz" else "r"
+
+    with open_func(fasta_file, mode) as f:
+        headers = [next(f).strip() for _ in range(100) if next(f).startswith(">")]
+
+    # Analyze headers here
+    complex_headers = any("|" in header for header in headers)
+    consistent_format = len(set(header.count("|") for header in headers)) == 1
+
+    return complex_headers and consistent_format
+
+
+def setup_logger(name, log_file, level=logging.INFO):
+    """Function to set up a logger with file and console handlers."""
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
+
+    # File Handler
+    file_handler = RotatingFileHandler(
+        log_file, maxBytes=10 * 1024 * 1024, backupCount=5
+    )
+    file_handler.setFormatter(formatter)
+
+    # Console Handler
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+
+    return logger
+
+
+def slack_message(messages: list, subject="Update") -> bool:
+    """
+    Sends a message to a Slack channel using the Slack API.
+
+    This function takes a list of messages and a subject as input and posts them to a Slack channel using the Slack API. The Slack API token is retrieved from the environment variables. The function returns True if the message was successfully posted.
+
+    :param messages: The list of messages to be posted to the Slack channel.
+    :type messages: list
+    :param subject: The subject of the message. By default, it's set to "Update".
+    :type subject: str, optional
+    :return: True if the message was successfully posted, False otherwise.
+    :rtype: bool
+    """
+
+    # Load environment variables from .env file
+    env = dotenv_values(f"{Path.cwd()}/.env")
+
+    # Create a WebClient object with the Slack API token
+    client = WebClient(token=env["SLACK"])
+
+    try:
+        # Call the chat.postMessage method using the WebClient
+        # This sends the message to the Slack channel
+        response = client.chat_postMessage(
+            channel="#blast-status",  # Channel to send message to
+            text=subject,  # Subject of the message
+            attachments=messages,
+        )
+        console.log("Done sending message to Slack channel")
+        return True
+    except SlackApiError as e:
+        # You will get a SlackApiError if "ok" is False
+        assert e.response["ok"] is False
+        assert e.response["error"]  # str like 'invalid_auth', 'channel_not_found'
+        print(f"Got an error: {e.response['error']}")
+        return False
+
+
+def get_ftp_file_size(fasta_uri: str) -> int:
+    """
+    Get the size of a file on an FTP server.
+
+    Args:
+        fasta_uri (str): The URI of the FASTA file on the FTP server.
+
+    Returns:
+        int: The size of the file in bytes, or 0 if size couldn't be determined.
+    """
+    try:
+        ftp_parts = fasta_uri.split("/")
+        ftp_server = ftp_parts[2]
+        ftp_path = "/".join(ftp_parts[3:-1])
+        filename = ftp_parts[-1]
+
+        with FTP(ftp_server) as ftp:
+            ftp.login()
+            ftp.cwd(ftp_path)
+            size = ftp.size(filename)
+
+        if size is not None:
+            console.log(f"File size for {filename} is {size} bytes")
+            return size
+        else:
+            console.log(f"Couldn't determine size for {filename}")
+            return 0
+    except Exception as e:
+        console.log(f"Error getting FTP file size: {e}")
+        return 0
