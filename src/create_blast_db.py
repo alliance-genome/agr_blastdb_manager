@@ -268,7 +268,7 @@ def process_json(
     json_file: Path,
     environment: str,
     mod: Optional[str] = None,
-    db_info: Optional[dict] = None
+    db_info: Optional[dict] = None,
 ) -> bool:
     LOGGER.info(f"Processing JSON file: {json_file}")
 
@@ -300,11 +300,13 @@ def process_json(
                     if output_dir.exists():
                         if run_makeblastdb(entry, output_dir):
                             if db_info is not None:
-                                db_info["databases_created"].append({
-                                    "name": entry['blast_title'],
-                                    "type": entry['seqtype'],
-                                    "taxon_id": entry['taxon_id']
-                                })
+                                db_info["databases_created"].append(
+                                    {
+                                        "name": entry["blast_title"],
+                                        "type": entry["seqtype"],
+                                        "taxon_id": entry["taxon_id"],
+                                    }
+                                )
                         else:
                             LOGGER.error(
                                 f"Failed to create BLAST database for {entry['uri']}"
@@ -317,24 +319,25 @@ def process_json(
         LOGGER.error(f"Error processing JSON file: {str(e)}")
         return False
 
+
 @click.command()
 @click.option("-g", "--config_yaml", help="YAML file with all MODs configuration")
 @click.option("-j", "--input_json", help="JSON file input coordinates")
 @click.option("-e", "--environment", help="Environment", default="dev")
 @click.option("-m", "--mod", help="Model organism")
-@click.option("-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=False)
+@click.option(
+    "-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=False
+)
 @click.option("-u", "--update-slack", help="Update Slack", is_flag=True, default=False)
 @click.option("-s3", "--sync-s3", help="Sync to S3", is_flag=True, default=False)
-def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_slack, sync_s3):
+def create_dbs(
+    config_yaml, input_json, environment, mod, skip_efs_sync, update_slack, sync_s3
+):
     start_time = time.time()
     LOGGER.info("Starting create_dbs function")
 
     try:
-        db_info = {
-            "mod": mod,
-            "environment": environment,
-            "databases_created": []
-        }
+        db_info = {"mod": mod, "environment": environment, "databases_created": []}
 
         if config_yaml:
             success = process_yaml(Path(config_yaml), db_info)
@@ -353,9 +356,9 @@ def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_
             message += f"*Environment:* {db_info['environment']}\n"
             message += f"*Databases created:*\n"
             for db in db_info['databases_created']:
-                message += f"- {db['name']} (Type: {db['type']}, Taxon ID: {db['taxon_id']})\n"
+                message += f"• {db['name']} (Type: {db['type']}, Taxon ID: {db['taxon_id']})\n"
 
-            slack_success = slack_message([{"title": "BLAST Database Update", "text": message}])
+            slack_success = slack_message([{"text": message}], subject="BLAST Database Update")
             LOGGER.info(f"Slack update {'successful' if slack_success else 'failed'}")
 
         if sync_s3:
