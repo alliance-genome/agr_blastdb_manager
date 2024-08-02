@@ -343,7 +343,7 @@ def create_dbs(
             return
 
         if update_slack:
-            slack_success = slack_message(SLACK_MESSAGES)
+            slack_success = slack_message(SLACK_MESSAGES, subject="BLAST Database Update")
             LOGGER.info(f"Slack update {'successful' if slack_success else 'failed'}")
 
         if sync_s3:
