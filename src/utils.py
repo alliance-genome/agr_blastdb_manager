@@ -15,7 +15,7 @@ import logging
 from ftplib import FTP
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from subprocess import PIPE, Popen, run, CalledProcessError
+from subprocess import PIPE, CalledProcessError, Popen, run
 from typing import Any, List, Tuple
 
 from dotenv import dotenv_values
