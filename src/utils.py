@@ -22,6 +22,9 @@ from rich.console import Console
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from slack_sdk.webhook import WebhookClient
+from ftplib import FTP
+from Bio import SeqIO
+from typing import Tuple, List
 
 console = Console()
 
@@ -453,19 +456,86 @@ def slack_message(messages: list, subject="Update") -> bool:
 
     return True
 
-
-def slack_post(message: str) -> bool:
+def get_ftp_file_size(fasta_uri: str) -> int:
     """
-    deprecated as it uses webhooks
+    Get the size of a file on an FTP server.
+
+    Args:
+        fasta_uri (str): The URI of the FASTA file on the FTP server.
+
+    Returns:
+        int: The size of the file in bytes, or 0 if size couldn't be determined.
     """
+    try:
+        ftp_parts = fasta_uri.split('/')
+        ftp_server = ftp_parts[2]
+        ftp_path = '/'.join(ftp_parts[3:-1])
+        filename = ftp_parts[-1]
 
-    env = dotenv_values(f"{Path.cwd()}/.env")
+        with FTP(ftp_server) as ftp:
+            ftp.login()
+            ftp.cwd(ftp_path)
+            size = ftp.size(filename)
 
-    # move to .env eventually
-    slack_channel = f"https://hooks.slack.com/services/{env['SLACK']}"
-    webhook = WebhookClient(slack_channel)
-    response = webhook.send(text=message)
-    assert response.status_code == 200
-    assert response.body == "ok"
+        if size is not None:
+            console.log(f"File size for {filename} is {size} bytes")
+            return size
+        else:
+            console.log(f"Couldn't determine size for {filename}")
+            return 0
+    except Exception as e:
+        console.log(f"Error getting FTP file size: {e}")
+        return 0
 
+
+def validate_fasta(filename: Path) -> bool:
+    """
+    Validate a FASTA file.
+
+    Args:
+        filename (Path): Path to the FASTA file.
+
+    Returns:
+        bool: True if the file is a valid FASTA, False otherwise.
+    """
+    try:
+        with open(filename, "r") as handle:
+            fasta = SeqIO.parse(handle, "fasta")
+            return any(fasta)  # False if no records found
+    except Exception as e:
+        console.log(f"Error validating FASTA file {filename}: {e}")
+        return False
+
+
+def check_output(stdout: bytes, stderr: bytes) -> bool:
+    """
+    Check the output of a subprocess for errors.
+
+    Args:
+        stdout (bytes): Standard output from the subprocess.
+        stderr (bytes): Standard error from the subprocess.
+
+    Returns:
+        bool: True if no errors were found, False otherwise.
+    """
+    stderr_str = stderr.decode("utf-8")
+    if stderr_str and "Error" in stderr_str:
+        console.log(f"Error in subprocess output: {stderr_str}", style="blink bold white on red")
+        return False
     return True
+
+def run_command(command: List[str]) -> Tuple[bool, str]:
+    """
+    Run a shell command and return its output.
+
+    Args:
+        command (List[str]): The command to run as a list of strings.
+
+    Returns:
+        Tuple[bool, str]: A tuple containing a boolean indicating success and the command output.
+    """
+    try:
+        result = subprocess.run(command, check=True, capture_output=True, text=True)
+        return True, result.stdout
+    except subprocess.CalledProcessError as e:
+        return False, f"Command failed with error: {e.stderr}"
