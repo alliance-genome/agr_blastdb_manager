@@ -320,29 +320,66 @@ def process_json(
         return False
 
 
+def derive_mod_from_input(input_file):
+    """
+    Derive the MOD (Model Organism) from the input file name.
+
+    Args:
+        input_file (str): The path to the input file.
+
+    Returns:
+        str: The MOD (Model Organism) extracted from the input file name. If the input file name does not have the expected format or the MOD cannot be extracted, returns 'Unknown'.
+    """
+    file_name = Path(input_file).name
+    parts = file_name.split('.')
+    if len(parts) >= 3 and parts[0] == 'databases':
+        return parts[1]  # This should be the MOD
+    return 'Unknown'
+
+
+
 @click.command()
 @click.option("-g", "--config_yaml", help="YAML file with all MODs configuration")
 @click.option("-j", "--input_json", help="JSON file input coordinates")
 @click.option("-e", "--environment", help="Environment", default="dev")
 @click.option("-m", "--mod", help="Model organism")
-@click.option(
-    "-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=False
-)
+@click.option("-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=False)
 @click.option("-u", "--update-slack", help="Update Slack", is_flag=True, default=False)
 @click.option("-s3", "--sync-s3", help="Sync to S3", is_flag=True, default=False)
-def create_dbs(
-    config_yaml, input_json, environment, mod, skip_efs_sync, update_slack, sync_s3
-):
+def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_slack, sync_s3):
+"""
+A command line interface function that creates BLAST databases based on the provided configuration.
+
+Parameters:
+- config_yaml (str): YAML file with all MODs configuration.
+- input_json (str): JSON file input coordinates.
+- environment (str): Environment. Default is "dev".
+- mod (str): Model organism.
+- skip_efs_sync (bool): Skip EFS sync. Default is False.
+- update_slack (bool): Update Slack. Default is False.
+- sync_s3 (bool): Sync to S3. Default is False.
+
+Returns:
+None
+"""
     start_time = time.time()
     LOGGER.info("Starting create_dbs function")
 
     try:
-        db_info = {"mod": mod, "environment": environment, "databases_created": []}
+        # If mod is not provided, try to derive it from the input file
+        if mod is None:
+            mod = derive_mod_from_input(input_json or config_yaml)
+
+        db_info = {
+            "mod": mod,
+            "environment": environment,
+            "databases_created": []
+        }
 
         if config_yaml:
             success = process_yaml(Path(config_yaml), db_info)
         elif input_json:
-            success = process_json(Path(input_json), environment, mod, db_info)
+            success = process_json(Path(input_json), environment, db_info['mod'], db_info)
         else:
             LOGGER.error("Neither config_yaml nor input_json provided")
             return
@@ -356,7 +393,7 @@ def create_dbs(
             message += f"*Environment:* {db_info['environment']}\n"
             message += f"*Databases created:*\n"
             for db in db_info['databases_created']:
-                message += f"• {db['name']} (Type: {db['type']}, Taxon ID: {db['taxon_id']})\n"
+                message += f"• *{db['name']}* (Type: `{db['type']}`, Taxon ID: `{db['taxon_id']}`)\n"
 
             slack_success = slack_message([{"text": message}], subject="BLAST Database Update")
             LOGGER.info(f"Slack update {'successful' if slack_success else 'failed'}")
@@ -371,6 +408,7 @@ def create_dbs(
         end_time = time.time()
         duration = end_time - start_time
         LOGGER.info(f"create_dbs function completed in {duration:.2f} seconds")
+
 
 
 if __name__ == "__main__":

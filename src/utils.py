@@ -374,22 +374,17 @@ def slack_message(messages: list, subject="BLAST Database Update") -> bool:
             blocks = [
                 {
                     "type": "header",
-                    "text": {"type": "plain_text", "text": subject, "emoji": True}
+                    "text": {"type": "plain_text", "text": subject, "emoji": True},
                 },
-                {
-                    "type": "section",
-                    "text": {"type": "mrkdwn", "text": msg['text']}
-                },
-                {
-                    "type": "divider"
-                }
+                {"type": "section", "text": {"type": "mrkdwn", "text": msg["text"]}},
+                {"type": "divider"},
             ]
 
             # Call the chat.postMessage method using the WebClient
             response = client.chat_postMessage(
                 channel="#blast-status",  # Channel to send message to
                 blocks=blocks,
-                text=subject  # Fallback text for notifications
+                text=subject,  # Fallback text for notifications
             )
 
         LOGGER.info("Successfully sent message to Slack channel")
@@ -397,6 +392,7 @@ def slack_message(messages: list, subject="BLAST Database Update") -> bool:
     except SlackApiError as e:
         LOGGER.error(f"Error sending message to Slack: {e.response['error']}")
         return False
+
 
 def get_ftp_file_size(fasta_uri: str) -> int:
     """
