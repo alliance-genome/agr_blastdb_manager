@@ -158,6 +158,11 @@ def run_makeblastdb(config_entry: Dict[str, str], output_dir: Path) -> bool:
     fasta_file = Path(config_entry["uri"]).name
     LOGGER.info(f"Running makeblastdb for {fasta_file}")
 
+    SLACK_MESSAGES.append({
+        "title": "Running makeblastdb",
+        "text": f"Processing {fasta_file}"
+    })
+
     gzipped_fasta = Path(f"../data/{fasta_file}")
     unzipped_fasta = gzipped_fasta.with_suffix("")
 
@@ -195,12 +200,17 @@ def run_makeblastdb(config_entry: Dict[str, str], output_dir: Path) -> bool:
     success, output = run_command(makeblast_command)
     if success:
         LOGGER.info("Makeblastdb: done")
-        unzipped_fasta.unlink()
-        LOGGER.info(f"Removed {unzipped_fasta}")
+        SLACK_MESSAGES.append({
+            "title": "Makeblastdb completed",
+            "text": f"Successfully processed {fasta_file}"
+        })
         return True
     else:
         LOGGER.error(f"Error running makeblastdb: {output}")
-        rmtree(output_dir)
+        SLACK_MESSAGES.append({
+            "title": "Makeblastdb Error",
+            "text": f"Failed to process {fasta_file}"
+        })
         return False
 
 

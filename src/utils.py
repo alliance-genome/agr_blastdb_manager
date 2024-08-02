@@ -399,8 +399,6 @@ def slack_message(messages: list, subject="Update") -> bool:
     """
     Sends a message to a Slack channel using the Slack API.
 
-    This function takes a list of messages and a subject as input and posts them to a Slack channel using the Slack API. The Slack API token is retrieved from the environment variables. The function returns True if the message was successfully posted.
-
     :param messages: The list of messages to be posted to the Slack channel.
     :type messages: list
     :param subject: The subject of the message. By default, it's set to "Update".
@@ -408,7 +406,6 @@ def slack_message(messages: list, subject="Update") -> bool:
     :return: True if the message was successfully posted, False otherwise.
     :rtype: bool
     """
-
     # Load environment variables from .env file
     env = dotenv_values(f"{Path.cwd()}/.env")
 
@@ -416,20 +413,33 @@ def slack_message(messages: list, subject="Update") -> bool:
     client = WebClient(token=env["SLACK"])
 
     try:
+        # Prepare the message blocks
+        blocks = [
+            {
+                "type": "header",
+                "text": {"type": "plain_text", "text": subject}
+            },
+            {
+                "type": "divider"
+            }
+        ]
+
+        # Add each message as a section block
+        for msg in messages:
+            blocks.append({
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": f"*{msg['title']}*\n{msg['text']}"}
+            })
+
         # Call the chat.postMessage method using the WebClient
-        # This sends the message to the Slack channel
         response = client.chat_postMessage(
             channel="#blast-status",  # Channel to send message to
-            text=subject,  # Subject of the message
-            attachments=messages,
+            blocks=blocks
         )
-        console.log("Done sending message to Slack channel")
+        LOGGER.info("Successfully sent message to Slack channel")
         return True
     except SlackApiError as e:
-        # You will get a SlackApiError if "ok" is False
-        assert e.response["ok"] is False
-        assert e.response["error"]  # str like 'invalid_auth', 'channel_not_found'
-        print(f"Got an error: {e.response['error']}")
+        LOGGER.error(f"Error sending message to Slack: {e.response['error']}")
         return False
 
 
