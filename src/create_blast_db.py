@@ -24,9 +24,16 @@ from dotenv import load_dotenv
 from rich.console import Console
 
 from utils import (
-    setup_logger, check_md5sum, edit_fasta, s3_sync,
-    send_slack_message, get_mod_from_json, get_ftp_file_size,
-    validate_fasta, check_output, run_command
+    setup_logger,
+    check_md5sum,
+    edit_fasta,
+    s3_sync,
+    send_slack_message,
+    get_mod_from_json,
+    get_ftp_file_size,
+    validate_fasta,
+    check_output,
+    run_command,
 )
 
 # Load environment variables
@@ -37,6 +44,7 @@ console = Console()
 # Global variables
 SLACK_MESSAGES: List[Dict[str, str]] = []
 LOGGER = setup_logger("create_blast_db", "blast_db_creation.log")
+
 
 def store_fasta_files(fasta_file: Path) -> None:
     """
@@ -52,6 +60,7 @@ def store_fasta_files(fasta_file: Path) -> None:
     console.log(f"Storing {fasta_file} in {original_files_store}")
     copyfile(fasta_file, original_files_store / fasta_file.name)
     LOGGER.info(f"Stored {fasta_file} in {original_files_store}")
+
 
 def get_files_ftp(fasta_uri: str, md5sum: str) -> bool:
     """
@@ -98,7 +107,10 @@ def get_files_ftp(fasta_uri: str, md5sum: str) -> bool:
         LOGGER.error(f"Error downloading {fasta_uri}: {e}")
         return False
 
-def create_db_structure(environment: str, mod: str, config_entry: Dict[str, str]) -> Tuple[Path, Path]:
+
+def create_db_structure(
+    environment: str, mod: str, config_entry: Dict[str, str]
+) -> Tuple[Path, Path]:
     """
     Create the database and folder structure for storing the downloaded FASTA files.
 
@@ -117,10 +129,14 @@ def create_db_structure(environment: str, mod: str, config_entry: Dict[str, str]
 
     if "seqcol" in config_entry:
         LOGGER.info("seqcol found in config file")
-        db_path = Path(f"../data/blast/{mod}/{environment}/databases/{config_entry['seqcol']}/{sanitized_blast_title}/")
+        db_path = Path(
+            f"../data/blast/{mod}/{environment}/databases/{config_entry['seqcol']}/{sanitized_blast_title}/"
+        )
     else:
         LOGGER.info("seqcol not found in config file")
-        db_path = Path(f"../data/blast/{mod}/{environment}/databases/{config_entry['genus']}/{config_entry['species']}/{sanitized_blast_title}/")
+        db_path = Path(
+            f"../data/blast/{mod}/{environment}/databases/{config_entry['genus']}/{config_entry['species']}/{sanitized_blast_title}/"
+        )
 
     config_path = Path(f"../data/config/{mod}/{environment}")
 
@@ -131,6 +147,7 @@ def create_db_structure(environment: str, mod: str, config_entry: Dict[str, str]
     LOGGER.info(f"Directory {db_path} created")
 
     return db_path, config_path
+
 
 def run_makeblastdb(config_entry: Dict[str, str], output_dir: Path) -> bool:
     """
@@ -148,11 +165,13 @@ def run_makeblastdb(config_entry: Dict[str, str], output_dir: Path) -> bool:
     LOGGER.info(f"Running makeblastdb for {fasta_file}")
     console.log(f"Running makeblastdb for {fasta_file}")
 
-    SLACK_MESSAGES.append({
-        "title": "Running makeblastdb",
-        "text": fasta_file,
-        "color": "#36a64f",
-    })
+    SLACK_MESSAGES.append(
+        {
+            "title": "Running makeblastdb",
+            "text": fasta_file,
+            "color": "#36a64f",
+        }
+    )
 
     unzipped_fasta = Path(f"../data/{fasta_file.replace('.gz', '')}")
     if not unzipped_fasta.exists():
@@ -168,11 +187,16 @@ def run_makeblastdb(config_entry: Dict[str, str], output_dir: Path) -> bool:
 
     makeblast_command = [
         "makeblastdb",
-        "-in", str(unzipped_fasta),
-        "-dbtype", config_entry["seqtype"],
-        "-title", sanitized_blast_title,
-        "-out", str(output_dir / fasta_file.replace(extensions, 'db')),
-        "-taxid", config_entry["taxon_id"].replace("NCBITaxon:", ""),
+        "-in",
+        str(unzipped_fasta),
+        "-dbtype",
+        config_entry["seqtype"],
+        "-title",
+        sanitized_blast_title,
+        "-out",
+        str(output_dir / fasta_file.replace(extensions, "db")),
+        "-taxid",
+        config_entry["taxon_id"].replace("NCBITaxon:", ""),
     ]
 
     LOGGER.info(f"Running makeblastdb: {' '.join(makeblast_command)}")
@@ -181,11 +205,13 @@ def run_makeblastdb(config_entry: Dict[str, str], output_dir: Path) -> bool:
     success, output = run_command(makeblast_command)
     if success:
         console.log("Makeblastdb: done")
-        SLACK_MESSAGES.append({
-            "title": "Makeblastdb completed",
-            "text": fasta_file,
-            "color": "#36a64f",
-        })
+        SLACK_MESSAGES.append(
+            {
+                "title": "Makeblastdb completed",
+                "text": fasta_file,
+                "color": "#36a64f",
+            }
+        )
         LOGGER.info("Makeblastdb: done")
 
         unzipped_fasta.unlink()
@@ -194,14 +220,17 @@ def run_makeblastdb(config_entry: Dict[str, str], output_dir: Path) -> bool:
         return True
     else:
         console.log(f"Error running makeblastdb: {output}")
-        SLACK_MESSAGES.append({
-            "title": "Error running makeblastdb",
-            "text": fasta_file,
-            "color": "#8D2707",
-        })
+        SLACK_MESSAGES.append(
+            {
+                "title": "Error running makeblastdb",
+                "text": fasta_file,
+                "color": "#8D2707",
+            }
+        )
         LOGGER.error(f"Error running makeblastdb: {output}")
         rmtree(output_dir)
         return False
+
 
 def process_yaml(config_yaml: Path) -> bool:
     """
@@ -214,14 +243,17 @@ def process_yaml(config_yaml: Path) -> bool:
         bool: True if the YAML file was successfully processed, False otherwise.
     """
     try:
-        with open(config_yaml, 'r') as file:
+        with open(config_yaml, "r") as file:
             config = yaml.safe_load(file)
 
         for provider in config["data_providers"]:
             console.log(f"Processing {provider['name']}")
             for environment in provider["environments"]:
                 console.log(f"Processing {environment}")
-                json_file = config_yaml.parent / f"{provider['name']}/databases.{provider['name']}.{environment}.json"
+                json_file = (
+                    config_yaml.parent
+                    / f"{provider['name']}/databases.{provider['name']}.{environment}.json"
+                )
                 console.log(f"Processing {json_file}")
                 process_json(json_file, environment, provider["name"])
 
@@ -229,6 +261,7 @@ def process_yaml(config_yaml: Path) -> bool:
     except Exception as e:
         LOGGER.error(f"Error processing YAML file: {e}")
         return False
+
 
 def process_json(json_file: Path, environment: str, mod: Optional[str] = None) -> bool:
     """
@@ -252,7 +285,7 @@ def process_json(json_file: Path, environment: str, mod: Optional[str] = None) -
         return False
 
     try:
-        with open(json_file, 'r') as file:
+        with open(json_file, "r") as file:
             db_coordinates = json.load(file)
 
         for entry in db_coordinates["data"]:
@@ -262,7 +295,9 @@ def process_json(json_file: Path, environment: str, mod: Optional[str] = None) -
 
                 if output_dir.exists():
                     if not run_makeblastdb(entry, output_dir):
-                        LOGGER.error(f"Failed to create BLAST database for {entry['uri']}")
+                        LOGGER.error(
+                            f"Failed to create BLAST database for {entry['uri']}"
+                        )
                         return False
 
         return True
@@ -270,15 +305,20 @@ def process_json(json_file: Path, environment: str, mod: Optional[str] = None) -
         LOGGER.error(f"Error processing JSON file: {e}")
         return False
 
+
 @click.command()
 @click.option("-g", "--config_yaml", help="YAML file with all MODs configuration")
 @click.option("-j", "--input_json", help="JSON file input coordinates")
 @click.option("-e", "--environment", help="Environment", default="dev")
 @click.option("-m", "--mod", help="Model organism")
-@click.option("-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=False)
+@click.option(
+    "-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=False
+)
 @click.option("-u", "--update-slack", help="Update Slack", is_flag=True, default=False)
 @click.option("-s3", "--sync-s3", help="Sync to S3", is_flag=True, default=False)
-def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_slack, sync_s3):
+def create_dbs(
+    config_yaml, input_json, environment, mod, skip_efs_sync, update_slack, sync_s3
+):
     """
     Main function that runs the pipeline for processing the configuration files and creating the BLAST databases.
     """
@@ -304,6 +344,7 @@ def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_
     except Exception as e:
         LOGGER.error(f"Error in create_dbs: {e}")
         console.log(f"Error in create_dbs: {e}")
+
 
 if __name__ == "__main__":
     create_dbs()

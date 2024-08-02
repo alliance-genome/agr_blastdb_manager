@@ -456,6 +456,7 @@ def slack_message(messages: list, subject="Update") -> bool:
 
     return True
 
+
 def get_ftp_file_size(fasta_uri: str) -> int:
     """
     Get the size of a file on an FTP server.
@@ -467,9 +468,9 @@ def get_ftp_file_size(fasta_uri: str) -> int:
         int: The size of the file in bytes, or 0 if size couldn't be determined.
     """
     try:
-        ftp_parts = fasta_uri.split('/')
+        ftp_parts = fasta_uri.split("/")
         ftp_server = ftp_parts[2]
-        ftp_path = '/'.join(ftp_parts[3:-1])
+        ftp_path = "/".join(ftp_parts[3:-1])
         filename = ftp_parts[-1]
 
         with FTP(ftp_server) as ftp:
@@ -520,9 +521,12 @@ def check_output(stdout: bytes, stderr: bytes) -> bool:
     """
     stderr_str = stderr.decode("utf-8")
     if stderr_str and "Error" in stderr_str:
-        console.log(f"Error in subprocess output: {stderr_str}", style="blink bold white on red")
+        console.log(
+            f"Error in subprocess output: {stderr_str}", style="blink bold white on red"
+        )
         return False
     return True
+
 
 def run_command(command: List[str]) -> Tuple[bool, str]:
     """
