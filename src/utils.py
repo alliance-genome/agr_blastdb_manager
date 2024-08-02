@@ -469,3 +469,4 @@ def slack_post(message: str) -> bool:
     assert response.body == "ok"
 
     return True
+
