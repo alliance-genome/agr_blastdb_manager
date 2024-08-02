@@ -4,21 +4,23 @@
 
 
 import pathlib
+from pathlib import Path
 import click
 import json
+from subprocess import Popen, PIPE
 
 
-
-def run_blast(db, fasta):
+def run_blast(db, fasta, mod, environment):
 
     print(db)
     temp = open("temp.fasta", "w")
     temp.write(fasta)
     temp.close()
 
-    blast_command = f"blastn -db {db} -query temp.fasta"
+    blast_command = f"blastn -db {db} -query temp.fasta -out output/{mod}/{environment}/{Path(db).name}.txt -num_threads 4 -evalue 1 -outfmt 6"
 
     print(blast_command)
+    p = Popen(blast_command, shell=True, stdout=PIPE, stderr=PIPE)
 
 
 @click.command()
@@ -31,12 +33,12 @@ def setup_blast(datadir, mod, environment):
 
     p = pathlib.Path(f"{datadir}/{mod}/{environment}/databases/")
     dbs = data[mod][environment]["dbs"]
-    fasta = f">test\nd{data[mod][environment]["nucl"]}"
+    fasta = f">test\n{data[mod][environment]["nucl"]}"
 
 
     for db in dbs:
         full_dir = p / db
-        run_blast(full_dir, fasta)
+        run_blast(full_dir, fasta, mod, environment)
 
 
 

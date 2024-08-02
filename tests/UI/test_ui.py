@@ -43,7 +43,7 @@ def run_test(mod, items, type, sequence):
         element.click()
         console.log("Clicked button")
 
-        for _ in tqdm(range(20)):  # Pauses the script for 10 seconds
+        for _ in tqdm(range(5)):  # Pauses the script for 10 seconds
             time.sleep(1)
 
         try:
@@ -51,7 +51,7 @@ def run_test(mod, items, type, sequence):
                 EC.presence_of_element_located((By.ID, "view"))
             )
             browser.save_screenshot(f"output/{mod}/{item}.png")
-            for _ in tqdm(range(20)):  # Pauses the script for 10 seconds
+            for _ in tqdm(range(5)):  # Pauses the script for 10 seconds
                 time.sleep(1)
         except Exception as e:
             console.log(e)
