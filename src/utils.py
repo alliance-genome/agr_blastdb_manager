@@ -543,3 +543,24 @@ def run_command(command: List[str]) -> Tuple[bool, str]:
         return True, result.stdout
     except subprocess.CalledProcessError as e:
         return False, f"Command failed with error: {e.stderr}"
+
+
+
+def needs_parse_id(fasta_file: Path) -> bool:
+    """
+    Determine if the FASTA file needs parse_id option for makeblastdb.
+
+    Args:
+        fasta_file (Path): Path to the FASTA file
+
+    Returns:
+        bool: True if parse_id is needed, False otherwise
+    """
+    with open(fasta_file, 'r') as f:
+        headers = [next(f).strip() for _ in range(100) if next(f).startswith('>')]
+
+    # Analyze headers here
+    complex_headers = any('|' in header for header in headers)
+    consistent_format = len(set(header.count('|') for header in headers)) == 1
+
+    return complex_headers and consistent_format

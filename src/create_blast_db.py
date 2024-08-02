@@ -38,6 +38,7 @@ from utils import (
     validate_fasta,
     check_output,
     run_command,
+    needs_parse_id,
 )
 
 # Load environment variables
@@ -183,6 +184,8 @@ def create_db_structure(
     return db_path, config_path
 
 
+from utils import needs_parse_id, run_command
+
 def run_makeblastdb(
     config_entry: Dict[str, str], output_dir: Path, progress: Progress, task: TaskID
 ) -> bool:
@@ -242,6 +245,11 @@ def run_makeblastdb(
         config_entry["taxon_id"].replace("NCBITaxon:", ""),
     ]
 
+    # Check if parse_id is needed
+    if needs_parse_id(unzipped_fasta):
+        makeblast_command.extend(["-parse_seqids"])
+        LOGGER.info("Added -parse_seqids option to makeblastdb command")
+
     LOGGER.info(f"Running makeblastdb: {' '.join(makeblast_command)}")
     progress.update(task, description=f"Running makeblastdb command", advance=10)
 
@@ -274,7 +282,6 @@ def run_makeblastdb(
         LOGGER.error(f"Error running makeblastdb: {output}")
         rmtree(output_dir)
         return False
-
 
 def process_yaml(config_yaml: Path) -> bool:
     """
