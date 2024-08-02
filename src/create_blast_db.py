@@ -26,7 +26,10 @@ load_dotenv()
 
 console = Console()
 
-def setup_logger(name: str, log_file: Optional[str] = None, level: int = logging.INFO) -> logging.Logger:
+
+def setup_logger(
+    name: str, log_file: Optional[str] = None, level: int = logging.INFO
+) -> logging.Logger:
     """
     Set up a logger with file and console handlers.
 
@@ -41,7 +44,9 @@ def setup_logger(name: str, log_file: Optional[str] = None, level: int = logging
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
 
     # Console handler
     ch = logging.StreamHandler()
@@ -55,6 +60,7 @@ def setup_logger(name: str, log_file: Optional[str] = None, level: int = logging
         logger.addHandler(fh)
 
     return logger
+
 
 def check_md5sum(file_path: Path, expected_md5: str) -> bool:
     """
@@ -76,11 +82,14 @@ def check_md5sum(file_path: Path, expected_md5: str) -> bool:
 
     calculated_md5 = file_hash.hexdigest()
     if calculated_md5 != expected_md5:
-        console.log(f"MD5 mismatch for {file_path}: expected {expected_md5}, got {calculated_md5}")
+        console.log(
+            f"MD5 mismatch for {file_path}: expected {expected_md5}, got {calculated_md5}"
+        )
         return False
 
     console.log(f"MD5 match for {file_path}: {calculated_md5}")
     return True
+
 
 def edit_fasta(fasta_file: Path, config_entry: Dict[str, str]) -> bool:
     """
@@ -94,12 +103,12 @@ def edit_fasta(fasta_file: Path, config_entry: Dict[str, str]) -> bool:
         bool: True if edit was successful, False otherwise.
     """
     try:
-        with open(fasta_file, 'r') as f:
+        with open(fasta_file, "r") as f:
             lines = f.readlines()
 
         edited_lines = []
         for line in lines:
-            if line.startswith('>'):
+            if line.startswith(">"):
                 line = line.strip()
                 if "seqcol" in config_entry:
                     line += f" {config_entry['seqcol']} {config_entry['genus']} {config_entry['species']}\n"
@@ -107,13 +116,14 @@ def edit_fasta(fasta_file: Path, config_entry: Dict[str, str]) -> bool:
                     line += f" {config_entry['genus']} {config_entry['species']} {config_entry['version']}\n"
             edited_lines.append(line)
 
-        with open(fasta_file, 'w') as f:
+        with open(fasta_file, "w") as f:
             f.writelines(edited_lines)
 
         return True
     except Exception as e:
         console.log(f"Error editing FASTA file {fasta_file}: {e}")
         return False
+
 
 def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
     """
@@ -129,16 +139,21 @@ def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
     console.log(f"Syncing {path_to_copy} to S3")
 
     s3_sync_command = [
-        "aws", "s3", "sync",
+        "aws",
+        "s3",
+        "sync",
         str(path_to_copy),
         os.environ["S3_BUCKET"],
-        "--exclude", "*.tmp",
+        "--exclude",
+        "*.tmp",
         "--verbose",
-        "--progress"
+        "--progress",
     ]
 
     try:
-        result = subprocess.run(s3_sync_command, check=True, capture_output=True, text=True)
+        result = subprocess.run(
+            s3_sync_command, check=True, capture_output=True, text=True
+        )
         for line in result.stderr.splitlines():
             console.log(line)
 
@@ -150,6 +165,7 @@ def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
     except subprocess.CalledProcessError as e:
         console.log(f"Error syncing to S3: {e}")
         return False
+
 
 def sync_to_efs() -> bool:
     """
@@ -167,15 +183,12 @@ def sync_to_efs() -> bool:
 
     console.log(f"Syncing {s3_path} to {efs_path}")
 
-    efs_sync_command = [
-        "aws", "s3", "sync",
-        s3_path,
-        efs_path,
-        "--exclude", "*.tmp"
-    ]
+    efs_sync_command = ["aws", "s3", "sync", s3_path, efs_path, "--exclude", "*.tmp"]
 
     try:
-        result = subprocess.run(efs_sync_command, check=True, capture_output=True, text=True)
+        result = subprocess.run(
+            efs_sync_command, check=True, capture_output=True, text=True
+        )
         for line in result.stderr.splitlines():
             console.log(line)
 
@@ -184,6 +197,7 @@ def sync_to_efs() -> bool:
     except subprocess.CalledProcessError as e:
         console.log(f"Error syncing to EFS: {e}")
         return False
+
 
 def get_mod_from_json(json_file: Path) -> Optional[str]:
     """
@@ -196,7 +210,7 @@ def get_mod_from_json(json_file: Path) -> Optional[str]:
         Optional[str]: The extracted MOD if found, None otherwise.
     """
     filename = json_file.name
-    parts = filename.split('.')
+    parts = filename.split(".")
     if len(parts) > 1:
         mod = parts[1]
         if mod in ["FB", "SGD", "WB", "XB", "ZFIN"]:
@@ -206,6 +220,7 @@ def get_mod_from_json(json_file: Path) -> Optional[str]:
     console.log(f"MOD not found in filename: {filename}")
     return None
 
+
 def send_slack_message(messages: List[Dict[str, str]], batch_size: int = 20) -> None:
     """
     Send messages to Slack, handling large numbers of messages by batching and summarizing.
@@ -214,7 +229,7 @@ def send_slack_message(messages: List[Dict[str, str]], batch_size: int = 20) -> 
         messages (List[Dict[str, str]]): List of message dictionaries to send.
         batch_size (int): Number of messages to include in each Slack message.
     """
-    client = WebClient(token=os.environ['SLACK_BOT_TOKEN'])
+    client = WebClient(token=os.environ["SLACK_BOT_TOKEN"])
     channel = "#blast-status"
 
     total_messages = len(messages)
@@ -230,33 +245,32 @@ def send_slack_message(messages: List[Dict[str, str]], batch_size: int = 20) -> 
         blocks = [
             {
                 "type": "section",
-                "text": {"type": "mrkdwn", "text": f"*{summary_text}*"}
+                "text": {"type": "mrkdwn", "text": f"*{summary_text}*"},
             },
-            {
-                "type": "divider"
-            }
+            {"type": "divider"},
         ]
 
         for msg in batch:
-            blocks.append({
-                "type": "section",
-                "text": {"type": "mrkdwn", "text": f"*{msg['title']}*\n{msg['text']}"},
-                "color": msg['color']
-            })
+            blocks.append(
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*{msg['title']}*\n{msg['text']}",
+                    },
+                    "color": msg["color"],
+                }
+            )
 
         try:
-            response = client.chat_postMessage(
-                channel=channel,
-                blocks=blocks
-            )
+            response = client.chat_postMessage(channel=channel, blocks=blocks)
         except SlackApiError as e:
             console.log(f"Error sending message to Slack: {e}")
 
     # Send a final summary message
     try:
         client.chat_postMessage(
-            channel=channel,
-            text=f"Completed processing {total_messages} sequences."
+            channel=channel, text=f"Completed processing {total_messages} sequences."
         )
     except SlackApiError as e:
         console.log(f"Error sending summary message to Slack: {e}")
