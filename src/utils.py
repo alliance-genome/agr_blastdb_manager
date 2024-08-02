@@ -352,13 +352,13 @@ def setup_logger(name, log_file, level=logging.INFO):
     return logger
 
 
-def slack_message(messages: list, subject="Update") -> bool:
+def slack_message(messages: list, subject="BLAST Database Update") -> bool:
     """
     Sends a message to a Slack channel using the Slack API.
 
     :param messages: The list of messages to be posted to the Slack channel.
     :type messages: list
-    :param subject: The subject of the message. By default, it's set to "Update".
+    :param subject: The subject of the message. By default, it's set to "BLAST Database Update".
     :type subject: str, optional
     :return: True if the message was successfully posted, False otherwise.
     :rtype: bool
@@ -370,31 +370,17 @@ def slack_message(messages: list, subject="Update") -> bool:
     client = WebClient(token=env["SLACK"])
 
     try:
-        # Prepare the message blocks
-        all_blocks = [
-            {
-                "type": "header",
-                "text": {"type": "plain_text", "text": subject}
-            },
-            {
-                "type": "divider"
-            }
-        ]
-
-        # Add each message as a section block
         for msg in messages:
-            all_blocks.append({
-                "type": "section",
-                "text": {"type": "mrkdwn", "text": f"*{msg['title']}*\n{msg['text']}"}
-            })
-
-        # Split blocks into chunks of 50 or fewer
-        block_chunks = [all_blocks[i:i+48] for i in range(0, len(all_blocks), 48)]
-
-        for i, blocks in enumerate(block_chunks):
-            # Add a header to each chunk if it's not the first one
-            if i > 0:
-                blocks.insert(0, {"type": "header", "text": {"type": "plain_text", "text": f"{subject} (continued {i+1})"}})
+            blocks = [
+                {
+                    "type": "header",
+                    "text": {"type": "plain_text", "text": msg['title']}
+                },
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": msg['text']}
+                }
+            ]
 
             # Call the chat.postMessage method using the WebClient
             response = client.chat_postMessage(
@@ -407,8 +393,7 @@ def slack_message(messages: list, subject="Update") -> bool:
     except SlackApiError as e:
         LOGGER.error(f"Error sending message to Slack: {e.response['error']}")
         return False
-
-
+    
 def get_ftp_file_size(fasta_uri: str) -> int:
     """
     Get the size of a file on an FTP server.
@@ -438,5 +423,5 @@ def get_ftp_file_size(fasta_uri: str) -> int:
             return 0
 
     except Exception as e:
-    console.log(f"Error getting FTP file size: {e}")
-    return 0
+        console.log(f"Error getting FTP file size: {e}")
+        return 0
