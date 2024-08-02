@@ -26,6 +26,8 @@ from slack_sdk.webhook import WebhookClient
 
 console = Console()
 
+# Define LOGGER at the top of utils.py
+LOGGER = logging.getLogger(__name__)
 
 # TODO: move to ENV
 MODS = ["FB", "SGD", "WB", "XB", "ZFIN"]
@@ -79,51 +81,6 @@ def check_md5sum(fasta_file, md5sum) -> bool:
     console.log(f"MD5sums match: {md5sum} {downloaded_md5sum}")
 
     return True
-
-
-def get_ftp_file_size(fasta_uri, file_logger) -> int:
-    """
-    Function to get the size of a file on an FTP server.
-
-    This function connects to an FTP server, navigates to the directory containing the file, and retrieves the size of the file.
-
-    :param fasta_uri: The URI of the FASTA file on the FTP server.
-    :type fasta_uri: str
-    :param file_logger: The logger object used for logging the process of getting the file size.
-    :type file_logger: logging.Logger
-    :return: The size of the file in bytes.
-    :rtype: int
-    """
-
-    # Initialize the size to 0
-    size = 0
-
-    # Connect to the FTP server
-    ftp = FTP(Path(fasta_uri).parts[1])
-    ftp.login()
-
-    # Navigate to the directory containing the file
-    ftp.cwd("/".join(Path(fasta_uri).parts[2:-1]))
-
-    # Get the name of the file
-    filename = Path(fasta_uri).name
-
-    if filename is not None:
-        # Get the size of the file
-        size = ftp.size(filename)
-        if size is not None:
-            # Log the size of the file
-            console.log(f"File size is {size} bytes")
-            file_logger.info(f"File size is {size} bytes")
-        else:
-            # Handle the case where size is None
-            console.log("Error: File size is not available.")
-            return 0
-    else:
-        console.log("Error: Filename is None.")
-        return 0
-
-    return size
 
 
 def get_mod_from_json(input_json) -> str | bool:
@@ -308,7 +265,7 @@ def sync_to_efs() -> bool:
     proc.wait()
 
     # Log the completion of the EFS sync process
-    console.log(f"Syncing {env['S3']}to {env['EFS']}: done")
+    console.log(f"Syncing {env['S3']} to {env['EFS']}: done")
 
     return True
 
@@ -414,7 +371,7 @@ def slack_message(messages: list, subject="Update") -> bool:
 
     try:
         # Prepare the message blocks
-        blocks = [
+        all_blocks = [
             {
                 "type": "header",
                 "text": {"type": "plain_text", "text": subject}
@@ -426,16 +383,25 @@ def slack_message(messages: list, subject="Update") -> bool:
 
         # Add each message as a section block
         for msg in messages:
-            blocks.append({
+            all_blocks.append({
                 "type": "section",
                 "text": {"type": "mrkdwn", "text": f"*{msg['title']}*\n{msg['text']}"}
             })
 
-        # Call the chat.postMessage method using the WebClient
-        response = client.chat_postMessage(
-            channel="#blast-status",  # Channel to send message to
-            blocks=blocks
-        )
+        # Split blocks into chunks of 50 or fewer
+        block_chunks = [all_blocks[i:i+48] for i in range(0, len(all_blocks), 48)]
+
+        for i, blocks in enumerate(block_chunks):
+            # Add a header to each chunk if it's not the first one
+            if i > 0:
+                blocks.insert(0, {"type": "header", "text": {"type": "plain_text", "text": f"{subject} (continued {i+1})"}})
+
+            # Call the chat.postMessage method using the WebClient
+            response = client.chat_postMessage(
+                channel="#blast-status",  # Channel to send message to
+                blocks=blocks
+            )
+
         LOGGER.info("Successfully sent message to Slack channel")
         return True
     except SlackApiError as e:
@@ -470,6 +436,7 @@ def get_ftp_file_size(fasta_uri: str) -> int:
         else:
             console.log(f"Couldn't determine size for {filename}")
             return 0
+
     except Exception as e:
-        console.log(f"Error getting FTP file size: {e}")
-        return 0
+    console.log(f"Error getting FTP file size: {e}")
+    return 0
