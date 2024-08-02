@@ -347,21 +347,21 @@ def derive_mod_from_input(input_file):
 @click.option("-u", "--update-slack", help="Update Slack", is_flag=True, default=False)
 @click.option("-s3", "--sync-s3", help="Sync to S3", is_flag=True, default=False)
 def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_slack, sync_s3):
-"""
-A command line interface function that creates BLAST databases based on the provided configuration.
-
-Parameters:
-- config_yaml (str): YAML file with all MODs configuration.
-- input_json (str): JSON file input coordinates.
-- environment (str): Environment. Default is "dev".
-- mod (str): Model organism.
-- skip_efs_sync (bool): Skip EFS sync. Default is False.
-- update_slack (bool): Update Slack. Default is False.
-- sync_s3 (bool): Sync to S3. Default is False.
-
-Returns:
-None
-"""
+    """
+    A command line interface function that creates BLAST databases based on the provided configuration.
+    
+    Parameters:
+    - config_yaml (str): YAML file with all MODs configuration.
+    - input_json (str): JSON file input coordinates.
+    - environment (str): Environment. Default is "dev".
+    - mod (str): Model organism.
+    - skip_efs_sync (bool): Skip EFS sync. Default is False.
+    - update_slack (bool): Update Slack. Default is False.
+    - sync_s3 (bool): Sync to S3. Default is False.
+    
+    Returns:
+    None
+    """
     start_time = time.time()
     LOGGER.info("Starting create_dbs function")
 
