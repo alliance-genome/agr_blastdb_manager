@@ -12,10 +12,11 @@ Date: Started July 2023, Refactored [Current Date]
 import json
 import re
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from shutil import copyfile, rmtree
-from typing import Dict, Tuple, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import click
 import wget
@@ -23,23 +24,14 @@ import yaml
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskID
-from rich.table import Table
+from rich.progress import (BarColumn, Progress, SpinnerColumn, TaskID,
+                           TextColumn)
 from rich.style import Style
+from rich.table import Table
 
-from utils import (
-    setup_logger,
-    check_md5sum,
-    edit_fasta,
-    s3_sync,
-    send_slack_message,
-    get_mod_from_json,
-    get_ftp_file_size,
-    validate_fasta,
-    check_output,
-    run_command,
-    needs_parse_id,
-)
+from utils import (check_md5sum, check_output, edit_fasta, get_ftp_file_size,
+                   get_mod_from_json, run_command, s3_sync,
+                   setup_logger, slack_message)
 
 # Load environment variables
 load_dotenv()
@@ -115,13 +107,6 @@ def get_files_ftp(
         wget.download(fasta_uri, str(fasta_file))
         store_fasta_files(fasta_file)
 
-        if not validate_fasta(fasta_file):
-            progress.update(
-                task, description=f"Invalid FASTA file: {fasta_file}", completed=100
-            )
-            LOGGER.error(f"Invalid FASTA file: {fasta_file}")
-            return False
-
         if check_md5sum(fasta_file, md5sum):
             progress.update(task, completed=100)
             return True
@@ -186,21 +171,10 @@ def create_db_structure(
 
 from utils import needs_parse_id, run_command
 
+
 def run_makeblastdb(
     config_entry: Dict[str, str], output_dir: Path, progress: Progress, task: TaskID
 ) -> bool:
-    """
-    Run the makeblastdb command to create a BLAST database.
-
-    Args:
-        config_entry (Dict[str, str]): Configuration for the database.
-        output_dir (Path): Directory to store the output files.
-        progress (Progress): Rich progress bar object.
-        task (TaskID): Task ID for the progress bar.
-
-    Returns:
-        bool: True if the database was created successfully, False otherwise.
-    """
     fasta_file = Path(config_entry["uri"]).name
 
     LOGGER.info(f"Running makeblastdb for {fasta_file}")
@@ -214,9 +188,11 @@ def run_makeblastdb(
         }
     )
 
-    unzipped_fasta = Path(f"../data/{fasta_file.replace('.gz', '')}")
+    gzipped_fasta = Path(f"../data/{fasta_file}")
+    unzipped_fasta = gzipped_fasta.with_suffix("")
+
     if not unzipped_fasta.exists():
-        success, output = run_command(["gunzip", "-v", f"../data/{fasta_file}"])
+        success, output = run_command(["gunzip", "-k", "-v", str(gzipped_fasta)])
         if not success:
             progress.update(
                 task,
@@ -228,8 +204,10 @@ def run_makeblastdb(
         LOGGER.info(f"Unzipping {fasta_file}: done")
         progress.update(task, advance=10)
 
+    # Check if parse_id is needed (on the gzipped file)
+    parse_id_needed = needs_parse_id(gzipped_fasta)
+
     sanitized_blast_title = re.sub(r"\W+", "_", config_entry["blast_title"])
-    extensions = "".join(Path(fasta_file).suffixes)
 
     makeblast_command = [
         "makeblastdb",
@@ -240,13 +218,12 @@ def run_makeblastdb(
         "-title",
         sanitized_blast_title,
         "-out",
-        str(output_dir / fasta_file.replace(extensions, "db")),
+        str(output_dir / unzipped_fasta.name.replace(".fasta", ".db")),
         "-taxid",
         config_entry["taxon_id"].replace("NCBITaxon:", ""),
     ]
 
-    # Check if parse_id is needed
-    if needs_parse_id(unzipped_fasta):
+    if parse_id_needed:
         makeblast_command.extend(["-parse_seqids"])
         LOGGER.info("Added -parse_seqids option to makeblastdb command")
 
@@ -282,6 +259,7 @@ def run_makeblastdb(
         LOGGER.error(f"Error running makeblastdb: {output}")
         rmtree(output_dir)
         return False
+
 
 def process_yaml(config_yaml: Path) -> bool:
     """
@@ -439,7 +417,15 @@ def create_dbs(
     """
     Main function that runs the pipeline for processing the configuration files and creating the BLAST databases.
     """
+    start_time = time.time()
+    LOGGER.info("Starting create_dbs function")
+    LOGGER.info(
+        f"Arguments: config_yaml={config_yaml}, input_json={input_json}, environment={environment}, "
+        f"mod={mod}, skip_efs_sync={skip_efs_sync}, update_slack={update_slack}, sync_s3={sync_s3}"
+    )
+
     if len(sys.argv) == 1:
+        LOGGER.info("No arguments provided. Displaying help message.")
         click.echo(create_dbs.get_help(ctx=None))
         return
 
@@ -451,43 +437,54 @@ def create_dbs(
 
     try:
         if config_yaml:
-            process_yaml(Path(config_yaml))
+            LOGGER.info(f"Processing YAML file: {config_yaml}")
+            success = process_yaml(Path(config_yaml))
+            LOGGER.info(f"YAML processing {'successful' if success else 'failed'}")
         elif input_json:
-            process_json(Path(input_json), environment, mod)
+            LOGGER.info(f"Processing JSON file: {input_json}")
+            success = process_json(Path(input_json), environment, mod)
+            LOGGER.info(f"JSON processing {'successful' if success else 'failed'}")
         else:
-            LOGGER.error("Either config_yaml or input_json must be provided")
+            LOGGER.error("Neither config_yaml nor input_json provided")
             console.print(
                 "[bold red]Error:[/bold red] Either config_yaml or input_json must be provided",
                 style="red",
             )
             return
 
+        if not success:
+            LOGGER.error("Processing failed. Exiting.")
+            return
+
         if update_slack:
+            LOGGER.info("Updating Slack")
             with console.status("[bold green]Updating Slack...[/bold green]"):
-                send_slack_message(SLACK_MESSAGES)
+                slack_success = slack_message(SLACK_MESSAGES)
+            LOGGER.info(f"Slack update {'successful' if slack_success else 'failed'}")
             console.print(
                 Panel(
-                    "Slack updated successfully",
+                    "Slack updated successfully"
+                    if slack_success
+                    else "Slack update failed",
                     title="Slack Update",
-                    border_style="green",
+                    border_style="green" if slack_success else "red",
                 )
             )
 
         if sync_s3:
+            LOGGER.info("Syncing to S3")
             with console.status("[bold blue]Syncing to S3...[/bold blue]"):
-                success = s3_sync(Path("../data"), skip_efs_sync)
-            if success:
-                console.print(
-                    Panel(
-                        "S3 sync completed successfully",
-                        title="S3 Sync",
-                        border_style="blue",
-                    )
+                s3_success = s3_sync(Path("../data"), skip_efs_sync)
+            LOGGER.info(f"S3 sync {'successful' if s3_success else 'failed'}")
+            console.print(
+                Panel(
+                    "S3 sync completed successfully"
+                    if s3_success
+                    else "S3 sync failed",
+                    title="S3 Sync",
+                    border_style="blue" if s3_success else "red",
                 )
-            else:
-                console.print(
-                    Panel("S3 sync failed", title="S3 Sync", border_style="red")
-                )
+            )
 
         # Display summary
         table = Table(title="BLAST Database Creation Summary")
@@ -501,14 +498,19 @@ def create_dbs(
         console.print(table)
 
     except Exception as e:
-        LOGGER.error(f"Error in create_dbs: {e}")
+        LOGGER.error(f"Unhandled exception in create_dbs: {str(e)}", exc_info=True)
         console.print(
             Panel(
-                f"[bold red]Error in create_dbs:[/bold red] {e}",
+                f"[bold red]Error in create_dbs:[/bold red] {str(e)}",
                 title="Error",
                 border_style="red",
             )
         )
+    finally:
+        end_time = time.time()
+        duration = end_time - start_time
+        LOGGER.info(f"create_dbs function completed in {duration:.2f} seconds")
+        console.print(f"Total execution time: {duration:.2f} seconds")
 
 
 if __name__ == "__main__":

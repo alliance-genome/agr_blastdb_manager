@@ -9,22 +9,20 @@ Author: Paulo Nuin, Adam Wright
 Date: started September 2023
 """
 
+import gzip
 import hashlib
 import logging
 from ftplib import FTP
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from subprocess import PIPE, Popen
-from typing import Any
+from typing import Any, List, Tuple
 
-from Bio import SeqIO  # type: ignore
 from dotenv import dotenv_values
 from rich.console import Console
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from slack_sdk.webhook import WebhookClient
-from ftplib import FTP
-from Bio import SeqIO
-from typing import Tuple, List
 
 console = Console()
 
@@ -151,20 +149,6 @@ def get_mod_from_json(input_json) -> str | bool:
     return mod
 
 
-# def route53_check() -> bool:
-#     """
-#     Function that checks if the route53 record exists
-#     """
-#
-#     client53 = boto3.client("route53")
-#     response = client53.list_resource_record_sets(
-#         HostedZoneId="alliancegenome.org", StartRecordType="TXT"
-#     )
-#     print(response)
-#
-#     return True
-
-
 def edit_fasta(fasta_file: str, config_entry: dict) -> bool:
     """
     Edits the FASTA file based on the configuration entry.
@@ -217,34 +201,6 @@ def edit_fasta(fasta_file: str, config_entry: dict) -> bool:
     edited_file.close()
 
     return True
-
-
-def validate_fasta(filename) -> Any:
-    """
-    Function that validates the FASTA file
-    """
-
-    with open(filename, "r") as handle:
-        fasta = SeqIO.parse(handle, "fasta")
-        return any(fasta)
-
-
-# def split_zfin_fasta(filename) -> Any:
-#     """ """
-#
-#     fasta = open(filename).read().splitlines()
-#     Path(f"{filename}.tmp").touch()
-#
-#     for line in fasta:
-#         temp = line.split("\\n")
-#         for item in temp:
-#             with open(f"{filename}.tmp", "a") as fh:
-#                 fh.write(f"{item}\n")
-#
-#     Path(filename).unlink()
-#     Path(f"{filename}.tmp").rename(filename)
-#
-#     return True
 
 
 def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
@@ -352,215 +308,4 @@ def sync_to_efs() -> bool:
     proc.wait()
 
     # Log the completion of the EFS sync process
-    console.log(f"Syncing {env['S3']} to {env['EFS']}: done")
-
-    return True
-
-
-def check_output(stdout, stderr) -> bool:
-    """
-    Checks the output of a command for errors.
-
-    This function decodes the stderr output of a command and checks if it contains the string "Error". If "Error" is found, it logs the stderr output and returns False. Otherwise, it returns True.
-
-    :param stdout: The stdout output of the command.
-    :type stdout: bytes
-    :param stderr: The stderr output of the command.
-    :type stderr: bytes
-    :return: True if no errors were found in the stderr output, False otherwise.
-    :rtype: bool
-    """
-
-    # Decode the stderr output to utf-8
-    stderr = stderr.decode("utf-8")
-
-    # Check if the stderr output is not empty
-    if len(stderr) > 1:
-        # If so, check if the stderr output contains the string "Error"
-        if stderr.find("Error") >= 1:
-            # If "Error" is found, log the stderr output and return False
-            console.log(stderr, style="blink bold white on red")
-            return False
-
-    # If no errors were found in the stderr output, return True
-    return True
-
-
-def slack_post(message: str) -> bool:
-    """
-    Posts a message to a Slack channel using a webhook.
-
-    This function takes a message as input and posts it to a Slack channel using a webhook. The webhook URL is retrieved from the environment variables. The function returns True if the message was successfully posted.
-
-    Note: This function is deprecated as it uses webhooks.
-
-    :param message: The message to be posted to the Slack channel.
-    :type message: str
-    :return: True if the message was successfully posted, False otherwise.
-    :rtype: bool
-    """
-
-    # Load environment variables from .env file
-    env = dotenv_values(f"{Path.cwd()}/.env")
-
-    # Get the Slack webhook URL from the environment variables
-    slack_channel = f"https://hooks.slack.com/services/{env['SLACK']}"
-
-    # Create a WebhookClient object with the Slack webhook URL
-    webhook = WebhookClient(slack_channel)
-
-    # Send the message to the Slack channel using the webhook
-    response = webhook.send(text=message)
-
-    # Check if the message was successfully posted
-    assert response.status_code == 200
-    assert response.body == "ok"
-
-    return True
-
-
-def slack_message(messages: list, subject="Update") -> bool:
-    """
-    Sends a message to a Slack channel using the Slack API.
-
-    This function takes a list of messages and a subject as input and posts them to a Slack channel using the Slack API. The Slack API token is retrieved from the environment variables. The function returns True if the message was successfully posted.
-
-    :param messages: The list of messages to be posted to the Slack channel.
-    :type messages: list
-    :param subject: The subject of the message. By default, it's set to "Update".
-    :type subject: str, optional
-    :return: True if the message was successfully posted, False otherwise.
-    :rtype: bool
-    """
-
-    # Load environment variables from .env file
-    env = dotenv_values(f"{Path.cwd()}/.env")
-
-    # Create a WebClient object with the Slack API token
-    client = WebClient(token=env["SLACK"])
-
-    try:
-        # Call the chat.postMessage method using the WebClient
-        # This sends the message to the Slack channel
-        response = client.chat_postMessage(
-            channel="#blast-status",  # Channel to send message to
-            text=subject,  # Subject of the message
-            attachments=messages,
-        )
-        console.log("Done sending message to Slack channel")
-    except SlackApiError as e:
-        # You will get a SlackApiError if "ok" is False
-        assert e.response["ok"] is False
-        assert e.response["error"]  # str like 'invalid_auth', 'channel_not_found'
-        print(f"Got an error: {e.response['error']}")
-
-    return True
-
-
-def get_ftp_file_size(fasta_uri: str) -> int:
-    """
-    Get the size of a file on an FTP server.
-
-    Args:
-        fasta_uri (str): The URI of the FASTA file on the FTP server.
-
-    Returns:
-        int: The size of the file in bytes, or 0 if size couldn't be determined.
-    """
-    try:
-        ftp_parts = fasta_uri.split("/")
-        ftp_server = ftp_parts[2]
-        ftp_path = "/".join(ftp_parts[3:-1])
-        filename = ftp_parts[-1]
-
-        with FTP(ftp_server) as ftp:
-            ftp.login()
-            ftp.cwd(ftp_path)
-            size = ftp.size(filename)
-
-        if size is not None:
-            console.log(f"File size for {filename} is {size} bytes")
-            return size
-        else:
-            console.log(f"Couldn't determine size for {filename}")
-            return 0
-    except Exception as e:
-        console.log(f"Error getting FTP file size: {e}")
-        return 0
-
-
-def validate_fasta(filename: Path) -> bool:
-    """
-    Validate a FASTA file.
-
-    Args:
-        filename (Path): Path to the FASTA file.
-
-    Returns:
-        bool: True if the file is a valid FASTA, False otherwise.
-    """
-    try:
-        with open(filename, "r") as handle:
-            fasta = SeqIO.parse(handle, "fasta")
-            return any(fasta)  # False if no records found
-    except Exception as e:
-        console.log(f"Error validating FASTA file {filename}: {e}")
-        return False
-
-
-def check_output(stdout: bytes, stderr: bytes) -> bool:
-    """
-    Check the output of a subprocess for errors.
-
-    Args:
-        stdout (bytes): Standard output from the subprocess.
-        stderr (bytes): Standard error from the subprocess.
-
-    Returns:
-        bool: True if no errors were found, False otherwise.
-    """
-    stderr_str = stderr.decode("utf-8")
-    if stderr_str and "Error" in stderr_str:
-        console.log(
-            f"Error in subprocess output: {stderr_str}", style="blink bold white on red"
-        )
-        return False
-    return True
-
-
-def run_command(command: List[str]) -> Tuple[bool, str]:
-    """
-    Run a shell command and return its output.
-
-    Args:
-        command (List[str]): The command to run as a list of strings.
-
-    Returns:
-        Tuple[bool, str]: A tuple containing a boolean indicating success and the command output.
-    """
-    try:
-        result = subprocess.run(command, check=True, capture_output=True, text=True)
-        return True, result.stdout
-    except subprocess.CalledProcessError as e:
-        return False, f"Command failed with error: {e.stderr}"
-
-
-
-def needs_parse_id(fasta_file: Path) -> bool:
-    """
-    Determine if the FASTA file needs parse_id option for makeblastdb.
-
-    Args:
-        fasta_file (Path): Path to the FASTA file
-
-    Returns:
-        bool: True if parse_id is needed, False otherwise
-    """
-    with open(fasta_file, 'r') as f:
-        headers = [next(f).strip() for _ in range(100) if next(f).startswith('>')]
-
-    # Analyze headers here
-    complex_headers = any('|' in header for header in headers)
-    consistent_format = len(set(header.count('|') for header in headers)) == 1
-
-    return complex_headers and consistent_format
+    console.log(f"Syncing {env['S3']}
