@@ -118,9 +118,6 @@ def create_db_structure(
     return db_path, config_path
 
 
-
-
-
 def get_files_ftp(fasta_uri: str, md5sum: str) -> bool:
     LOGGER.info(f"Downloading {fasta_uri}")
 
@@ -158,10 +155,9 @@ def run_makeblastdb(config_entry: Dict[str, str], output_dir: Path) -> bool:
     fasta_file = Path(config_entry["uri"]).name
     LOGGER.info(f"Running makeblastdb for {fasta_file}")
 
-    SLACK_MESSAGES.append({
-        "title": "Running makeblastdb",
-        "text": f"Processing {fasta_file}"
-    })
+    SLACK_MESSAGES.append(
+        {"title": "Running makeblastdb", "text": f"Processing {fasta_file}"}
+    )
 
     gzipped_fasta = Path(f"../data/{fasta_file}")
     unzipped_fasta = gzipped_fasta.with_suffix("")
@@ -200,17 +196,18 @@ def run_makeblastdb(config_entry: Dict[str, str], output_dir: Path) -> bool:
     success, output = run_command(makeblast_command)
     if success:
         LOGGER.info("Makeblastdb: done")
-        SLACK_MESSAGES.append({
-            "title": "Makeblastdb completed",
-            "text": f"Successfully processed {fasta_file}"
-        })
+        SLACK_MESSAGES.append(
+            {
+                "title": "Makeblastdb completed",
+                "text": f"Successfully processed {fasta_file}",
+            }
+        )
         return True
     else:
         LOGGER.error(f"Error running makeblastdb: {output}")
-        SLACK_MESSAGES.append({
-            "title": "Makeblastdb Error",
-            "text": f"Failed to process {fasta_file}"
-        })
+        SLACK_MESSAGES.append(
+            {"title": "Makeblastdb Error", "text": f"Failed to process {fasta_file}"}
+        )
         return False
 
 
@@ -343,7 +340,9 @@ def create_dbs(
             return
 
         if update_slack:
-            slack_success = slack_message(SLACK_MESSAGES, subject="BLAST Database Update")
+            slack_success = slack_message(
+                SLACK_MESSAGES, subject="BLAST Database Update"
+            )
             LOGGER.info(f"Slack update {'successful' if slack_success else 'failed'}")
 
         if sync_s3:
