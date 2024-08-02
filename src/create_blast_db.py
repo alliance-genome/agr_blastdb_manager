@@ -31,8 +31,8 @@ from rich.style import Style
 from rich.table import Table
 
 from utils import (check_md5sum, check_output, edit_fasta, get_ftp_file_size,
-                   get_mod_from_json, run_command, s3_sync, setup_logger,
-                   slack_message)
+                   get_mod_from_json, needs_parse_id, run_command, s3_sync,
+                   setup_logger, slack_message)
 
 # Load environment variables
 load_dotenv()
@@ -65,6 +65,10 @@ def store_fasta_files(fasta_file: Path) -> None:
     copyfile(fasta_file, original_files_store / fasta_file.name)
     LOGGER.info(f"Stored {fasta_file} in {original_files_store}")
 
+
+def bar_custom(current, total, width=80):
+    if current % (total / 100) == 0:
+        LOGGER.info(f"Downloading: {current/total*100:.1f}% complete")
 
 
 def create_db_structure(
@@ -114,7 +118,7 @@ def create_db_structure(
     return db_path, config_path
 
 
-from utils import needs_parse_id, run_command
+
 
 
 def get_files_ftp(fasta_uri: str, md5sum: str) -> bool:
@@ -133,7 +137,10 @@ def get_files_ftp(fasta_uri: str, md5sum: str) -> bool:
             LOGGER.error(f"Failed to get file size for {fasta_uri}")
             return False
 
-        wget.download(fasta_uri, str(fasta_file))
+        # Use a custom progress bar (or no progress bar)
+        wget.download(fasta_uri, str(fasta_file), bar=bar_custom)
+        LOGGER.info(f"Downloaded {fasta_uri}")
+
         store_fasta_files(fasta_file)
 
         if check_md5sum(fasta_file, md5sum):
@@ -270,17 +277,23 @@ def process_json(
 
         total_entries = len(db_coordinates["data"])
         with Progress() as progress:
-            main_task = progress.add_task(f"Processing {mod} - {environment}", total=total_entries)
+            main_task = progress.add_task(
+                f"Processing {mod} - {environment}", total=total_entries
+            )
 
             for entry in db_coordinates["data"]:
                 LOGGER.info(f"Processing {entry['uri']}")
                 if get_files_ftp(entry["uri"], entry["md5sum"]):
-                    output_dir, config_dir = create_db_structure(environment, mod, entry)
+                    output_dir, config_dir = create_db_structure(
+                        environment, mod, entry
+                    )
                     copyfile(json_file, config_dir / "environment.json")
 
                     if output_dir.exists():
                         if not run_makeblastdb(entry, output_dir):
-                            LOGGER.error(f"Failed to create BLAST database for {entry['uri']}")
+                            LOGGER.error(
+                                f"Failed to create BLAST database for {entry['uri']}"
+                            )
                             return False
                 progress.update(main_task, advance=1)
 
@@ -288,6 +301,7 @@ def process_json(
     except Exception as e:
         LOGGER.error(f"Error processing JSON file: {str(e)}")
         return False
+
 
 @click.command()
 @click.option("-g", "--config_yaml", help="YAML file with all MODs configuration")
