@@ -13,10 +13,15 @@ from dotenv import load_dotenv, find_dotenv
 # Load environment variables from .env file in src directory
 load_dotenv(find_dotenv(filename='src/.env'))
 
+# Ensure logs directory exists
+log_file = os.getenv('LOG_FILE', 'logs/webhook.log')
+log_dir = os.path.dirname(log_file)
+Path(log_dir).mkdir(parents=True, exist_ok=True)
+
 # Set up logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    filename=os.getenv('LOG_FILE', 'logs/webhook.log'))
+                    filename=log_file)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
