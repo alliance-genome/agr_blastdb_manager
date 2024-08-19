@@ -4,25 +4,20 @@ import json
 import logging
 import os
 import subprocess
-from configparser import ConfigParser
 from pathlib import Path
 
 import yaml
 from flask import Flask, request, abort
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from .env file in src directory
+load_dotenv(find_dotenv(filename='src/.env'))
 
 # Set up logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    filename='webhook.log')
+                    filename=os.getenv('LOG_FILE', 'logs/webhook.log'))
 logger = logging.getLogger(__name__)
-
-# Load configuration
-config = ConfigParser()
-config.read('config.ini')
 
 app = Flask(__name__)
 
@@ -115,12 +110,19 @@ def webhook():
 
     try:
         # Update the local repository
-        repo_path = config.get('Repository', 'local_path')
+        repo_path = os.getenv('REPO_LOCAL_PATH')
+        if not repo_path:
+            logger.error("Repository local path not configured")
+            abort(500, "Server configuration error")
+
         subprocess.run(["git", "-C", repo_path, "pull", "origin", branch], check=True)
         logger.info(f"Successfully pulled latest changes for {repo_name}")
 
         # Get the script path
-        script_path = config.get('Script', 'path')
+        script_path = os.getenv('SCRIPT_PATH')
+        if not script_path:
+            logger.error("Script path not configured")
+            abort(500, "Server configuration error")
 
         # Process all config files
         config_files = get_config_files(repo_path)
