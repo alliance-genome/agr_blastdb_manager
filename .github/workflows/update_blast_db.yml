@@ -1,0 +1,54 @@
+name: Update BLAST DB on EC2
+on:
+  push:
+    branches: [ main ]  # or whichever branch you want to trigger on
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  update-blast-db:
+    runs-on: [self-hosted, Linux, X64, blast]
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0  # This gets all history for all branches and tags
+    
+    - name: Set up Python
+      run: |
+        python3 -m pip install --upgrade pip
+        pip3 install poetry
+    
+    - name: Install Poetry dependencies
+      run: |
+        poetry config virtualenvs.create false
+        poetry install --no-interaction --no-root
+    
+    - name: Ensure BLAST is installed
+      run: |
+        if ! command -v blastn &> /dev/null
+        then
+            echo "BLAST is not installed. Installing..."
+            sudo yum update -y
+            sudo yum install -y ncbi-blast+
+        else
+            echo "BLAST is already installed"
+        fi
+    
+    - name: Run BLAST DB update script
+      env:
+        GITHUB_WEBHOOK_SECRET: ${{ secrets.GITHUB_WEBHOOK_SECRET }}
+        SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      run: |
+        python3 src/create_blast_db.py \
+          --config_yaml config/blast_config.yaml \
+          --environment ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }} \
+          --update-slack \
+          --sync-s3
+    
+    - name: Upload logs
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: blast-db-logs
+        path: logs/blast_db_creation.log
