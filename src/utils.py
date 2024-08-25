@@ -9,14 +9,15 @@ Author: Paulo Nuin, Adam Wright
 Date: started September 2023
 """
 
+import gzip
 import hashlib
 import logging
 from ftplib import FTP
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from subprocess import PIPE, Popen
-from typing import Any
+from subprocess import PIPE, CalledProcessError, Popen, run
+from typing import Any, List, Tuple
 
-from Bio import SeqIO  # type: ignore
 from dotenv import dotenv_values
 from rich.console import Console
 from slack_sdk import WebClient
@@ -25,6 +26,8 @@ from slack_sdk.webhook import WebhookClient
 
 console = Console()
 
+# Define LOGGER at the top of utils.py
+LOGGER = logging.getLogger(__name__)
 
 # TODO: move to ENV
 MODS = ["FB", "SGD", "WB", "XB", "ZFIN"]
@@ -80,51 +83,6 @@ def check_md5sum(fasta_file, md5sum) -> bool:
     return True
 
 
-def get_ftp_file_size(fasta_uri, file_logger) -> int:
-    """
-    Function to get the size of a file on an FTP server.
-
-    This function connects to an FTP server, navigates to the directory containing the file, and retrieves the size of the file.
-
-    :param fasta_uri: The URI of the FASTA file on the FTP server.
-    :type fasta_uri: str
-    :param file_logger: The logger object used for logging the process of getting the file size.
-    :type file_logger: logging.Logger
-    :return: The size of the file in bytes.
-    :rtype: int
-    """
-
-    # Initialize the size to 0
-    size = 0
-
-    # Connect to the FTP server
-    ftp = FTP(Path(fasta_uri).parts[1])
-    ftp.login()
-
-    # Navigate to the directory containing the file
-    ftp.cwd("/".join(Path(fasta_uri).parts[2:-1]))
-
-    # Get the name of the file
-    filename = Path(fasta_uri).name
-
-    if filename is not None:
-        # Get the size of the file
-        size = ftp.size(filename)
-        if size is not None:
-            # Log the size of the file
-            console.log(f"File size is {size} bytes")
-            file_logger.info(f"File size is {size} bytes")
-        else:
-            # Handle the case where size is None
-            console.log("Error: File size is not available.")
-            return 0
-    else:
-        console.log("Error: Filename is None.")
-        return 0
-
-    return size
-
-
 def get_mod_from_json(input_json) -> str | bool:
     """
     Retrieves the model organism (mod) from the input JSON file.
@@ -146,20 +104,6 @@ def get_mod_from_json(input_json) -> str | bool:
     console.log(f"Mod found: {mod}")
 
     return mod
-
-
-# def route53_check() -> bool:
-#     """
-#     Function that checks if the route53 record exists
-#     """
-#
-#     client53 = boto3.client("route53")
-#     response = client53.list_resource_record_sets(
-#         HostedZoneId="alliancegenome.org", StartRecordType="TXT"
-#     )
-#     print(response)
-#
-#     return True
 
 
 def edit_fasta(fasta_file: str, config_entry: dict) -> bool:
@@ -214,34 +158,6 @@ def edit_fasta(fasta_file: str, config_entry: dict) -> bool:
     edited_file.close()
 
     return True
-
-
-def validate_fasta(filename) -> Any:
-    """
-    Function that validates the FASTA file
-    """
-
-    with open(filename, "r") as handle:
-        fasta = SeqIO.parse(handle, "fasta")
-        return any(fasta)
-
-
-# def split_zfin_fasta(filename) -> Any:
-#     """ """
-#
-#     fasta = open(filename).read().splitlines()
-#     Path(f"{filename}.tmp").touch()
-#
-#     for line in fasta:
-#         temp = line.split("\\n")
-#         for item in temp:
-#             with open(f"{filename}.tmp", "a") as fh:
-#                 fh.write(f"{item}\n")
-#
-#     Path(filename).unlink()
-#     Path(f"{filename}.tmp").rename(filename)
-#
-#     return True
 
 
 def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
@@ -354,82 +270,99 @@ def sync_to_efs() -> bool:
     return True
 
 
-def check_output(stdout, stderr) -> bool:
+def check_output(stdout: bytes, stderr: bytes) -> bool:
     """
-    Checks the output of a command for errors.
+    Check the output of a subprocess for errors.
 
-    This function decodes the stderr output of a command and checks if it contains the string "Error". If "Error" is found, it logs the stderr output and returns False. Otherwise, it returns True.
+    Args:
+        stdout (bytes): Standard output from the subprocess.
+        stderr (bytes): Standard error from the subprocess.
 
-    :param stdout: The stdout output of the command.
-    :type stdout: bytes
-    :param stderr: The stderr output of the command.
-    :type stderr: bytes
-    :return: True if no errors were found in the stderr output, False otherwise.
-    :rtype: bool
+    Returns:
+        bool: True if no errors were found, False otherwise.
     """
-
-    # Decode the stderr output to utf-8
-    stderr = stderr.decode("utf-8")
-
-    # Check if the stderr output is not empty
-    if len(stderr) > 1:
-        # If so, check if the stderr output contains the string "Error"
-        if stderr.find("Error") >= 1:
-            # If "Error" is found, log the stderr output and return False
-            console.log(stderr, style="blink bold white on red")
-            return False
-
-    # If no errors were found in the stderr output, return True
+    stderr_str = stderr.decode("utf-8")
+    if stderr_str and "Error" in stderr_str:
+        console.log(
+            f"Error in subprocess output: {stderr_str}", style="blink bold white on red"
+        )
+        return False
     return True
 
 
-def slack_post(message: str) -> bool:
+def run_command(command: List[str]) -> Tuple[bool, str]:
     """
-    Posts a message to a Slack channel using a webhook.
+    Run a shell command and return its output.
 
-    This function takes a message as input and posts it to a Slack channel using a webhook. The webhook URL is retrieved from the environment variables. The function returns True if the message was successfully posted.
+    Args:
+        command (List[str]): The command to run as a list of strings.
 
-    Note: This function is deprecated as it uses webhooks.
-
-    :param message: The message to be posted to the Slack channel.
-    :type message: str
-    :return: True if the message was successfully posted, False otherwise.
-    :rtype: bool
+    Returns:
+        Tuple[bool, str]: A tuple containing a boolean indicating success and the command output.
     """
-
-    # Load environment variables from .env file
-    env = dotenv_values(f"{Path.cwd()}/.env")
-
-    # Get the Slack webhook URL from the environment variables
-    slack_channel = f"https://hooks.slack.com/services/{env['SLACK']}"
-
-    # Create a WebhookClient object with the Slack webhook URL
-    webhook = WebhookClient(slack_channel)
-
-    # Send the message to the Slack channel using the webhook
-    response = webhook.send(text=message)
-
-    # Check if the message was successfully posted
-    assert response.status_code == 200
-    assert response.body == "ok"
-
-    return True
+    try:
+        result = run(command, check=True, capture_output=True, text=True)
+        return True, result.stdout
+    except CalledProcessError as e:
+        return False, f"Command failed with error: {e.stderr}"
 
 
-def slack_message(messages: list, subject="Update") -> bool:
+def needs_parse_id(fasta_file: Path) -> bool:
+    """
+    Determine if the FASTA file needs parse_id option for makeblastdb.
+
+    Args:
+        fasta_file (Path): Path to the gzipped FASTA file
+
+    Returns:
+        bool: True if parse_id is needed, False otherwise
+    """
+    open_func = gzip.open if fasta_file.suffix == ".gz" else open
+    mode = "rt" if fasta_file.suffix == ".gz" else "r"
+
+    with open_func(fasta_file, mode) as f:
+        headers = [next(f).strip() for _ in range(100) if next(f).startswith(">")]
+
+    # Analyze headers here
+    complex_headers = any("|" in header for header in headers)
+    consistent_format = len(set(header.count("|") for header in headers)) == 1
+
+    return complex_headers and consistent_format
+
+
+def setup_logger(name, log_file, level=logging.INFO):
+    """Function to set up a logger with file and console handlers."""
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
+
+    # File Handler
+    file_handler = RotatingFileHandler(
+        log_file, maxBytes=10 * 1024 * 1024, backupCount=5
+    )
+    file_handler.setFormatter(formatter)
+
+    # Console Handler
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+
+    return logger
+
+
+def slack_message(messages: list, subject="BLAST Database Update") -> bool:
     """
     Sends a message to a Slack channel using the Slack API.
 
-    This function takes a list of messages and a subject as input and posts them to a Slack channel using the Slack API. The Slack API token is retrieved from the environment variables. The function returns True if the message was successfully posted.
-
     :param messages: The list of messages to be posted to the Slack channel.
     :type messages: list
-    :param subject: The subject of the message. By default, it's set to "Update".
+    :param subject: The subject of the message. By default, it's set to "BLAST Database Update".
     :type subject: str, optional
     :return: True if the message was successfully posted, False otherwise.
     :rtype: bool
     """
-
     # Load environment variables from .env file
     env = dotenv_values(f"{Path.cwd()}/.env")
 
@@ -437,35 +370,58 @@ def slack_message(messages: list, subject="Update") -> bool:
     client = WebClient(token=env["SLACK"])
 
     try:
-        # Call the chat.postMessage method using the WebClient
-        # This sends the message to the Slack channel
-        response = client.chat_postMessage(
-            channel="#blast-status",  # Channel to send message to
-            text=subject,  # Subject of the message
-            attachments=messages,
-        )
-        console.log("Done sending message to Slack channel")
+        for msg in messages:
+            blocks = [
+                {
+                    "type": "header",
+                    "text": {"type": "plain_text", "text": subject, "emoji": True},
+                },
+                {"type": "section", "text": {"type": "mrkdwn", "text": msg["text"]}},
+                {"type": "divider"},
+            ]
+
+            # Call the chat.postMessage method using the WebClient
+            response = client.chat_postMessage(
+                channel="#blast-status",  # Channel to send message to
+                blocks=blocks,
+                text=subject,  # Fallback text for notifications
+            )
+
+        LOGGER.info("Successfully sent message to Slack channel")
+        return True
     except SlackApiError as e:
-        # You will get a SlackApiError if "ok" is False
-        assert e.response["ok"] is False
-        assert e.response["error"]  # str like 'invalid_auth', 'channel_not_found'
-        print(f"Got an error: {e.response['error']}")
-
-    return True
+        LOGGER.error(f"Error sending message to Slack: {e.response['error']}")
+        return False
 
 
-def slack_post(message: str) -> bool:
+def get_ftp_file_size(fasta_uri: str) -> int:
     """
-    deprecated as it uses webhooks
+    Get the size of a file on an FTP server.
+
+    Args:
+        fasta_uri (str): The URI of the FASTA file on the FTP server.
+
+    Returns:
+        int: The size of the file in bytes, or 0 if size couldn't be determined.
     """
+    try:
+        ftp_parts = fasta_uri.split("/")
+        ftp_server = ftp_parts[2]
+        ftp_path = "/".join(ftp_parts[3:-1])
+        filename = ftp_parts[-1]
 
-    env = dotenv_values(f"{Path.cwd()}/.env")
+        with FTP(ftp_server) as ftp:
+            ftp.login()
+            ftp.cwd(ftp_path)
+            size = ftp.size(filename)
 
-    # move to .env eventually
-    slack_channel = f"https://hooks.slack.com/services/{env['SLACK']}"
-    webhook = WebhookClient(slack_channel)
-    response = webhook.send(text=message)
-    assert response.status_code == 200
-    assert response.body == "ok"
+        if size is not None:
+            console.log(f"File size for {filename} is {size} bytes")
+            return size
+        else:
+            console.log(f"Couldn't determine size for {filename}")
+            return 0
 
-    return True
+    except Exception as e:
+        console.log(f"Error getting FTP file size: {e}")
+        return 0
