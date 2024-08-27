@@ -1,0 +1,59 @@
+name: Test Update BLAST DB on EC2
+
+on:
+ push:
+   branches: [ main, automation ]
+ workflow_dispatch:
+
+jobs:
+ update-blast-db:
+   runs-on: ubuntu-latest  # This is compatible with act
+   steps:
+   - uses: actions/checkout@v3
+     with:
+       fetch-depth: 0
+
+   - name: Check working directory
+     run: |
+       echo "Current working directory: $(pwd)"
+       ls -la
+
+   - name: Set up Python
+     run: |
+       python3 -m pip install --upgrade pip
+       pip3 install poetry
+
+   - name: Install Poetry dependencies
+     run: |
+       poetry config virtualenvs.create false
+       poetry install --no-interaction --no-root
+
+   - name: Mock BLAST installation
+     run: |
+       echo "Mocking BLAST installation for testing"
+       mkdir -p $HOME/bin
+       echo -e '#!/bin/bash\necho "Mock blastn $@"' > $HOME/bin/blastn
+       chmod +x $HOME/bin/blastn
+       export PATH=$HOME/bin:$PATH
+
+   - name: Run BLAST DB update script (Test Mode)
+     env:
+       GITHUB_WEBHOOK_SECRET: ${{ secrets.GITHUB_WEBHOOK_SECRET }}
+       SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
+       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+     run: |
+       echo "Running in test mode - mocking database update"
+       python3 src/create_blast_db.py \
+         --config_yaml config/blast_config.yaml \
+         --environment dev \
+         --update-slack \
+         --sync-s3 \
+         --dry-run
+
+   - name: Upload logs
+     uses: actions/upload-artifact@v3
+     if: always()
+     with:
+       name: blast-db-logs
+       path: logs/blast_db_creation.log
