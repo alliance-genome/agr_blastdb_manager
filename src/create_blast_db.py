@@ -32,7 +32,7 @@ from rich.table import Table
 
 from utils import (check_md5sum, check_output, edit_fasta, get_ftp_file_size,
                    get_mod_from_json, needs_parse_id, run_command, s3_sync,
-                   setup_logger, slack_message)
+                   setup_logger, slack_message, get_https_file_size)
 
 # Load environment variables
 load_dotenv()
@@ -129,7 +129,10 @@ def get_files_ftp(fasta_uri: str, md5sum: str) -> bool:
         return False
 
     try:
-        file_size = get_ftp_file_size(fasta_uri)
+        if fasta_uri.startswith('https'):
+            file_size = get_https_file_size(fasta_uri)
+        else:
+            file_size = get_ftp_file_size(fasta_uri)
         if file_size == 0:
             LOGGER.error(f"Failed to get file size for {fasta_uri}")
             return False
