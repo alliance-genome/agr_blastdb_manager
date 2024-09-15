@@ -18,6 +18,7 @@ from pathlib import Path
 from subprocess import PIPE, CalledProcessError, Popen, run
 from typing import Any, List, Tuple
 
+import requests
 from dotenv import dotenv_values
 from rich.console import Console
 from slack_sdk import WebClient
@@ -427,17 +428,17 @@ def get_ftp_file_size(fasta_uri: str) -> int:
         return 0
 
 
-import requests
-
 def get_https_file_size(https_uri: str) -> int:
     try:
         response = requests.head(https_uri, allow_redirects=True)
         if response.status_code == 200:
-            size = int(response.headers.get('content-length', 0))
+            size = int(response.headers.get("content-length", 0))
             console.log(f"File size for {https_uri} is {size} bytes")
             return size
         else:
-            console.log(f"Couldn't determine size for {https_uri}. Status code: {response.status_code}")
+            console.log(
+                f"Couldn't determine size for {https_uri}. Status code: {response.status_code}"
+            )
             return 0
     except Exception as e:
         console.log(f"Error getting HTTPS file size: {e}")
