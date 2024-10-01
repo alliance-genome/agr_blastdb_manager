@@ -1,7 +1,5 @@
 import sys
-
 from bs4 import BeautifulSoup
-
 
 def main():
     if len(sys.argv) != 2:
@@ -14,16 +12,12 @@ def main():
         data = f.read()
 
     soup = BeautifulSoup(data, features="html.parser")
-    # print(soup)
 
-    items = []
+    items = set()
     for tag in soup.find_all("a", class_="jstree-anchor"):
-        # print(tag.text)
-        # print(tag.get("id"))
-        items.append(tag.get("id"))
+        items.add(tag.get("id"))
 
-    print(items)
-
+    print(sorted(items))
 
 if __name__ == "__main__":
     main()
