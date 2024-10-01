@@ -12,22 +12,26 @@ from tqdm import tqdm
 console = Console()
 
 
-def run_test(mod, items, type, sequence):
-    # Locate and click the checkbox
+def run_test(mod, db_type, items, sequence, release):
     for item in items:
-        # Set up the browser (replace "chrome" with "firefox" for Firefox)
         browser = webdriver.Chrome()
 
-        # Navigate to your webpage
-        browser.get(f"https://blast.alliancegenome.org/blast/{mod}/{type}")
-        console.log(f"Testing {item}")
+        # Update URL construction to handle different MODs, DB types, and releases
+        if mod == "SGD" and db_type in ["main", "fungal"]:
+            url = f"https://blast.alliancegenome.org/blast/{mod}/{db_type}"
+        else:
+            url = f"https://blast.alliancegenome.org/blast/{mod}/{release}"
+
+        browser.get(url)
+        console.log(f"Testing {item} for {mod} - {db_type} (Release: {release})")
+
+        # Rest of the function remains the same
         checkbox = WebDriverWait(browser, 10).until(
             EC.element_to_be_clickable((By.ID, item))
         )
         checkbox.click()
         console.log(f"Clicked {item}")
 
-        # Locate and fill out the input box
         input_box = WebDriverWait(browser, 10).until(
             EC.element_to_be_clickable((By.NAME, "sequence"))
         )
@@ -38,15 +42,15 @@ def run_test(mod, items, type, sequence):
         element.click()
         console.log("Clicked button")
 
-        for _ in tqdm(range(5)):  # Pauses the script for 10 seconds
+        for _ in tqdm(range(5)):
             time.sleep(1)
 
         try:
             next_page_element = WebDriverWait(browser, 600).until(
                 EC.presence_of_element_located((By.ID, "view"))
             )
-            browser.save_screenshot(f"{item}.png")
-            for _ in tqdm(range(15)):  # Pauses the script for 10 seconds
+            browser.save_screenshot(f"{mod}_{db_type}_{release}_{item}.png")
+            for _ in tqdm(range(15)):
                 time.sleep(1)
         except Exception as e:
             console.log(e)
@@ -56,7 +60,8 @@ def run_test(mod, items, type, sequence):
 
 @click.command()
 @click.option("-m", "--mod", help="The MOD to test")
-@click.option("-t", "--type", help="The DB type to test, i.e. fungal for SGD")
+@click.option("-t", "--type",
+              help="The DB type to test, i.e. main or fungal for SGD, or the release version for other MODs")
 @click.option("-s", "--single_item", help="How many items to test", default=1)
 @click.option(
     "-M",
@@ -70,12 +75,15 @@ def run_test(mod, items, type, sequence):
     help="number of items to test, random, default all, cannot be used with single item",
 )
 def prepare_test(mod, type, single_item, number_of_items, molecule):
-    """ """
-
-    # print(mod, type, single_item, number_of_items, molecule)
-
     data = json.loads(open("config.json").read())
-    run_test(mod, data[mod][type]["items"], type, data[mod][type][molecule])
+
+    if mod == "SGD":
+        db_types = ["main", "fungal"] if type == "all" else [type]
+        for db_type in db_types:
+            run_test(mod, db_type, data[mod][db_type]["items"], data[mod][db_type][molecule], "")
+    else:
+        release = data[mod]["current_release"]
+        run_test(mod, "main", data[mod]["items"], data[mod][molecule], release)
 
 
 if __name__ == "__main__":
