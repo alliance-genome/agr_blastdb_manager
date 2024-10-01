@@ -16,7 +16,6 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from shutil import copyfile, rmtree
 from typing import Dict, List, Optional, Tuple
 
 import click
@@ -31,8 +30,8 @@ from rich.style import Style
 from rich.table import Table
 
 from utils import (check_md5sum, check_output, edit_fasta, get_ftp_file_size,
-                   get_mod_from_json, needs_parse_id, run_command, s3_sync,
-                   setup_logger, slack_message, get_https_file_size)
+                   get_https_file_size, get_mod_from_json, needs_parse_id,
+                   run_command, s3_sync, setup_logger, slack_message)
 
 # Load environment variables
 load_dotenv()
@@ -129,7 +128,7 @@ def get_files_ftp(fasta_uri: str, md5sum: str) -> bool:
         return False
 
     try:
-        if fasta_uri.startswith('https'):
+        if fasta_uri.startswith("https"):
             file_size = get_https_file_size(fasta_uri)
         else:
             file_size = get_ftp_file_size(fasta_uri)
@@ -334,11 +333,10 @@ def derive_mod_from_input(input_file):
         str: The MOD (Model Organism) extracted from the input file name. If the input file name does not have the expected format or the MOD cannot be extracted, returns 'Unknown'.
     """
     file_name = Path(input_file).name
-    parts = file_name.split('.')
-    if len(parts) >= 3 and parts[0] == 'databases':
+    parts = file_name.split(".")
+    if len(parts) >= 3 and parts[0] == "databases":
         return parts[1]  # This should be the MOD
-    return 'Unknown'
-
+    return "Unknown"
 
 
 @click.command()
@@ -346,13 +344,17 @@ def derive_mod_from_input(input_file):
 @click.option("-j", "--input_json", help="JSON file input coordinates")
 @click.option("-e", "--environment", help="Environment", default="dev")
 @click.option("-m", "--mod", help="Model organism")
-@click.option("-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=False)
+@click.option(
+    "-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=False
+)
 @click.option("-u", "--update-slack", help="Update Slack", is_flag=True, default=False)
 @click.option("-s3", "--sync-s3", help="Sync to S3", is_flag=True, default=False)
-def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_slack, sync_s3):
+def create_dbs(
+    config_yaml, input_json, environment, mod, skip_efs_sync, update_slack, sync_s3
+):
     """
     A command line interface function that creates BLAST databases based on the provided configuration.
-    
+
     Parameters:
     - config_yaml (str): YAML file with all MODs configuration.
     - input_json (str): JSON file input coordinates.
@@ -361,7 +363,7 @@ def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_
     - skip_efs_sync (bool): Skip EFS sync. Default is False.
     - update_slack (bool): Update Slack. Default is False.
     - sync_s3 (bool): Sync to S3. Default is False.
-    
+
     Returns:
     None
     """
@@ -373,16 +375,14 @@ def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_
         if mod is None:
             mod = derive_mod_from_input(input_json or config_yaml)
 
-        db_info = {
-            "mod": mod,
-            "environment": environment,
-            "databases_created": []
-        }
+        db_info = {"mod": mod, "environment": environment, "databases_created": []}
 
         if config_yaml:
             success = process_yaml(Path(config_yaml), db_info)
         elif input_json:
-            success = process_json(Path(input_json), environment, db_info['mod'], db_info)
+            success = process_json(
+                Path(input_json), environment, db_info["mod"], db_info
+            )
         else:
             LOGGER.error("Neither config_yaml nor input_json provided")
             return
@@ -395,10 +395,12 @@ def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_
             message = f"*MOD:* {db_info['mod']}\n"
             message += f"*Environment:* {db_info['environment']}\n"
             message += f"*Databases created:*\n"
-            for db in db_info['databases_created']:
+            for db in db_info["databases_created"]:
                 message += f"• *{db['name']}* (Type: `{db['type']}`, Taxon ID: `{db['taxon_id']}`)\n"
 
-            slack_success = slack_message([{"text": message}], subject="BLAST Database Update")
+            slack_success = slack_message(
+                [{"text": message}], subject="BLAST Database Update"
+            )
             LOGGER.info(f"Slack update {'successful' if slack_success else 'failed'}")
 
         if sync_s3:
@@ -411,7 +413,6 @@ def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_
         end_time = time.time()
         duration = end_time - start_time
         LOGGER.info(f"create_dbs function completed in {duration:.2f} seconds")
-
 
 
 if __name__ == "__main__":
