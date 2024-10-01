@@ -12,18 +12,15 @@ from tqdm import tqdm
 console = Console()
 
 
-def run_test(mod, db_type, items, sequence, release):
+def run_test(mod, release, items, sequence):
     for item in items:
         browser = webdriver.Chrome()
 
-        # Update URL construction to handle different MODs, DB types, and releases
-        if mod == "SGD" and db_type in ["main", "fungal"]:
-            url = f"https://blast.alliancegenome.org/blast/{mod}/{db_type}"
-        else:
-            url = f"https://blast.alliancegenome.org/blast/{mod}/{release}"
+        # Construct URL using the mod and release
+        url = f"https://blast.alliancegenome.org/blast/{mod}/{release}"
 
         browser.get(url)
-        console.log(f"Testing {item} for {mod} - {db_type} (Release: {release})")
+        console.log(f"Testing {item} for {mod} - Release: {release}")
 
         # Rest of the function remains the same
         checkbox = WebDriverWait(browser, 10).until(
@@ -49,7 +46,7 @@ def run_test(mod, db_type, items, sequence, release):
             next_page_element = WebDriverWait(browser, 600).until(
                 EC.presence_of_element_located((By.ID, "view"))
             )
-            browser.save_screenshot(f"{mod}_{db_type}_{release}_{item}.png")
+            browser.save_screenshot(f"{mod}_{release}_{item}.png")
             for _ in tqdm(range(15)):
                 time.sleep(1)
         except Exception as e:
@@ -60,8 +57,7 @@ def run_test(mod, db_type, items, sequence, release):
 
 @click.command()
 @click.option("-m", "--mod", help="The MOD to test")
-@click.option("-t", "--type",
-              help="The DB type to test, i.e. main or fungal for SGD, or the release version for other MODs")
+@click.option("-r", "--release", help="The release version to test")
 @click.option("-s", "--single_item", help="How many items to test", default=1)
 @click.option(
     "-M",
@@ -74,16 +70,15 @@ def run_test(mod, db_type, items, sequence, release):
     "--number_of_items",
     help="number of items to test, random, default all, cannot be used with single item",
 )
-def prepare_test(mod, type, single_item, number_of_items, molecule):
+def prepare_test(mod, release, single_item, number_of_items, molecule):
     data = json.loads(open("config.json").read())
 
-    if mod == "SGD":
-        db_types = ["main", "fungal"] if type == "all" else [type]
-        for db_type in db_types:
-            run_test(mod, db_type, data[mod][db_type]["items"], data[mod][db_type][molecule], "")
+    if mod in data:
+        items = data[mod]["items"]
+        sequence = data[mod][molecule]
+        run_test(mod, release, items, sequence)
     else:
-        release = data[mod]["current_release"]
-        run_test(mod, "main", data[mod]["items"], data[mod][molecule], release)
+        console.log(f"Error: {mod} not found in configuration")
 
 
 if __name__ == "__main__":
