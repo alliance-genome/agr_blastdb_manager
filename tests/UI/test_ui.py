@@ -13,6 +13,8 @@ console = Console()
 
 
 def run_test(mod, items, type, sequence):
+
+    # Locate and click the checkbox
     # Locate and click the checkbox
     for item in items:
         # Set up the browser (replace "chrome" with "firefox" for Firefox)
@@ -34,7 +36,10 @@ def run_test(mod, items, type, sequence):
         input_box.send_keys(sequence)
         console.log(f"Sent sequence")
 
-        element = browser.find_element(By.ID, "method")
+        # Locate the element right before interacting with it
+        element = WebDriverWait(browser, 10).until(
+            EC.element_to_be_clickable((By.ID, "method"))
+        )
         element.click()
         console.log("Clicked button")
 
@@ -45,25 +50,19 @@ def run_test(mod, items, type, sequence):
             next_page_element = WebDriverWait(browser, 600).until(
                 EC.presence_of_element_located((By.ID, "view"))
             )
-            browser.save_screenshot(f"{item}.png")
-            for _ in tqdm(range(15)):  # Pauses the script for 10 seconds
+            browser.save_screenshot(f"output/{mod}/{item}.png")
+            for _ in tqdm(range(5)):  # Pauses the script for 10 seconds
                 time.sleep(1)
         except Exception as e:
             console.log(e)
 
         browser.quit()
 
-
 @click.command()
 @click.option("-m", "--mod", help="The MOD to test")
 @click.option("-t", "--type", help="The DB type to test, i.e. fungal for SGD")
 @click.option("-s", "--single_item", help="How many items to test", default=1)
-@click.option(
-    "-M",
-    "--molecule",
-    help="The molecule to test, nucl or prot only, default nucl",
-    default="nucl",
-)
+@click.option("-M", "--molecule", help="The molecule to test, nucl or prot only, default nucl", default="nucl")
 @click.option(
     "-n",
     "--number_of_items",
