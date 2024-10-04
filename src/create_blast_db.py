@@ -132,7 +132,6 @@ def get_files_ftp(fasta_uri: str, md5sum: str) -> bool:
         file_size = get_ftp_file_size(fasta_uri)
         if file_size == 0:
             LOGGER.error(f"Failed to get file size for {fasta_uri}")
-            return False
 
         # Use a custom progress bar (or no progress bar)
         wget.download(fasta_uri, str(fasta_file), bar=bar_custom)

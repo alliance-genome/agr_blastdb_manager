@@ -83,7 +83,52 @@ def check_md5sum(fasta_file, md5sum) -> bool:
     return True
 
 
-def get_mod_from_json(input_json) -> str | bool:
+def get_ftp_file_size(fasta_uri, file_logger) -> int:
+    """
+    Function to get the size of a file on an FTP server.
+
+    This function connects to an FTP server, navigates to the directory containing the file, and retrieves the size of the file.
+
+    :param fasta_uri: The URI of the FASTA file on the FTP server.
+    :type fasta_uri: str
+    :param file_logger: The logger object used for logging the process of getting the file size.
+    :type file_logger: logging.Logger
+    :return: The size of the file in bytes.
+    :rtype: int
+    """
+
+    # Initialize the size to 0
+    size = 0
+
+    # Connect to the FTP server
+    ftp = FTP(Path(fasta_uri).parts[1])
+    ftp.login()
+
+    # Navigate to the directory containing the file
+    ftp.cwd("/".join(Path(fasta_uri).parts[2:-1]))
+
+    # Get the name of the file
+    filename = Path(fasta_uri).name
+
+    if filename is not None:
+        # Get the size of the file
+        size = ftp.size(filename)
+        if size is not None:
+            # Log the size of the file
+            console.log(f"File size is {size} bytes")
+            file_logger.info(f"File size is {size} bytes")
+        else:
+            # Handle the case where size is None
+            console.log("Error: File size is not available.")
+            return 0
+    else:
+        console.log("Error: Filename is None.")
+        return 0
+
+    return size
+
+
+def get_mod_from_json(input_json) -> str:
     """
     Retrieves the model organism (mod) from the input JSON file.
 
