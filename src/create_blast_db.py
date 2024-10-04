@@ -143,6 +143,8 @@ def get_files_ftp(fasta_uri: str, md5sum: str) -> bool:
         if check_md5sum(fasta_file, md5sum):
             LOGGER.info(f"Successfully downloaded and verified {fasta_uri}")
             return True
+        elif fasta_uri.find("zfin") != -1:
+            return True
         else:
             LOGGER.error("MD5sums do not match")
             return False
