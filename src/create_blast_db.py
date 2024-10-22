@@ -1,11 +1,11 @@
 """
 create_blast_db.py
 
-This script creates BLAST databases from FASTA files. It includes functions to download files from an FTP site,
+This script creates BLAST databases from FASTA files. It includes functions to download files from HTTPS or FTP sites,
 store the downloaded FASTA files, create the database and folder structure, run the makeblastdb command, and process
-configuration files in YAML and JSON formats.
+configuration files in JSON format.
 
-Authors: Paulo Nuin, Adam Wright
+Authors: Paulo Nuin, Adam Wright, [Assistant]
 Date: Started July 2023, Refactored [Current Date]
 """
 
@@ -18,10 +18,10 @@ from datetime import datetime
 from pathlib import Path
 from shutil import copyfile, rmtree
 from typing import Dict, List, Optional, Tuple
+from urllib.parse import urlparse
 
 import click
-import wget
-import yaml
+import requests
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
@@ -29,6 +29,7 @@ from rich.progress import (BarColumn, Progress, SpinnerColumn, TaskID,
                            TextColumn)
 from rich.style import Style
 from rich.table import Table
+from ftplib import FTP
 
 from utils import (check_md5sum, check_output, edit_fasta, get_ftp_file_size,
                    get_mod_from_json, needs_parse_id, run_command, s3_sync,
@@ -42,7 +43,6 @@ console = Console()
 # Global variables
 SLACK_MESSAGES: List[Dict[str, str]] = []
 LOGGER = setup_logger("create_blast_db", "blast_db_creation.log")
-
 
 def store_fasta_files(fasta_file: Path) -> None:
     """
@@ -65,11 +65,81 @@ def store_fasta_files(fasta_file: Path) -> None:
     copyfile(fasta_file, original_files_store / fasta_file.name)
     LOGGER.info(f"Stored {fasta_file} in {original_files_store}")
 
+def get_files(fasta_uri: str, md5sum: str) -> bool:
+    """
+    Download files from HTTPS or FTP based on the URI.
 
-def bar_custom(current, total, width=80):
-    if current % (total / 100) == 0:
-        LOGGER.info(f"Downloading: {current/total*100:.1f}% complete")
+    Args:
+        fasta_uri (str): The URI of the FASTA file to download.
+        md5sum (str): The expected MD5 checksum of the file.
 
+    Returns:
+        bool: True if download and verification succeed, False otherwise.
+    """
+    LOGGER.info(f"Downloading {fasta_uri}")
+
+    today_date = datetime.now().strftime("%Y_%b_%d")
+    fasta_file = Path(f"../data/{Path(fasta_uri).name}")
+
+    if (Path(f"../data/database_{today_date}") / fasta_file.name).exists():
+        LOGGER.info(f"{fasta_file} already processed")
+        return False
+
+    parsed_uri = urlparse(fasta_uri)
+    
+    try:
+        if parsed_uri.scheme in ['http', 'https']:
+            return get_files_https(fasta_uri, fasta_file, md5sum)
+        elif parsed_uri.scheme == 'ftp':
+            return get_files_ftp(fasta_uri, fasta_file, md5sum)
+        else:
+            LOGGER.error(f"Unsupported protocol: {parsed_uri.scheme}")
+            return False
+    except Exception as e:
+        LOGGER.error(f"Error downloading {fasta_uri}: {str(e)}")
+        return False
+
+def get_files_https(fasta_uri: str, fasta_file: Path, md5sum: str) -> bool:
+    """Download files from HTTPS."""
+    try:
+        with requests.get(fasta_uri, stream=True, timeout=300) as response:
+            response.raise_for_status()
+            with open(fasta_file, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+        
+        LOGGER.info(f"Downloaded {fasta_uri}")
+        store_fasta_files(fasta_file)
+        return verify_download(fasta_file, md5sum, fasta_uri)
+    except requests.exceptions.RequestException as e:
+        LOGGER.error(f"Error downloading {fasta_uri}: {str(e)}")
+        return False
+
+def get_files_ftp(fasta_uri: str, fasta_file: Path, md5sum: str) -> bool:
+    """Download files from FTP."""
+    parsed_uri = urlparse(fasta_uri)
+    try:
+        with FTP(parsed_uri.netloc) as ftp:
+            ftp.login()
+            with open(fasta_file, 'wb') as f:
+                ftp.retrbinary(f'RETR {parsed_uri.path}', f.write)
+        
+        LOGGER.info(f"Downloaded {fasta_uri}")
+        store_fasta_files(fasta_file)
+        return verify_download(fasta_file, md5sum, fasta_uri)
+    except Exception as e:
+        LOGGER.error(f"Error downloading {fasta_uri}: {str(e)}")
+        return False
+
+def verify_download(fasta_file: Path, md5sum: str, fasta_uri: str) -> bool:
+    """Verify the downloaded file."""
+    if check_md5sum(fasta_file, md5sum):
+        LOGGER.info(f"Successfully downloaded and verified {fasta_uri}")
+        return True
+    else:
+        LOGGER.error("MD5sums do not match")
+        return False
 
 def create_db_structure(
     environment: str, mod: str, config_entry: Dict[str, str]
@@ -116,41 +186,6 @@ def create_db_structure(
     LOGGER.info(f"Directory {db_path} created")
 
     return db_path, config_path
-
-
-def get_files_ftp(fasta_uri: str, md5sum: str) -> bool:
-    LOGGER.info(f"Downloading {fasta_uri}")
-
-    today_date = datetime.now().strftime("%Y_%b_%d")
-    fasta_file = Path(f"../data/{Path(fasta_uri).name}")
-
-    if (Path(f"../data/database_{today_date}") / fasta_file.name).exists():
-        LOGGER.info(f"{fasta_file} already processed")
-        return False
-
-    try:
-        file_size = get_ftp_file_size(fasta_uri)
-        if file_size == 0:
-            LOGGER.error(f"Failed to get file size for {fasta_uri}")
-
-        # Use a custom progress bar (or no progress bar)
-        wget.download(fasta_uri, str(fasta_file), bar=bar_custom)
-        LOGGER.info(f"Downloaded {fasta_uri}")
-
-        store_fasta_files(fasta_file)
-
-        if check_md5sum(fasta_file, md5sum):
-            LOGGER.info(f"Successfully downloaded and verified {fasta_uri}")
-            return True
-        elif fasta_uri.find("zfin") != -1:
-            return True
-        else:
-            LOGGER.error("MD5sums do not match")
-            return False
-    except Exception as e:
-        LOGGER.error(f"Error downloading {fasta_uri}: {str(e)}")
-        return False
-
 
 def run_makeblastdb(config_entry: Dict[str, str], output_dir: Path) -> bool:
     fasta_file = Path(config_entry["uri"]).name
@@ -211,60 +246,6 @@ def run_makeblastdb(config_entry: Dict[str, str], output_dir: Path) -> bool:
         )
         return False
 
-
-def process_yaml(config_yaml: Path) -> bool:
-    """
-    Process a YAML file containing configuration details for multiple data providers.
-
-    Args:
-        config_yaml (Path): The path to the YAML file that needs to be processed.
-
-    Returns:
-        bool: True if the YAML file was successfully processed, False otherwise.
-    """
-    try:
-        with open(config_yaml, "r") as file:
-            config = yaml.safe_load(file)
-
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-        ) as progress:
-            main_task = progress.add_task(
-                "[green]Processing YAML config", total=len(config["data_providers"])
-            )
-
-            for provider in config["data_providers"]:
-                provider_task = progress.add_task(
-                    f"Processing {provider['name']}",
-                    total=len(provider["environments"]),
-                )
-
-                for environment in provider["environments"]:
-                    json_file = (
-                        config_yaml.parent
-                        / f"{provider['name']}/databases.{provider['name']}.{environment}.json"
-                    )
-                    process_json(json_file, environment, provider["name"], progress)
-                    progress.update(provider_task, advance=1)
-
-                progress.update(main_task, advance=1)
-
-        return True
-    except Exception as e:
-        LOGGER.error(f"Error processing YAML file: {e}")
-        console.print(
-            Panel(
-                f"[bold red]Error processing YAML file:[/bold red] {e}",
-                title="Error",
-                border_style="red",
-            )
-        )
-        return False
-
-
 def process_json(
     json_file: Path,
     environment: str,
@@ -292,7 +273,7 @@ def process_json(
 
             for entry in db_coordinates["data"]:
                 LOGGER.info(f"Processing {entry['uri']}")
-                if get_files_ftp(entry["uri"], entry["md5sum"]):
+                if get_files(entry["uri"], entry["md5sum"]):
                     output_dir, config_dir = create_db_structure(
                         environment, mod, entry
                     )
@@ -320,7 +301,6 @@ def process_json(
         LOGGER.error(f"Error processing JSON file: {str(e)}")
         return False
 
-
 def derive_mod_from_input(input_file):
     """
     Derive the MOD (Model Organism) from the input file name.
@@ -337,22 +317,18 @@ def derive_mod_from_input(input_file):
         return parts[1]  # This should be the MOD
     return 'Unknown'
 
-
-
 @click.command()
-@click.option("-g", "--config_yaml", help="YAML file with all MODs configuration")
 @click.option("-j", "--input_json", help="JSON file input coordinates")
 @click.option("-e", "--environment", help="Environment", default="dev")
 @click.option("-m", "--mod", help="Model organism")
 @click.option("-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=False)
 @click.option("-u", "--update-slack", help="Update Slack", is_flag=True, default=False)
 @click.option("-s3", "--sync-s3", help="Sync to S3", is_flag=True, default=False)
-def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_slack, sync_s3):
+def create_dbs(input_json, environment, mod, skip_efs_sync, update_slack, sync_s3):
     """
     A command line interface function that creates BLAST databases based on the provided configuration.
     
     Parameters:
-    - config_yaml (str): YAML file with all MODs configuration.
     - input_json (str): JSON file input coordinates.
     - environment (str): Environment. Default is "dev".
     - mod (str): Model organism.
@@ -369,7 +345,7 @@ def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_
     try:
         # If mod is not provided, try to derive it from the input file
         if mod is None:
-            mod = derive_mod_from_input(input_json or config_yaml)
+            mod = derive_mod_from_input(input_json)
 
         db_info = {
             "mod": mod,
@@ -377,12 +353,10 @@ def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_
             "databases_created": []
         }
 
-        if config_yaml:
-            success = process_yaml(Path(config_yaml), db_info)
-        elif input_json:
+        if input_json:
             success = process_json(Path(input_json), environment, db_info['mod'], db_info)
         else:
-            LOGGER.error("Neither config_yaml nor input_json provided")
+            LOGGER.error("Input JSON file not provided")
             return
 
         if not success:
@@ -409,8 +383,6 @@ def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_
         end_time = time.time()
         duration = end_time - start_time
         LOGGER.info(f"create_dbs function completed in {duration:.2f} seconds")
-
-
 
 if __name__ == "__main__":
     create_dbs()
