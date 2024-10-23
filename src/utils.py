@@ -10,13 +10,13 @@ Date: started September 2023
 """
 
 import hashlib
+import json
 import logging
 from ftplib import FTP
 from pathlib import Path
 from subprocess import PIPE, Popen
 from typing import Any
 
-from Bio import SeqIO  # type: ignore
 from dotenv import dotenv_values
 from rich.console import Console
 from slack_sdk import WebClient
@@ -216,32 +216,43 @@ def edit_fasta(fasta_file: str, config_entry: dict) -> bool:
     return True
 
 
-def validate_fasta(filename) -> Any:
+def validate_fasta(filename: str) -> bool:
     """
-    Function that validates the FASTA file
+    Validates if a file is in FASTA format without using Biopython.
+
+    Parameters:
+    filename (str): Path to the file to validate
+
+    Returns:
+    bool: True if the file is a valid FASTA file, False otherwise
     """
+    try:
+        with open(filename, "r") as f:
+            # Check if file is empty
+            first_line = f.readline().strip()
+            if not first_line:
+                return False
 
-    with open(filename, "r") as handle:
-        fasta = SeqIO.parse(handle, "fasta")
-        return any(fasta)
+            # Check if first line starts with '>'
+            if not first_line.startswith(">"):
+                return False
 
+            # Check for at least one sequence
+            has_sequence = False
+            for line in f:
+                line = line.strip()
+                if line.startswith(">"):
+                    if not has_sequence:
+                        return False
+                    has_sequence = False
+                elif line:  # sequence line
+                    has_sequence = True
 
-# def split_zfin_fasta(filename) -> Any:
-#     """ """
-#
-#     fasta = open(filename).read().splitlines()
-#     Path(f"{filename}.tmp").touch()
-#
-#     for line in fasta:
-#         temp = line.split("\\n")
-#         for item in temp:
-#             with open(f"{filename}.tmp", "a") as fh:
-#                 fh.write(f"{item}\n")
-#
-#     Path(filename).unlink()
-#     Path(f"{filename}.tmp").rename(filename)
-#
-#     return True
+            return has_sequence
+
+    except Exception as e:
+        console.log(f"[red]Error validating FASTA file: {e}[/red]")
+        return False
 
 
 def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
@@ -469,3 +480,57 @@ def slack_post(message: str) -> bool:
     assert response.body == "ok"
 
     return True
+
+
+def list_databases_from_config(config_file: str) -> None:
+    """
+    Lists all database names from either a YAML or JSON configuration file.
+
+    Parameters:
+    config_file (str): Path to either YAML or JSON configuration file
+    """
+    console.log("\n[bold]Available databases:[/bold]")
+
+    if config_file.endswith(".yaml") or config_file.endswith(".yml"):
+        # Load and process YAML file
+        config = yaml.load(open(config_file), Loader=yaml.FullLoader)
+
+        for provider in config["data_providers"]:
+            console.log(f"\n[bold cyan]{provider['name']}:[/bold cyan]")
+            for environment in provider["environments"]:
+                json_file = (
+                    Path(config_file).parent
+                    / f"{provider['name']}/databases.{provider['name']}.{environment}.json"
+                )
+                if json_file.exists():
+                    db_coordinates = json.load(open(json_file, "r"))
+                    for entry in db_coordinates["data"]:
+                        console.log(f"  • {entry['blast_title']}")
+                else:
+                    console.log(f"  Warning: JSON file not found - {json_file}")
+
+    elif config_file.endswith(".json"):
+        # Load and process JSON file
+        db_coordinates = json.load(open(config_file, "r"))
+        for entry in db_coordinates["data"]:
+            console.log(f"  • {entry['blast_title']}")
+    else:
+        console.log("[red]Error: Config file must be either YAML or JSON[/red]")
+
+
+# def split_zfin_fasta(filename) -> Any:
+#     """ """
+#
+#     fasta = open(filename).read().splitlines()
+#     Path(f"{filename}.tmp").touch()
+#
+#     for line in fasta:
+#         temp = line.split("\\n")
+#         for item in temp:
+#             with open(f"{filename}.tmp", "a") as fh:
+#                 fh.write(f"{item}\n")
+#
+#     Path(filename).unlink()
+#     Path(f"{filename}.tmp").rename(filename)
+#
+#     return True

@@ -24,7 +24,8 @@ from dotenv import dotenv_values
 from rich.console import Console
 
 from utils import (check_md5sum, check_output, extendable_logger,
-                   get_mod_from_json, s3_sync, slack_message)
+                   get_mod_from_json, list_databases_from_config, s3_sync,
+                   slack_message)
 
 console = Console()
 
@@ -53,7 +54,6 @@ def store_fasta_files(fasta_file, file_logger) -> None:
     """
 
     # Get the current date in the format "YYYY_MMM_DD"
-
     date_to_add = datetime.now().strftime("%Y_%b_%d")
 
     # Define the directory where the FASTA files will be stored
@@ -65,7 +65,6 @@ def store_fasta_files(fasta_file, file_logger) -> None:
         Path(original_files_store).mkdir(parents=True, exist_ok=True)
 
     # Copy the FASTA file to the directory
-
     copyfile(fasta_file, original_files_store / Path(fasta_file).name)
 
 
@@ -80,17 +79,6 @@ def get_files_ftp(fasta_uri, md5sum, file_logger) -> bool:
 
     Returns:
     bool: True if the file was successfully downloaded and the MD5 checksum matches, False otherwise.
-
-
-    :param fasta_uri: The URI of the FASTA file that needs to be downloaded.
-    :type fasta_uri: str
-    :param md5sum: The MD5 checksum of the file.
-    :type md5sum: str
-    :param file_logger: The logger object used for logging the process of downloading the files.
-    :type file_logger: logging.Logger
-    :return: True if the file was successfully downloaded and the MD5 checksum matches, False otherwise.
-    :rtype: bool
-
     """
 
     # Log the start of the download process
@@ -103,7 +91,6 @@ def get_files_ftp(fasta_uri, md5sum, file_logger) -> bool:
         console.log(f"Downloading {fasta_uri}")
 
         # Define the path where the downloaded file will be stored
-
         fasta_file = f"../data/{Path(fasta_uri).name}"
         fasta_name = f"{Path(fasta_uri).name}"
 
@@ -147,18 +134,7 @@ def create_db_structure(environment, mod, config_entry, file_logger) -> tuple[st
     file_logger (logging.Logger): The logger object used for logging the process of creating the database structure.
 
     Returns:
-    bool: True if the directory was successfully created, False otherwise.
-
-    :param environment: The current environment (like dev, prod, etc.).
-    :type environment: str
-    :param mod: The model organism.
-    :type mod: str
-    :param config_entry: A dictionary containing the configuration details.
-    :type config_entry: dict
-    :param file_logger: The logger object used for logging the process of creating the database structure.
-    :type file_logger: logging.Logger
-    :return: True if the directory was successfully created, False otherwise.
-    :rtype: bool
+    tuple[str, str]: A tuple containing the paths to the created directories.
     """
 
     # Get the blast_title from the config_entry
@@ -202,9 +178,10 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
     """
     This function runs the makeblastdb command to create a BLAST database.
 
-    :param config_entry: A JSON element containing information about the database to be created.
-    :param output_dir: The directory where the BLAST databases will be created.
-    :param file_logger: An external file logger.
+    Parameters:
+    config_entry (dict): A dictionary containing the configuration details.
+    output_dir (str): The directory where the BLAST database will be created.
+    file_logger (logging.Logger): The logger object used for logging the process.
     """
 
     # Load environment variables
@@ -237,17 +214,6 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
         console.log("Unzip: done\nEditing FASTA file")
         file_logger.info(f"Unzipping {fasta_file}: done")
 
-    # Check if the taxon ID is for ZFIN
-    # if config_entry["taxon_id"] == "NCBITaxon:7955":
-    #     # Log the start of the ZFIN FASTA file editing process
-    #     console.log("Editing ZFIN FASTA file")
-    #
-    #     # Edit the ZFIN FASTA file
-    #     split_zfin_fasta(f"../data/{fasta_file.replace('.gz', '')}")
-
-    # Edit the FASTA file
-    # edit_fasta(f"../data/{fasta_file.replace('.gz', '')}", config_entry)
-
     # Get the blast_title from the config_entry
     blast_title = config_entry["blast_title"]
 
@@ -260,7 +226,6 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
         # Construct the command to run makeblastdb
         makeblast_command = (
             f"makeblastdb -in ../data/{fasta_file.replace('.gz', '')} -dbtype {config_entry['seqtype']} "
-            # f"-title '{config_entry['blast_title']}' -parse_seqids "
             f"-title '{sanitized_blast_title}' "
             f"-out {output_dir}/{fasta_file.replace(extensions, 'db')} "
             f"-taxid {config_entry['taxon_id'].replace('NCBITaxon:', '')} "
@@ -326,22 +291,17 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
     return True
 
 
-def process_yaml(config_yaml) -> bool:
+def process_yaml(config_yaml, db_list=None) -> bool:
     """
     Function that processes a YAML file containing configuration details for multiple data providers.
 
     Parameters:
     config_yaml (str): The path to the YAML file that needs to be processed.
+    db_list (list): Optional list of database names to process.
 
     Returns:
     bool: True if the YAML file was successfully processed, False otherwise.
-
-    :param config_yaml: The path to the YAML file that needs to be processed.
-    :type config_yaml: str
-    :return: True if the YAML file was successfully processed, False otherwise.
-    :rtype: bool
     """
-
     # Load the YAML file
     config = yaml.load(open(config_yaml), Loader=yaml.FullLoader)
 
@@ -365,75 +325,149 @@ def process_yaml(config_yaml) -> bool:
             console.log(f"Processing {json_file}")
 
             # Process the JSON file
-            process_json(json_file, environment, provider["name"])
+            process_json(json_file, environment, provider["name"], db_list)
 
     return True
 
 
-def process_json(json_file, environment, mod) -> bool:
+def process_json(json_file, environment, mod, db_list=None) -> bool:
     """
-    Function that processes a JSON file containing configuration details for a specific data provider.
+    Process a JSON file containing configuration details for a specific data provider.
 
     Parameters:
     json_file (str): The path to the JSON file that needs to be processed.
     environment (str): The current environment (like dev, prod, etc.).
     mod (str): The model organism.
+    db_list (list): Optional list of database names to process.
 
     Returns:
-    bool: True if the JSON file was successfully processed, False otherwise.
-
-    :param json_file: The path to the JSON file that needs to be processed.
-    :type json_file: str
-    :param environment: The current environment (like dev, prod, etc.).
-    :type environment: str
-    :param mod: The model organism.
-    :type mod: str
-    :return: True if the JSON file was successfully processed, False otherwise.
-    :rtype: bool
-
+    bool: True if all databases were processed successfully, False if any errors occurred.
     """
+    try:
+        date_to_add = datetime.now().strftime("%Y_%b_%d")
+        console.log(f"Processing {json_file}")
 
-    # Get the current date in the format "YYYY_MMM_DD"
+        # Verify JSON file exists
+        if not Path(json_file).exists():
+            console.log(f"[red]Error: JSON file not found: {json_file}[/red]")
+            return False
 
-    date_to_add = datetime.now().strftime("%Y_%b_%d")
-    console.log(f"Processing {json_file}")
+        # Get or verify mod code
+        mod_code = mod if mod is not None else get_mod_from_json(json_file)
+        if not mod_code:
+            console.log("[red]Error: Invalid or missing MOD code[/red]")
+            return False
 
-    # If the model organism is not provided, get it from the JSON file
-    if mod is None:
-        mod_code = get_mod_from_json(json_file)
-    else:
-        mod_code = mod
+        # Load and validate JSON file
+        try:
+            with open(json_file, "r") as f:
+                db_coordinates = json.load(f)
+        except json.JSONDecodeError as e:
+            console.log(f"[red]Error: Invalid JSON file: {e}[/red]")
+            return False
 
-    # If the model organism is found, process the JSON file
-    if mod_code is not False:
-        # Load the JSON file
-        db_coordinates = json.load(open(json_file, "r"))
-
-        # Iterate over each entry in the JSON file
-        for entry in db_coordinates["data"]:
-            # Create a logger for the current entry
-            file_logger = extendable_logger(
-                entry["blast_title"],
-                f"../logs/{entry['genus']}_{entry['species']}"
-                f"_{entry['seqtype']}_{date_to_add}.log",
+        if "data" not in db_coordinates:
+            console.log(
+                "[red]Error: Invalid JSON structure - 'data' key not found[/red]"
             )
+            return False
 
-            # Log the model organism code
-            file_logger.info(f"Mod found/provided: {mod_code}")
-            # If the file is successfully downloaded, create the database structure and run makeblastdb
-            if get_files_ftp(entry["uri"], entry["md5sum"], file_logger):
-                # Create the database structure
-                output_dir, config_dir = create_db_structure(
-                    environment, mod_code, entry, file_logger
-                )
+        # Create logs directory if it doesn't exist
+        Path("../logs").mkdir(parents=True, exist_ok=True)
 
-                # Copy the JSON file to the configuration directory
-                copyfile(json_file, f"{config_dir}/environment.json")
+        # Track overall success
+        all_successful = True
 
-                # If the output directory exists, run makeblastdb
+        # Process each database entry
+        for entry in db_coordinates["data"]:
+            try:
+                # Skip if not in requested database list
+                if db_list and entry["blast_title"] not in db_list:
+                    console.log(
+                        f"Skipping {entry['blast_title']} - not in requested database list"
+                    )
+                    continue
+
+                # Validate required fields
+                required_fields = [
+                    "blast_title",
+                    "genus",
+                    "species",
+                    "seqtype",
+                    "uri",
+                    "md5sum",
+                ]
+                missing_fields = [
+                    field for field in required_fields if field not in entry
+                ]
+                if missing_fields:
+                    console.log(
+                        f"[red]Error: Missing required fields for {entry.get('blast_title', 'Unknown')}: {missing_fields}[/red]"
+                    )
+                    all_successful = False
+                    continue
+
+                # Create logger for current entry
+                log_path = f"../logs/{entry['genus']}_{entry['species']}_{entry['seqtype']}_{date_to_add}.log"
+                file_logger = extendable_logger(entry["blast_title"], log_path)
+                file_logger.info(f"Mod found/provided: {mod_code}")
+
+                # Download and process the file
+                if not get_files_ftp(entry["uri"], entry["md5sum"], file_logger):
+                    console.log(
+                        f"[red]Error: Failed to download or verify file for {entry['blast_title']}[/red]"
+                    )
+                    all_successful = False
+                    continue
+
+                # Create database structure
+                try:
+                    output_dir, config_dir = create_db_structure(
+                        environment, mod_code, entry, file_logger
+                    )
+                except Exception as e:
+                    console.log(
+                        f"[red]Error creating database structure for {entry['blast_title']}: {e}[/red]"
+                    )
+                    file_logger.error(f"Error creating database structure: {e}")
+                    all_successful = False
+                    continue
+
+                # Copy configuration file
+                try:
+                    copyfile(json_file, f"{config_dir}/environment.json")
+                except Exception as e:
+                    console.log(
+                        f"[red]Error copying configuration file for {entry['blast_title']}: {e}[/red]"
+                    )
+                    file_logger.error(f"Error copying configuration file: {e}")
+                    all_successful = False
+                    continue
+
+                # Run makeblastdb if output directory exists
                 if Path(output_dir).exists():
-                    run_makeblastdb(entry, output_dir, file_logger)
-    return True
+                    if not run_makeblastdb(entry, output_dir, file_logger):
+                        console.log(
+                            f"[red]Error: makeblastdb failed for {entry['blast_title']}[/red]"
+                        )
+                        all_successful = False
+                else:
+                    console.log(
+                        f"[red]Error: Output directory not found for {entry['blast_title']}[/red]"
+                    )
+                    all_successful = False
+
+            except Exception as e:
+                console.log(
+                    f"[red]Error processing entry {entry.get('blast_title', 'Unknown')}: {e}[/red]"
+                )
+                all_successful = False
+
+        return all_successful
+
+    except Exception as e:
+        console.log(f"[red]Fatal error processing JSON file: {e}[/red]")
+        return False
 
 
 @click.command()
@@ -442,63 +476,66 @@ def process_json(json_file, environment, mod) -> bool:
 @click.option("-e", "--environment", help="Environment", default="dev")
 @click.option("-m", "--mod", help="Model organism")
 @click.option(
-    "-r", "--check_route53", help="Check Route53", is_flag=True, default=False
-)
-@click.option(
     "-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=False
 )
 @click.option("-u", "--update-slack", help="Update Slack", is_flag=True, default=False)
 @click.option("-s3", "--sync-s3", help="Sync to S3", is_flag=True, default=False)
-# @click.option("-d", "--dry_run", help="Don't download anything", is_flag=True, default=False)
+@click.option(
+    "-d",
+    "--db_names",
+    help="Comma-separated list of database names to create",
+    default=None,
+)
+@click.option(
+    "-l",
+    "--list",
+    "list_dbs",
+    help="List available databases",
+    is_flag=True,
+    default=False,
+)
 def create_dbs(
     config_yaml,
     input_json,
     environment,
     mod,
-    check_route53,
     skip_efs_sync,
     update_slack,
     sync_s3,
+    db_names,
+    list_dbs,
 ) -> None:
     """
     Main function that runs the pipeline for processing the configuration files and creating the BLAST databases.
-
-    Parameters:
-    config_yaml (str): The path to the YAML file that contains configuration details for multiple data providers.
-    input_json (str): The path to the JSON file that contains configuration details for a specific data provider.
-    environment (str): The current environment (like dev, prod, etc.).
-    mod (str): The model organism.
-    check_route53 (bool): A flag that indicates whether to check Route53.
-
-    Returns:
-    None
-
-    :param config_yaml: The path to the YAML file that contains configuration details for multiple data providers.
-    :type config_yaml: str
-    :param input_json: The path to the JSON file that contains configuration details for a specific data provider.
-    :type input_json: str
-    :param environment: The current environment (like dev, prod, etc.).
-    :type environment: str
-    :param mod: The model organism.
-    :type mod: str
-    :param check_route53: A flag that indicates whether to check Route53.
-    :type check_route53: bool
+    Use -d/--db_names to specify which databases to create (comma-separated list matching blast_title in config).
+    Use -l/--list to see available databases without creating them.
     """
+    # If list option is specified, show available databases and exit
+    if list_dbs:
+        if config_yaml:
+            list_databases_from_config(config_yaml)
+        elif input_json:
+            list_databases_from_config(input_json)
+        else:
+            click.echo(
+                "Please provide either a YAML (-g) or JSON (-j) configuration file to list databases."
+            )
+        return
+
+    # Convert db_names string to list if provided
+    db_list = None
+    if db_names:
+        db_list = [name.strip() for name in db_names.split(",")]
 
     # If no arguments are provided, display the help message
     if len(sys.argv) == 1:
         click.echo(create_dbs.get_help(ctx=None))
     # If a YAML configuration file is provided, process the YAML file
-
-    if config_yaml is not None:
-        process_yaml(config_yaml)
-    # If the check_route53 flag is set, check Route53
-
-    elif check_route53:
-        console.log("Checking Route53")
+    elif config_yaml is not None:
+        process_yaml(config_yaml, db_list)
     # Otherwise, process the JSON file
     else:
-        process_json(input_json, environment, mod)
+        process_json(input_json, environment, mod, db_list)
 
     # If the Slack update option is enabled, update Slack with the messages
     if update_slack:
