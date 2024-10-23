@@ -20,15 +20,14 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import click
 import yaml
-from rich.console import Console
 
+from terminal import (create_progress, log_error, print_header, print_status,
+                      show_summary)
 from utils import (check_output, extendable_logger, get_files_ftp,
                    get_files_http, get_mod_from_json, needs_parse_seqids,
                    s3_sync)
 from utils import setup_detailed_logger as setup_logger
 from utils import slack_message, update_genome_browser_map
-
-console = Console()
 
 # Global variables
 SLACK_MESSAGES: List[Dict[str, str]] = []
@@ -291,126 +290,17 @@ def process_files(
         raise
 
 
-def process_json_entries(
-    json_file: str,
-    environment: str,
-    mod: Optional[str] = None,
-    db_list: Optional[List[str]] = None,
-    check_only: bool = False,
-    store_files: bool = False,
-    cleanup: bool = True,
-) -> bool:
-    """
-    Process entries from a JSON configuration file with enhanced logging.
-
-    Args:
-        json_file: Path to JSON config file
-        environment: Deployment environment
-        mod: Model organism database identifier (optional)
-        db_list: List of specific databases to process (optional)
-        check_only: Whether to only check parse_seqids
-        store_files: Whether to store original files
-        cleanup: Whether to clean up FASTA files after processing (defaults to True)
-
-    Returns:
-        bool: Success status
-    """
-    start_time = datetime.now()
-    LOGGER.info(f"Processing JSON entries from: {json_file}")
-    LOGGER.info(
-        f"Environment: {environment}, Check only: {check_only}, "
-        f"Store files: {store_files}, Cleanup: {cleanup}"
-    )
-
-    try:
-        with open(json_file, "r") as f:
-            db_coordinates = json.load(f)
-            LOGGER.info("Successfully loaded JSON configuration")
-
-        # Get MOD code
-        mod_code = mod if mod is not None else get_mod_from_json(json_file)
-        if not mod_code:
-            LOGGER.error("Invalid or missing MOD code")
-            console.log("[red]Error: Invalid or missing MOD code[/red]")
-            return False
-
-        LOGGER.info(f"Using MOD code: {mod_code}")
-
-        # Create logs directory
-        Path("../logs").mkdir(parents=True, exist_ok=True)
-
-        # Process entries
-        entries = db_coordinates.get("data", [])
-        total_entries = len(entries)
-        processed = 0
-        successful = 0
-
-        LOGGER.info(f"Found {total_entries} entries to process")
-
-        for entry in entries:
-            processed += 1
-            LOGGER.info(
-                f"\nProcessing entry {processed}/{total_entries}: {entry['blast_title']}"
-            )
-
-            # Skip if not in requested list
-            if db_list and entry["blast_title"] not in db_list:
-                LOGGER.info(f"Skipping {entry['blast_title']} (not in requested list)")
-                continue
-
-            # Process entry
-            try:
-                if process_entry(entry, mod_code, environment, check_only, store_files):
-                    successful += 1
-            except Exception as e:
-                LOGGER.error(
-                    f"Failed to process entry {entry['blast_title']}: {str(e)}",
-                    exc_info=True,
-                )
-
-        # Clean up all FASTA files after processing all entries if cleanup is enabled
-        if cleanup and not check_only:
-            LOGGER.info("Starting post-processing cleanup")
-            cleanup_fasta_files(Path("../data"), LOGGER)
-
-        # Log summary
-        duration = datetime.now() - start_time
-        LOGGER.info(f"\nJSON processing summary:")
-        LOGGER.info(f"Total entries: {total_entries}")
-        LOGGER.info(f"Processed: {processed}")
-        LOGGER.info(f"Successful: {successful}")
-        LOGGER.info(f"Failed: {processed - successful}")
-        LOGGER.info(f"Total duration: {duration}")
-
-        return successful > 0
-
-    except Exception as e:
-        LOGGER.error(
-            f"Failed to process JSON file {json_file}: {str(e)}", exc_info=True
-        )
-        return False
-
-
 def process_entry(
-    entry: Dict,
-    mod_code: str,
-    environment: str,
-    check_only: bool = False,
-    store_files: bool = False,
+        entry: Dict,
+        mod_code: str,
+        environment: str,
+        check_only: bool = False,
+        store_files: bool = False,
 ) -> bool:
     """
-    Process a single database entry with comprehensive logging.
-
-    Args:
-        entry: Database entry configuration
-        mod_code: Model organism database identifier
-        environment: Deployment environment
-        check_only: Whether to only check parse_seqids
-        store_files: Whether to store original files
-
-    Returns:
-        bool: Success status
+    Process a single database entry with comprehensive logging and progress display.
     """
+    print_header(f"Processing {entry['blast_title']}")
     start_time = datetime.now()
     entry_name = entry["blast_title"]
 
@@ -429,14 +319,14 @@ def process_entry(
         unzipped_fasta = f"../data/{fasta_file.replace('.gz', '')}"
 
         # Log processing parameters
-        logger.info(f"Processing parameters:")
-        logger.info(f"  MOD code: {mod_code}")
-        logger.info(f"  Environment: {environment}")
-        logger.info(f"  Check only: {check_only}")
-        logger.info(f"  Store files: {store_files}")
+        print_status("Processing parameters:", "info")
+        print_status(f"  MOD code: {mod_code}", "info")
+        print_status(f"  Environment: {environment}", "info")
+        print_status(f"  Check only: {check_only}", "info")
+        print_status(f"  Store files: {store_files}", "info")
 
         # Download file
-        logger.info(f"Downloading file from {entry['uri']}")
+        print_status(f"Downloading {fasta_file}...", "info")
         if entry["uri"].startswith("ftp://"):
             success = get_files_ftp(
                 entry["uri"],
@@ -455,20 +345,24 @@ def process_entry(
             )
 
         if not success:
-            logger.error("File download failed")
+            log_error("File download failed")
             return False
+
+        print_status("File download complete", "success")
 
         # Create database if not check_only
         if not check_only:
-            logger.info("Creating database structure")
+            print_status("Creating database structure", "info")
             output_dir, config_dir = create_db_structure(
                 environment, mod_code, entry, logger
             )
 
-            logger.info("Running makeblastdb")
+            print_status("Running makeblastdb...", "info")
             if not run_makeblastdb(entry, output_dir, logger):
-                logger.error("Database creation failed")
+                log_error("Database creation failed")
                 return False
+
+            print_status("Database created successfully", "success")
 
             SLACK_MESSAGES.append(
                 {
@@ -482,11 +376,9 @@ def process_entry(
             if Path(unzipped_fasta).exists():
                 needs_parse = needs_parse_seqids(unzipped_fasta)
                 status = "requires" if needs_parse else "does not require"
-                logger.info(f"Parse seqids check: {entry_name} {status} -parse_seqids")
-                console.log(
-                    f"{entry_name}: " f"[green]requires[/green]"
-                    if needs_parse
-                    else "[yellow]does not require[/yellow]" f" -parse_seqids"
+                print_status(
+                    f"Parse seqids check: {entry_name} {status} -parse_seqids",
+                    "info"
                 )
 
         # Clean up files
@@ -494,30 +386,39 @@ def process_entry(
             if Path(unzipped_fasta).exists():
                 if check_only or not store_files:
                     file_size = Path(unzipped_fasta).stat().st_size
-                    logger.info(
-                        f"Cleaning up unzipped file: {unzipped_fasta} (size: {file_size:,} bytes)"
+                    print_status(
+                        f"Cleaning up unzipped file: {unzipped_fasta} (size: {file_size:,} bytes)",
+                        "info",
                     )
                     Path(unzipped_fasta).unlink()
 
             original_gzip = f"../data/{fasta_file}"
             if Path(original_gzip).exists() and not store_files:
                 file_size = Path(original_gzip).stat().st_size
-                logger.info(
-                    f"Cleaning up original gzipped file: {original_gzip} (size: {file_size:,} bytes)"
+                print_status(
+                    f"Cleaning up original gzipped file: {original_gzip} (size: {file_size:,} bytes)",
+                    "info",
                 )
                 Path(original_gzip).unlink()
 
         except Exception as e:
-            logger.error(f"Cleanup failed: {str(e)}", exc_info=True)
-            # Don't fail the whole process for cleanup errors
+            log_error("Cleanup failed", e)
 
-        # Log completion
+        # Log completion and show summary
         duration = datetime.now() - start_time
-        logger.info(f"Entry processing completed successfully in {duration}")
+        show_summary(
+            f"Entry Processing: {entry_name}",
+            {
+                "Status": "Completed",
+                "Files Cleaned": "Yes" if not store_files else "No",
+                "Check Only Mode": str(check_only),
+            },
+            duration,
+        )
         return True
 
     except Exception as e:
-        logger.error(f"Entry processing failed: {str(e)}", exc_info=True)
+        log_error(f"Entry processing failed", e)
         SLACK_MESSAGES.append(
             {
                 "title": "Processing Error",
@@ -525,6 +426,94 @@ def process_entry(
                 "color": "#8D2707",
             }
         )
+        return False
+
+def process_json_entries(
+    json_file: str,
+    environment: str,
+    mod: Optional[str] = None,
+    db_list: Optional[List[str]] = None,
+    check_only: bool = False,
+    store_files: bool = False,
+    cleanup: bool = True,
+) -> bool:
+    """
+    Process entries from a JSON configuration file with enhanced progress display.
+    """
+    print_header("Processing JSON Entries")
+    start_time = datetime.now()
+
+    try:
+        with open(json_file, "r") as f:
+            db_coordinates = json.load(f)
+            print_status("Successfully loaded JSON configuration", "success")
+
+        # Get MOD code
+        mod_code = mod if mod is not None else get_mod_from_json(json_file)
+        if not mod_code:
+            log_error("Invalid or missing MOD code")
+            return False
+
+        print_status(f"Using MOD code: {mod_code}", "info")
+
+        # Create logs directory
+        Path("../logs").mkdir(parents=True, exist_ok=True)
+
+        # Process entries with progress tracking
+        entries = db_coordinates.get("data", [])
+        total_entries = len(entries)
+        processed = 0
+        successful = 0
+
+        print_status(f"Found {total_entries} entries to process", "info")
+
+        with create_progress() as progress:
+            task = progress.add_task("Processing entries...", total=total_entries)
+
+            for entry in entries:
+                processed += 1
+
+                if db_list and entry["blast_title"] not in db_list:
+                    print_status(
+                        f"Skipping {entry['blast_title']} (not in requested list)",
+                        "warning",
+                    )
+                    progress.advance(task)
+                    continue
+
+                try:
+                    if process_entry(
+                        entry, mod_code, environment, check_only, store_files
+                    ):
+                        successful += 1
+                except Exception as e:
+                    log_error(f"Failed to process entry {entry['blast_title']}", e)
+
+                progress.advance(task)
+
+        # Clean up all FASTA files after processing if cleanup is enabled
+        if cleanup and not check_only:
+            print_status("Starting post-processing cleanup", "info")
+            cleanup_fasta_files(Path("../data"), LOGGER)
+
+        # Show final summary
+        duration = datetime.now() - start_time
+        show_summary(
+            "JSON Processing",
+            {
+                "Total Entries": total_entries,
+                "Processed": processed,
+                "Successful": successful,
+                "Failed": processed - successful,
+                "Cleanup Performed": str(cleanup and not check_only),
+            },
+            duration,
+        )
+
+        return successful > 0
+
+    except Exception as e:
+        log_error(f"Failed to process JSON file {json_file}", e)
         return False
 
 
