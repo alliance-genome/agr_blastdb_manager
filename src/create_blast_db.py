@@ -23,9 +23,8 @@ import yaml
 from dotenv import dotenv_values
 from rich.console import Console
 
-from utils import (check_md5sum, check_output, edit_fasta,  # type: ignore
-                   extendable_logger, get_mod_from_json, s3_sync,
-                   slack_message)
+from utils import (check_md5sum, check_output, extendable_logger,
+                   get_mod_from_json, s3_sync, slack_message)
 
 console = Console()
 
@@ -497,7 +496,6 @@ def create_dbs(
 
     elif check_route53:
         console.log("Checking Route53")
-        route53_check()
     # Otherwise, process the JSON file
     else:
         process_json(input_json, environment, mod)
