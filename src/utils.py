@@ -9,12 +9,14 @@ Author: Paulo Nuin, Adam Wright
 Date: started September 2023
 """
 
+import gzip
 import hashlib
 import json
 import logging
 import re
 from datetime import datetime
 from ftplib import FTP
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from shutil import copyfile
 from subprocess import PIPE, Popen
@@ -100,7 +102,7 @@ def get_ftp_file_size(fasta_uri, file_logger) -> int:
     return size
 
 
-def get_mod_from_json(input_json) -> str | bool:
+def get_mod_from_json(input_json) -> str:
     """
     Retrieves the model organism (mod) from the input JSON file.
     """
@@ -245,7 +247,7 @@ def sync_to_efs() -> bool:
     return True
 
 
-def check_output(stdout, stderr) -> bool:
+def check_output(stdout: bytes, stderr: bytes) -> bool:
     """
     Checks the output of a command for errors.
     """
@@ -257,7 +259,7 @@ def check_output(stdout, stderr) -> bool:
     return True
 
 
-def slack_message(messages: list, subject="Update") -> bool:
+def slack_message(messages: list, subject="BLAST Database Update") -> bool:
     """
     Sends a message to a Slack channel using the Slack API.
     """
@@ -387,4 +389,6 @@ def get_files_ftp(fasta_uri, md5sum, file_logger, mod=None) -> bool:
         console.log(f"Error downloading {fasta_uri}: {e}")
         return False
 
-    return True
+    except Exception as e:
+        console.log(f"Error getting FTP file size: {e}")
+        return 0

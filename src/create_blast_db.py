@@ -1,17 +1,19 @@
 """
 create_blast_db.py
 
-This script is used to create BLAST databases from FASTA files. It includes functions to download files from an FTP site,
+This script creates BLAST databases from FASTA files. It includes functions to download files from an FTP site,
 store the downloaded FASTA files, create the database and folder structure, run the makeblastdb command, and process
 configuration files in YAML and JSON formats.
 
 Authors: Paulo Nuin, Adam Wright
-Date: started July 2023
+Date: Started July 2023, Refactored [Current Date]
 """
 
 import json
 import re
+import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from shutil import rmtree
@@ -19,8 +21,13 @@ from subprocess import PIPE, Popen
 
 import click
 import yaml
-from dotenv import dotenv_values
+from dotenv import load_dotenv
 from rich.console import Console
+from rich.panel import Panel
+from rich.progress import (BarColumn, Progress, SpinnerColumn, TaskID,
+                           TextColumn)
+from rich.style import Style
+from rich.table import Table
 
 from utils import (check_md5sum, check_output, extendable_logger,
                    get_files_ftp, get_files_http, get_mod_from_json,
@@ -29,7 +36,9 @@ from utils import (check_md5sum, check_output, extendable_logger,
 
 console = Console()
 
-slack_messages = []
+# Global variables
+SLACK_MESSAGES: List[Dict[str, str]] = []
+LOGGER = setup_logger("create_blast_db", "blast_db_creation.log")
 
 
 def create_db_structure(environment, mod, config_entry, file_logger) -> tuple[str, str]:
@@ -72,6 +81,7 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
     slack_messages.append(
         {"title": "Running makeblastdb", "text": fasta_file, "color": "#36a64f"},
     )
+    LOGGER.info(f"Directory {db_path} created")
 
     if not Path(unzipped_fasta).exists():
         file_logger.info(f"Unzipping {fasta_file}")
@@ -138,15 +148,18 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
         console.log(f"Error running makeblastdb: {e}")
         slack_messages.append(
             {
-                "title": "Error running makeblastdb",
-                "text": fasta_file,
-                "color": "#8D2707",
-            },
+                "title": "Makeblastdb completed",
+                "text": f"Successfully processed {fasta_file}",
+            }
+        )
+        return True
+    else:
+        LOGGER.error(f"Error running makeblastdb: {output}")
+        SLACK_MESSAGES.append(
+            {"title": "Makeblastdb Error", "text": f"Failed to process {fasta_file}"}
         )
         file_logger.info(f"Error running makeblastdb: {e}")
         return False
-
-    return True
 
 
 def list_databases_from_config(config_file: str) -> None:
