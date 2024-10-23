@@ -22,17 +22,11 @@ import click
 import yaml
 from rich.console import Console
 
-from utils import (
-    check_output,
-    extendable_logger,
-    get_files_ftp,
-    get_files_http,
-    get_mod_from_json,
-    needs_parse_seqids,
-    s3_sync,
-    slack_message,
-    setup_detailed_logger as setup_logger,
-)
+from utils import (check_output, extendable_logger, get_files_ftp,
+                   get_files_http, get_mod_from_json, needs_parse_seqids,
+                   s3_sync)
+from utils import setup_detailed_logger as setup_logger
+from utils import slack_message, update_genome_browser_map
 
 console = Console()
 
@@ -162,6 +156,14 @@ def run_makeblastdb(config_entry: Dict, output_dir: str, logger) -> bool:
             duration = datetime.now() - start_time
             logger.info(f"makeblastdb completed successfully in {duration}")
 
+            # Update genome browser mapping if applicable
+            if "genome_browser" in config_entry:
+                logger.info("Updating genome browser mapping")
+                if update_genome_browser_map(config_entry, logger):
+                    logger.info("Genome browser mapping updated successfully")
+                else:
+                    logger.error("Failed to update genome browser mapping")
+
             # Clean up unzipped file
             if Path(unzipped_fasta).exists():
                 file_size = Path(unzipped_fasta).stat().st_size
@@ -239,7 +241,9 @@ def process_files(
     Process configuration files with enhanced logging.
     """
     LOGGER.info("Starting configuration file processing")
-    LOGGER.info(f"Parameters: check_only={check_only}, store_files={store_files}, cleanup={cleanup}")
+    LOGGER.info(
+        f"Parameters: check_only={check_only}, store_files={store_files}, cleanup={cleanup}"
+    )
 
     try:
         if config_yaml:
@@ -266,7 +270,7 @@ def process_files(
                             db_list,
                             check_only,
                             store_files,
-                            cleanup
+                            cleanup,
                         )
                     else:
                         LOGGER.warning(f"JSON file not found: {json_file}")
@@ -285,6 +289,7 @@ def process_files(
     except Exception as e:
         LOGGER.error(f"Failed to process configuration files: {str(e)}", exc_info=True)
         raise
+
 
 def process_json_entries(
     json_file: str,
@@ -384,6 +389,7 @@ def process_json_entries(
             f"Failed to process JSON file {json_file}: {str(e)}", exc_info=True
         )
         return False
+
 
 def process_entry(
     entry: Dict,
@@ -527,11 +533,19 @@ def process_entry(
 @click.option("-j", "--input_json", help="JSON file input coordinates")
 @click.option("-e", "--environment", help="Environment", default="dev")
 @click.option("-m", "--mod", help="Model organism")
-@click.option("-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=False)
+@click.option(
+    "-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=False
+)
 @click.option("-u", "--update-slack", help="Update Slack", is_flag=True, default=False)
 @click.option("-s3", "--sync-s3", help="Sync to S3", is_flag=True, default=False)
 @click.option("--store-files", help="Store original files", is_flag=True, default=False)
-@click.option("-cl", "--cleanup", help="Clean up FASTA files after processing", is_flag=True, default=True)
+@click.option(
+    "-cl",
+    "--cleanup",
+    help="Clean up FASTA files after processing",
+    is_flag=True,
+    default=True,
+)
 @click.option(
     "-d",
     "--db_names",
@@ -601,12 +615,24 @@ def create_dbs(
         if config_yaml:
             LOGGER.info(f"Processing YAML config: {config_yaml}")
             process_files(
-                config_yaml, None, None, db_list, check_parse_seqids, store_files, cleanup
+                config_yaml,
+                None,
+                None,
+                db_list,
+                check_parse_seqids,
+                store_files,
+                cleanup,
             )
         elif input_json:
             LOGGER.info(f"Processing JSON config: {input_json}")
             process_files(
-                None, input_json, environment, db_list, check_parse_seqids, store_files, cleanup
+                None,
+                input_json,
+                environment,
+                db_list,
+                check_parse_seqids,
+                store_files,
+                cleanup,
             )
 
         if update_slack and not check_parse_seqids:
