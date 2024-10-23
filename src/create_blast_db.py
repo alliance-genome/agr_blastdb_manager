@@ -24,8 +24,8 @@ from dotenv import dotenv_values
 from rich.console import Console
 
 from utils import (check_md5sum, check_output, extendable_logger,
-                   get_mod_from_json, list_databases_from_config, s3_sync,
-                   slack_message)
+                  get_mod_from_json, list_databases_from_config, s3_sync,
+                  slack_message, needs_parse_seqids)
 
 console = Console()
 
@@ -183,12 +183,12 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
     output_dir (str): The directory where the BLAST database will be created.
     file_logger (logging.Logger): The logger object used for logging the process.
     """
-
     # Load environment variables
     env = dotenv_values(f"{Path.cwd()}/.env")
 
     # Get the name of the FASTA file
     fasta_file = Path(config_entry["uri"]).name
+    unzipped_fasta = f"../data/{fasta_file.replace('.gz', '')}"
 
     # Log the start of the makeblastdb process
     console.log(f"Running makeblastdb for {fasta_file}")
@@ -199,7 +199,7 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
     )
 
     # Check if the FASTA file exists in the data directory
-    if not Path(f"../data/{fasta_file.replace('.gz', '')}").exists():
+    if not Path(unzipped_fasta).exists():
         # Log the start of the unzipping process
         file_logger.info(f"Unzipping {fasta_file}")
 
@@ -214,6 +214,13 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
         console.log("Unzip: done\nEditing FASTA file")
         file_logger.info(f"Unzipping {fasta_file}: done")
 
+    # Check if parse_seqids is needed using the utility function
+    parse_ids_flag = ""
+    if needs_parse_seqids(unzipped_fasta):
+        parse_ids_flag = "-parse_seqids"
+        file_logger.info("FASTA headers require -parse_seqids flag")
+        console.log("FASTA headers require -parse_seqids flag")
+
     # Get the blast_title from the config_entry
     blast_title = config_entry["blast_title"]
 
@@ -225,11 +232,12 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
     try:
         # Construct the command to run makeblastdb
         makeblast_command = (
-            f"makeblastdb -in ../data/{fasta_file.replace('.gz', '')} -dbtype {config_entry['seqtype']} "
+            f"makeblastdb -in {unzipped_fasta} -dbtype {config_entry['seqtype']} "
             f"-title '{sanitized_blast_title}' "
             f"-out {output_dir}/{fasta_file.replace(extensions, 'db')} "
             f"-taxid {config_entry['taxon_id'].replace('NCBITaxon:', '')} "
-        )
+            f"{parse_ids_flag}"
+        ).strip()  # strip() removes trailing space if parse_ids_flag is empty
 
         # Log the start of the makeblastdb process
         file_logger.info(f"Running makeblastdb: {makeblast_command}")
@@ -254,7 +262,7 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
             file_logger.info("Makeblastdb: done")
 
             # Remove the unzipped FASTA file
-            Path(f"../data/{fasta_file.replace('.gz', '')}").unlink()
+            Path(unzipped_fasta).unlink()
             file_logger.info(f"Removed {fasta_file.replace('.gz', '')}")
             console.log("Removed unzipped file")
         else:

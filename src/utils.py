@@ -518,6 +518,59 @@ def list_databases_from_config(config_file: str) -> None:
         console.log("[red]Error: Config file must be either YAML or JSON[/red]")
 
 
+def needs_parse_seqids(fasta_file: str) -> bool:
+    """
+    Determines if a FASTA file needs the -parse_seqids flag by examining its headers.
+    BLAST's -parse_seqids is needed when headers contain certain formats like:
+    - lcl|123
+    - gb|123|456
+    - ref|NM_123.4|
+    - etc.
+
+    Parameters:
+    fasta_file (str): Path to the FASTA file to examine
+
+    Returns:
+    bool: True if the file contains headers that need parsing, False otherwise
+    """
+    # Common sequence identifier patterns that need parsing
+    id_patterns = [
+        r'^>.*\|.*\|',  # Matches patterns like gb|123|456 or ref|NM_123.4|
+        r'^>lcl\|',  # Local identifiers
+        r'^>ref\|',  # Reference sequences
+        r'^>gb\|',  # GenBank
+        r'^>emb\|',  # EMBL
+        r'^>dbj\|',  # DDBJ
+        r'^>pir\|',  # PIR
+        r'^>prf\|',  # Protein Research Foundation
+        r'^>sp\|',  # Swiss-Prot
+        r'^>pdb\|',  # Protein Data Bank
+        r'^>pat\|',  # Patents
+        r'^>bbs\|',  # GenInfo Backbone Id
+        r'^>gnl\|',  # General database identifier
+        r'^>gi\|'  # GenInfo Id
+    ]
+
+    # Compile patterns for efficiency
+    patterns = [re.compile(pattern) for pattern in id_patterns]
+
+    try:
+        with open(fasta_file, 'r') as f:
+            # Only need to check header lines
+            for line in f:
+                if line.startswith('>'):
+                    # Check if any pattern matches this header
+                    if any(pattern.match(line) for pattern in patterns):
+                        return True
+    except Exception as e:
+        # If there's any error reading the file, err on the side of caution
+        console.log(f"Warning: Error checking FASTA headers: {e}")
+        return True
+
+    return False
+
+
+
 # def split_zfin_fasta(filename) -> Any:
 #     """ """
 #
