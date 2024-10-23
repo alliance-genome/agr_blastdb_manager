@@ -16,6 +16,7 @@ import re
 from datetime import datetime
 from ftplib import FTP
 from pathlib import Path
+from shutil import copyfile
 from subprocess import PIPE, Popen
 from typing import Any
 
@@ -33,7 +34,7 @@ console = Console()
 MODS = ["FB", "SGD", "WB", "XB", "ZFIN"]
 
 
-from shutil import copyfile  # Add to imports if not present
+
 
 
 def store_fasta_files(fasta_file, file_logger) -> None:
@@ -604,10 +605,14 @@ def process_entry(entry, mod_code, file_logger, environment=None, check_only=Fal
         console.log(f"\n[bold]Checking {entry['blast_title']}[/bold]")
 
     # Download and verify the file
-    if entry["uri"].startswith('ftp://'):
-        success = get_files_ftp(entry["uri"], entry["md5sum"], file_logger, mod=mod_code)
+    if entry["uri"].startswith("ftp://"):
+        success = get_files_ftp(
+            entry["uri"], entry["md5sum"], file_logger, mod=mod_code
+        )
     else:
-        success = get_files_http(entry["uri"], entry["md5sum"], file_logger, mod=mod_code)
+        success = get_files_http(
+            entry["uri"], entry["md5sum"], file_logger, mod=mod_code
+        )
 
     if not success:
         if check_only:
@@ -624,7 +629,11 @@ def process_entry(entry, mod_code, file_logger, environment=None, check_only=Fal
     if Path(unzipped_fasta).exists():
         needs_parse = needs_parse_seqids(unzipped_fasta)
         if check_only:
-            status = "[green]requires[/green]" if needs_parse else "[yellow]does not require[/yellow]"
+            status = (
+                "[green]requires[/green]"
+                if needs_parse
+                else "[yellow]does not require[/yellow]"
+            )
             console.log(f"{entry['blast_title']}: {status} -parse_seqids")
 
     # Clean up if we're only checking
