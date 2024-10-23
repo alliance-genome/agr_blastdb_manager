@@ -14,7 +14,7 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from shutil import copyfile, rmtree
+from shutil import rmtree
 from subprocess import PIPE, Popen
 
 import click
@@ -22,16 +22,22 @@ import yaml
 from dotenv import dotenv_values
 from rich.console import Console
 
-from utils import check_output  # Added imports
-from utils import (check_md5sum, extendable_logger, get_files_ftp,
-                   get_files_http, get_mod_from_json,
-                   list_databases_from_config, needs_parse_seqids,
-                   process_files, s3_sync, slack_message, store_fasta_files)
+from utils import (
+    check_output,
+    check_md5sum,
+    extendable_logger,
+    get_files_ftp,
+    get_files_http,
+    get_mod_from_json,
+    needs_parse_seqids,
+    s3_sync,
+    slack_message,
+    store_fasta_files,
+)
 
 console = Console()
 
 slack_messages = []
-
 
 def create_db_structure(environment, mod, config_entry, file_logger) -> tuple[str, str]:
     """
@@ -59,7 +65,6 @@ def create_db_structure(environment, mod, config_entry, file_logger) -> tuple[st
     file_logger.info(f"Directory {p} created")
 
     return p, c
-
 
 def run_makeblastdb(config_entry, output_dir, file_logger):
     """
@@ -149,6 +154,131 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
 
     return True
 
+def list_databases_from_config(config_file: str) -> None:
+    """
+    Lists all database names from either a YAML or JSON configuration file.
+    """
+    console.log("\n[bold]Available databases:[/bold]")
+
+    if config_file.endswith(".yaml") or config_file.endswith(".yml"):
+        config = yaml.load(open(config_file), Loader=yaml.FullLoader)
+
+        for provider in config["data_providers"]:
+            console.log(f"\n[bold cyan]{provider['name']}:[/bold cyan]")
+            for environment in provider["environments"]:
+                json_file = (
+                    Path(config_file).parent
+                    / f"{provider['name']}/databases.{provider['name']}.{environment}.json"
+                )
+                if json_file.exists():
+                    db_coordinates = json.load(open(json_file, "r"))
+                    for entry in db_coordinates["data"]:
+                        console.log(f"  • {entry['blast_title']}")
+                else:
+                    console.log(f"  Warning: JSON file not found - {json_file}")
+
+    elif config_file.endswith(".json"):
+        db_coordinates = json.load(open(config_file, "r"))
+        for entry in db_coordinates["data"]:
+            console.log(f"  • {entry['blast_title']}")
+    else:
+        console.log("[red]Error: Config file must be either YAML or JSON[/red]")
+
+def process_entry(entry, mod_code, file_logger, environment=None, check_only=False):
+    """Helper function to process a single database entry"""
+    fasta_file = Path(entry["uri"]).name
+    unzipped_fasta = f"../data/{fasta_file.replace('.gz', '')}"
+
+    if check_only:
+        console.log(f"\n[bold]Checking {entry['blast_title']}[/bold]")
+
+    if entry["uri"].startswith('ftp://'):
+        success = get_files_ftp(entry["uri"], entry["md5sum"], file_logger, mod=mod_code)
+    else:
+        success = get_files_http(entry["uri"], entry["md5sum"], file_logger, mod=mod_code)
+
+    if not success:
+        if check_only:
+            console.log(f"[red]Could not download {fasta_file} - skipping check[/red]")
+        return
+
+    if not Path(unzipped_fasta).exists():
+        unzip_command = f"gunzip -v ../data/{fasta_file}"
+        p = Popen(unzip_command, shell=True, stdout=PIPE, stderr=PIPE)
+        p.wait()
+
+    if Path(unzipped_fasta).exists():
+        needs_parse = needs_parse_seqids(unzipped_fasta)
+        if check_only:
+            status = "[green]requires[/green]" if needs_parse else "[yellow]does not require[/yellow]"
+            console.log(f"{entry['blast_title']}: {status} -parse_seqids")
+
+    if check_only:
+        if Path(unzipped_fasta).exists():
+            Path(unzipped_fasta).unlink()
+
+    if not check_only:
+        output_dir, config_dir = create_db_structure(
+            environment, mod_code, entry, file_logger
+        )
+        if not run_makeblastdb(entry, output_dir, file_logger):
+            console.log(
+                f"[red]Error creating database for {entry['blast_title']}[/red]"
+            )
+
+def process_json_entries(
+    json_file, environment, mod=None, db_list=None, check_only=False
+):
+    """
+    Process entries from a JSON configuration file.
+    """
+    try:
+        with open(json_file, "r") as f:
+            db_coordinates = json.load(f)
+    except json.JSONDecodeError as e:
+        console.log(f"[red]Error: Invalid JSON file: {e}[/red]")
+        return False
+
+    mod_code = mod if mod is not None else get_mod_from_json(json_file)
+    if not mod_code:
+        console.log("[red]Error: Invalid or missing MOD code[/red]")
+        return False
+
+    date_to_add = datetime.now().strftime("%Y_%b_%d")
+    Path("../logs").mkdir(parents=True, exist_ok=True)
+
+    for entry in db_coordinates.get("data", []):
+        if db_list and entry["blast_title"] not in db_list:
+            continue
+
+        log_path = f"../logs/{entry['genus']}_{entry['species']}_{entry['seqtype']}_{date_to_add}.log"
+        file_logger = extendable_logger(entry["blast_title"], log_path)
+        file_logger.info(f"Mod found/provided: {mod_code}")
+
+        process_entry(entry, mod_code, file_logger, environment, check_only)
+
+    return True
+
+def process_files(config_yaml, input_json, environment, db_list=None, check_only=False):
+    """
+    Process files either from YAML or JSON configuration.
+    """
+    if config_yaml:
+        config = yaml.load(open(config_yaml), Loader=yaml.FullLoader)
+        for provider in config["data_providers"]:
+            console.log(f"Processing {provider['name']}")
+            for env in provider["environments"]:
+                json_file = (
+                    Path(config_yaml).parent
+                    / f"{provider['name']}/databases.{provider['name']}.{env}.json"
+                )
+                if json_file.exists():
+                    process_json_entries(
+                        json_file, env, provider["name"], db_list, check_only
+                    )
+
+    elif input_json:
+        process_json_entries(input_json, environment, None, db_list, check_only)
 
 @click.command()
 @click.option("-g", "--config_yaml", help="YAML file with all MODs configuration")
@@ -230,7 +360,6 @@ def create_dbs(
     except Exception as e:
         console.log(f"[red]Error: {e}[/red]")
         sys.exit(1)
-
 
 if __name__ == "__main__":
     create_dbs()
