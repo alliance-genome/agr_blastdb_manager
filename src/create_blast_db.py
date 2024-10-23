@@ -22,11 +22,11 @@ import yaml
 from dotenv import dotenv_values
 from rich.console import Console
 
-from utils import (check_md5sum, setup_enhanced_logger, get_files_ftp,
-                  get_files_http, get_mod_from_json,
-                  list_databases_from_config, needs_parse_seqids,
-                  process_files, s3_sync, slack_message, store_fasta_files,
-                  check_output)
+from utils import check_output  # Added imports
+from utils import (check_md5sum, extendable_logger, get_files_ftp,
+                   get_files_http, get_mod_from_json,
+                   list_databases_from_config, needs_parse_seqids,
+                   process_files, s3_sync, slack_message, store_fasta_files)
 
 console = Console()
 
@@ -150,56 +150,6 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
     return True
 
 
-def process_entry(entry, mod_code, file_logger, environment=None, check_only=False, keep_files=False):
-    """Helper function to process a single database entry"""
-    fasta_file = Path(entry["uri"]).name
-    unzipped_fasta = f"../data/{fasta_file.replace('.gz', '')}"
-    downloaded_file = f"../data/{fasta_file}"
-
-    try:
-        # Only show checking message if in check mode
-        if check_only:
-            console.log(f"\n[bold]Checking {entry['blast_title']}[/bold]")
-
-        # Download and verify the file
-        if entry["uri"].startswith('ftp://'):
-            success = get_files_ftp(entry["uri"], entry["md5sum"], file_logger, mod=mod_code, keep_files=keep_files)
-        else:
-            success = get_files_http(entry["uri"], entry["md5sum"], file_logger, mod=mod_code, keep_files=keep_files)
-
-        if not success:
-            if check_only:
-                console.log(f"[red]Could not download {fasta_file} - skipping check[/red]")
-            return
-
-        # Process the database
-        if not check_only:
-            output_dir, config_dir = create_db_structure(
-                environment, mod_code, entry, file_logger
-            )
-            if not run_makeblastdb(entry, output_dir, file_logger):
-                console.log(
-                    f"[red]Error creating database for {entry['blast_title']}[/red]"
-                )
-                return
-
-        # Clean up files if not keeping them
-        if not keep_files and Path(downloaded_file).exists():
-            file_logger.info(f"Removing downloaded file: {downloaded_file}")
-            Path(downloaded_file).unlink()
-            console.log(f"Removed {downloaded_file}")
-
-        if not keep_files and Path(unzipped_fasta).exists():
-            file_logger.info(f"Removing unzipped file: {unzipped_fasta}")
-            Path(unzipped_fasta).unlink()
-            console.log(f"Removed {unzipped_fasta}")
-
-    except Exception as e:
-        file_logger.error(f"Error processing {entry['blast_title']}: {str(e)}")
-        console.log(f"[red]Error processing {entry['blast_title']}: {str(e)}[/red]")
-        raise
-
-
 @click.command()
 @click.option("-g", "--config_yaml", help="YAML file with all MODs configuration")
 @click.option("-j", "--input_json", help="JSON file input coordinates")
@@ -231,13 +181,6 @@ def process_entry(entry, mod_code, file_logger, environment=None, check_only=Fal
     is_flag=True,
     default=False,
 )
-@click.option(
-    "-k",
-    "--keep-files",
-    help="Keep downloaded FASTA files after processing",
-    is_flag=True,
-    default=False,
-)
 def create_dbs(
     config_yaml,
     input_json,
@@ -249,7 +192,6 @@ def create_dbs(
     db_names,
     list_dbs,
     check_parse_seqids,
-    keep_files,
 ) -> None:
     """
     Main function that runs the pipeline for processing the configuration files and creating the BLAST databases.
@@ -269,11 +211,15 @@ def create_dbs(
             )
         return
 
+    if len(sys.argv) == 1:
+        click.echo(create_dbs.get_help(ctx=None))
+        return
+
     try:
         if config_yaml:
-            process_files(config_yaml, None, None, db_list, check_parse_seqids, keep_files)
+            process_files(config_yaml, None, None, db_list, check_parse_seqids)
         elif input_json:
-            process_files(None, input_json, environment, db_list, check_parse_seqids, keep_files)
+            process_files(None, input_json, environment, db_list, check_parse_seqids)
 
         if update_slack and not check_parse_seqids:
             slack_message(slack_messages)
