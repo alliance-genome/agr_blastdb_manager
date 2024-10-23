@@ -13,7 +13,6 @@ console = Console()
 
 
 def run_test(mod, items, type, sequence):
-
     # Locate and click the checkbox
     # Locate and click the checkbox
     for item in items:
@@ -58,11 +57,17 @@ def run_test(mod, items, type, sequence):
 
         browser.quit()
 
+
 @click.command()
 @click.option("-m", "--mod", help="The MOD to test")
 @click.option("-t", "--type", help="The DB type to test, i.e. fungal for SGD")
 @click.option("-s", "--single_item", help="How many items to test", default=1)
-@click.option("-M", "--molecule", help="The molecule to test, nucl or prot only, default nucl", default="nucl")
+@click.option(
+    "-M",
+    "--molecule",
+    help="The molecule to test, nucl or prot only, default nucl",
+    default="nucl",
+)
 @click.option(
     "-n",
     "--number_of_items",

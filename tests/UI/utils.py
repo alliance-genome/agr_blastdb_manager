@@ -3,6 +3,7 @@ import sys
 from bs4 import BeautifulSoup
 import requests
 
+
 def main():
     if len(sys.argv) != 2:
         print("Usage: python script.py <filename>")
@@ -42,14 +43,8 @@ def main2(url):
     return items
 
 
-
 if __name__ == "__main__":
     # url = sys.argv[1]
     # result = main(url)
     # print(result)
     main()
-
-
-
-
-

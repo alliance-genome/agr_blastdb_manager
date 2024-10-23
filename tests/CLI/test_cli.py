@@ -11,7 +11,6 @@ from subprocess import Popen, PIPE
 
 
 def run_blast(db, fasta, mod, environment):
-
     print(db)
     temp = open("temp.fasta", "w")
     temp.write(fasta)
@@ -28,18 +27,15 @@ def run_blast(db, fasta, mod, environment):
 @click.option("-M", "--mod", help="The MOD to test", required=True)
 @click.option("-e", "--environment", help="The environment to test", required=True)
 def setup_blast(datadir, mod, environment):
-
     data = json.loads(open("config.json").read())
 
     p = pathlib.Path(f"{datadir}/{mod}/{environment}/databases/")
     dbs = data[mod][environment]["dbs"]
     fasta = f">test\n{data[mod][environment]["nucl"]}"
 
-
     for db in dbs:
         full_dir = p / db
         run_blast(full_dir, fasta, mod, environment)
-
 
 
 if __name__ == "__main__":
