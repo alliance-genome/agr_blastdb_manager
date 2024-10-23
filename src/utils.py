@@ -38,6 +38,25 @@ console = Console()
 MODS = ["FB", "SGD", "WB", "XB", "ZFIN"]
 
 
+def copy_config_file(json_file: Path, config_dir: Path, logger) -> bool:
+    """
+    Copies the configuration file to the config directory.
+    """
+    try:
+        # Ensure config directory exists
+        config_dir.mkdir(parents=True, exist_ok=True)
+
+        # Copy the JSON configuration file
+        target_file = config_dir / "environment.json"
+        target_file.write_text(json_file.read_text())
+        logger.info(f"Copied configuration file to {target_file}")
+
+        return True
+    except Exception as e:
+        logger.error(f"Failed to copy configuration file: {str(e)}")
+        return False
+
+
 def setup_detailed_logger(
     log_name: str, file_name: str, level=logging.INFO
 ) -> logging.Logger:
@@ -629,75 +648,49 @@ def get_ftp_file_size(fasta_uri: str, logger) -> int:
         return 0
 
 
-def update_genome_browser_map(config_entry: Dict, logger) -> bool:
+def update_genome_browser_map(config_entry: dict, mod: str, environment: str, logger) -> bool:
     """
-    Updates the genome browser mapping files (Ruby and JSON), mapping FASTA filenames
-    to genome browser URLs. Creates the files if they don't exist.
-
-    Args:
-        config_entry (Dict): Configuration dictionary containing database details
-        logger: Logger instance for tracking operations
-
-    Returns:
-        bool: Success status
+    Updates the genome browser mapping files (Ruby and JSON) with FASTA filename
+    to genome browser URL mappings.
     """
     try:
-        ruby_file = Path("../data/config/genome_browser_map.rb")
-        json_file = Path("../data/config/genome_browser_map.json")
-
-        # Only process if genome_browser information exists
+        # Skip if no genome browser info
         if "genome_browser" not in config_entry:
-            logger.debug(
-                "No genome browser information in config entry, skipping mapping update"
-            )
+            logger.debug("No genome browser information in config entry")
             return True
 
+        # Create config directory structure
+        config_base = Path("../data/config")
+        config_base.mkdir(parents=True, exist_ok=True)
+
+        ruby_file = config_base / "genome_browser_map.rb"
+        json_file = config_base / "genome_browser_map.json"
+
+        # Get filename and browser URL
         filename = Path(config_entry["uri"]).name
         browser_url = config_entry["genome_browser"]["url"]
 
-        # Initialize mapping dict
+        # Initialize or load existing mappings
         current_map = {}
+        if json_file.exists():
+            current_map = json.loads(json_file.read_text())
 
-        # Read existing mappings if either file exists
-        if ruby_file.exists():
-            logger.info(f"Reading existing genome browser mappings from {ruby_file}")
-            with open(ruby_file, "r") as f:
-                content = f.read()
-                # Extract existing mappings using regex
-                pattern = r"'([^']+)'\s*=>\s*'([^']+)'"
-                matches = re.findall(pattern, content)
-                current_map = dict(matches)
-                logger.info(f"Found {len(current_map)} existing mappings in Ruby file")
-        elif json_file.exists():
-            logger.info(f"Reading existing genome browser mappings from {json_file}")
-            with open(json_file, "r") as f:
-                current_map = json.load(f)
-                logger.info(f"Found {len(current_map)} existing mappings in JSON file")
-
-        # Update mapping with new entry
+        # Update mapping
         current_map[filename] = browser_url
-        logger.info(f"Adding/updating mapping for {filename}")
 
-        # Ensure config directory exists
-        ruby_file.parent.mkdir(parents=True, exist_ok=True)
+        # Write Ruby mapping
+        ruby_content = "GENOME_BROWSER_MAP = {\n"
+        for fname, url in sorted(current_map.items()):
+            ruby_content += f"  '{fname}' => '{url}',\n"
+        ruby_content += "}.freeze\n"
+        ruby_file.write_text(ruby_content)
 
-        # Write updated Ruby mapping
-        with open(ruby_file, "w") as f:
-            f.write("GENOME_BROWSER_MAP = {\n")
-            for fname, url in sorted(current_map.items()):
-                f.write(f"  '{fname}' => '{url}',\n")
-            f.write("}.freeze\n")
-        logger.info(f"Successfully updated Ruby mapping file at {ruby_file}")
+        # Write JSON mapping
+        json_file.write_text(json.dumps(current_map, indent=2, sort_keys=True))
 
-        # Write updated JSON mapping
-        with open(json_file, "w") as f:
-            json.dump(current_map, f, indent=2, sort_keys=True)
-        logger.info(f"Successfully updated JSON mapping file at {json_file}")
-
+        logger.info(f"Updated genome browser mappings for {filename}")
         return True
 
     except Exception as e:
-        logger.error(
-            f"Failed to update genome browser mapping: {str(e)}", exc_info=True
-        )
+        logger.error(f"Failed to update genome browser mapping: {str(e)}")
         return False

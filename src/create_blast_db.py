@@ -26,7 +26,7 @@ from terminal import (create_progress, log_error, print_header, print_status,
 from utils import cleanup_fasta_files  # Add this import
 from utils import (check_output, extendable_logger, get_files_ftp,
                    get_files_http, get_mod_from_json, needs_parse_seqids,
-                   s3_sync, setup_detailed_logger, slack_message)
+                   s3_sync, setup_detailed_logger, slack_message, copy_config_file, update_genome_browser_map)
 
 # Global variables
 SLACK_MESSAGES: List[Dict[str, str]] = []
@@ -157,7 +157,7 @@ def run_makeblastdb(config_entry: Dict, output_dir: str, logger) -> bool:
             # Update genome browser mapping if applicable
             if "genome_browser" in config_entry:
                 logger.info("Updating genome browser mapping")
-                if update_genome_browser_map(config_entry, logger):
+                if update_genome_browser_map(config_entry, mod, environment, logger):
                     logger.info("Genome browser mapping updated successfully")
                 else:
                     logger.error("Failed to update genome browser mapping")
@@ -302,10 +302,20 @@ def process_entry(
 ) -> bool:
     """
     Process a single database entry with comprehensive logging and progress display.
+
+    Args:
+        entry: Database entry configuration
+        mod_code: Model organism database identifier
+        environment: Deployment environment
+        check_only: Whether to only check parse_seqids
+        store_files: Whether to store original files
+
+    Returns:
+        bool: Success status
     """
     print_header(f"Processing {entry['blast_title']}")
     start_time = datetime.now()
-    entry_name = entry["blast_title"]
+    entry_name = entry['blast_title']
 
     # Setup entry-specific logging
     date_to_add = datetime.now().strftime("%Y_%b_%d")
@@ -353,39 +363,27 @@ def process_entry(
 
         print_status("File download complete", "success")
 
-        # Unzip file if needed
-        if not Path(unzipped_fasta).exists() and Path(f"../data/{fasta_file}").exists():
-            logger.info(f"Unzipping {fasta_file}")
-            print_status(f"Unzipping {fasta_file}...", "info")
-            unzip_command = f"gunzip -v ../data/{fasta_file}"
-            p = Popen(unzip_command, shell=True, stdout=PIPE, stderr=PIPE)
-            stdout, stderr = p.communicate()
-
-            if p.returncode != 0:
-                log_error(f"Unzip failed: {stderr.decode('utf-8')}")
-                return False
-
-        # Check parse_seqids requirement if in check_only mode
-        if check_only:
-            if Path(unzipped_fasta).exists():
-                needs_parse = needs_parse_seqids(unzipped_fasta)
-                status = (
-                    "[green]requires[/green]"
-                    if needs_parse
-                    else "[yellow]does not require[/yellow]"
-                )
-                print_status(f"{entry_name}: {status} -parse_seqids flag", "info")
-                logger.info(
-                    f"Parse seqids check: {entry_name} {'requires' if needs_parse else 'does not require'} -parse_seqids"
-                )
-
         # Create database if not check_only
         if not check_only:
+            # Create database structure
             print_status("Creating database structure", "info")
             output_dir, config_dir = create_db_structure(
                 environment, mod_code, entry, logger
             )
 
+            # Unzip file if needed
+            if not Path(unzipped_fasta).exists() and Path(f"../data/{fasta_file}").exists():
+                logger.info(f"Unzipping {fasta_file}")
+                print_status(f"Unzipping {fasta_file}...", "info")
+                unzip_command = f"gunzip -v ../data/{fasta_file}"
+                p = Popen(unzip_command, shell=True, stdout=PIPE, stderr=PIPE)
+                stdout, stderr = p.communicate()
+
+                if p.returncode != 0:
+                    log_error(f"Unzip failed: {stderr.decode('utf-8')}")
+                    return False
+
+            # Run makeblastdb
             print_status("Running makeblastdb...", "info")
             if not run_makeblastdb(entry, output_dir, logger):
                 log_error("Database creation failed")
@@ -400,6 +398,19 @@ def process_entry(
                     "color": "#36a64f",
                 }
             )
+
+        # Check parse_seqids requirement if in check_only mode
+        elif check_only:
+            if Path(unzipped_fasta).exists():
+                needs_parse = needs_parse_seqids(unzipped_fasta)
+                status = "requires" if needs_parse else "does not require"
+                print_status(
+                    f"{entry_name}: {'[green]requires[/green]' if needs_parse else '[yellow]does not require[/yellow]'} -parse_seqids flag",
+                    "info"
+                )
+                logger.info(
+                    f"Parse seqids check: {entry_name} {status} -parse_seqids"
+                )
 
         # Clean up files
         try:
@@ -425,6 +436,7 @@ def process_entry(
             log_error("Cleanup failed", e)
             logger.error(f"Cleanup failed: {str(e)}", exc_info=True)
 
+        # Log completion
         duration = datetime.now() - start_time
         logger.info(f"Entry processing completed in {duration}")
         return True
@@ -441,7 +453,6 @@ def process_entry(
         )
         return False
 
-
 def process_json_entries(
     json_file: str,
     environment: str,
@@ -456,6 +467,7 @@ def process_json_entries(
     """
     print_header("Processing JSON Entries")
     start_time = datetime.now()
+    LOGGER.info(f"Processing JSON entries from: {json_file}")
 
     try:
         with open(json_file, "r") as f:
@@ -504,6 +516,24 @@ def process_json_entries(
                     log_error(f"Failed to process entry {entry['blast_title']}", e)
 
                 progress.advance(task)
+
+        # After all entries are processed successfully, copy the configuration file
+        if successful > 0 and not check_only:
+            print_status("Copying configuration file", "info")
+            config_dir = Path(f"../data/config/{mod_code}/{environment}")
+            if copy_config_file(Path(json_file), config_dir, LOGGER):
+                print_status("Configuration file copied successfully", "success")
+            else:
+                log_error("Failed to copy configuration file")
+
+            # Update genome browser mappings after all entries are processed
+            print_status("Updating genome browser mappings", "info")
+            for entry in entries:
+                if "genome_browser" in entry:
+                    if update_genome_browser_map(entry, mod_code, environment, LOGGER):
+                        print_status(f"Updated mapping for {entry['blast_title']}", "success")
+                    else:
+                        log_error(f"Failed to update mapping for {entry['blast_title']}")
 
         # Clean up all FASTA files after processing if cleanup is enabled
         if cleanup and not check_only:
