@@ -18,7 +18,8 @@ from pathlib import Path
 from shutil import copyfile
 from subprocess import PIPE, Popen
 from typing import Any, Dict, Optional
-
+import json
+from rich import print as rprint
 import wget
 from dotenv import dotenv_values
 from rich.console import Console
@@ -650,60 +651,99 @@ def get_ftp_file_size(fasta_uri: str, logger) -> int:
 
 def update_genome_browser_map(config_entry: dict, mod: str, environment: str, logger) -> bool:
     """
-    Creates both Ruby (.rb) and JSON files containing genome browser URL mappings.
-    Both files are generated fresh for each MOD/environment combination.
-
-    Args:
-        config_entry: Configuration dictionary containing genome browser information
-        mod: Model organism database identifier
-        environment: Deployment environment (dev, stage, prod)
-        logger: Logger instance for tracking operations
+    Updates genome browser mappings for both Ruby and JSON formats.
     """
+
+    def log_and_print(message: str, level: str = "info"):
+        """Helper to both log and print messages"""
+        if level == "error":
+            logger.error(message)
+            rprint(f"[red]ERROR: {message}[/red]")
+        elif level == "warning":
+            logger.warning(message)
+            rprint(f"[yellow]WARNING: {message}[/yellow]")
+        else:
+            logger.info(message)
+            rprint(f"[blue]INFO: {message}[/blue]")
+
     try:
+        # Debug current directory
+        current_dir = Path.cwd()
+        log_and_print(f"Current working directory: {current_dir}")
+
         # Skip if no genome browser info
         if "genome_browser" not in config_entry:
-            logger.debug("No genome browser information in config entry")
+            log_and_print("No genome browser info found in entry, skipping", "warning")
             return True
 
-        # Create config directories
-        config_path = Path(f"../data/config/{mod}/{environment}")
-        config_path.mkdir(parents=True, exist_ok=True)
-
-        ruby_file = config_path / "genome_browser_map.rb"
-        json_file = config_path / "genome_browser_map.json"
-
-        # Get filename and browser URL
+        # Get filename and browser URL for current entry
         filename = Path(config_entry["uri"]).name
         browser_url = config_entry["genome_browser"]["url"]
+        log_and_print(f"Processing: {filename} -> {browser_url}")
 
-        # Load or initialize the mapping dictionary
+        # Define target directory with correct path and create if needed
+        target_dir = Path("../data/config") / mod / environment
+        target_dir.mkdir(parents=True, exist_ok=True)
+        log_and_print(f"Target directory: {target_dir.absolute()} (exists: {target_dir.exists()})")
+
+        # Define file paths
+        json_file = target_dir / "genome_browser_map.json"
+        ruby_file = target_dir / "genome_browser_map.rb"
+        log_and_print(f"Will write to:\n  JSON: {json_file.absolute()}\n  Ruby: {ruby_file.absolute()}")
+
+        # Load existing mappings from JSON if it exists
         mapping = {}
         if json_file.exists():
-            with open(json_file, 'r') as f:
-                mapping = json.load(f)
+            try:
+                with open(json_file, 'r') as f:
+                    content = f.read()
+                    log_and_print(f"Existing JSON content: {content[:100]}...")
+                    if content.strip():
+                        mapping = json.loads(content)
+                log_and_print(f"Loaded {len(mapping)} existing mappings")
+            except Exception as e:
+                log_and_print(f"Starting fresh due to error reading JSON: {e}", "warning")
 
-        # Add or update the current mapping
+        # Add new mapping
         mapping[filename] = browser_url
-        logger.info(f"Adding mapping: {filename} => {browser_url}")
-
-        # Generate Ruby file
-        ruby_content = "GENOME_BROWSER_MAP = {\n"
-        for fname, url in sorted(mapping.items()):
-            ruby_content += f"  '{fname}' => '{url}',\n"
-        ruby_content += "}.freeze\n"
-
-        # Write Ruby file
-        with open(ruby_file, 'w') as f:
-            f.write(ruby_content)
-        logger.info(f"Written Ruby mapping file with {len(mapping)} entries to {ruby_file}")
+        log_and_print(f"Added new mapping. Total mappings now: {len(mapping)}")
 
         # Write JSON file
-        with open(json_file, 'w') as f:
-            json.dump(mapping, f, indent=2, sort_keys=True)
-        logger.info(f"Written JSON mapping file with {len(mapping)} entries to {json_file}")
+        try:
+            json_content = json.dumps(mapping, indent=2, sort_keys=True)
+            log_and_print(f"Writing JSON content: {json_content[:100]}...")
+            with open(json_file, 'w') as f:
+                f.write(json_content)
+            log_and_print(f"Wrote JSON file: {json_file} (size: {json_file.stat().st_size} bytes)")
+        except Exception as e:
+            log_and_print(f"Failed to write JSON file: {e}", "error")
+            return False
 
+        # Write Ruby file
+        try:
+            ruby_content = "GENOME_BROWSER_MAP = {\n"
+            for fname, url in sorted(mapping.items()):
+                ruby_content += f"  '{fname}' => '{url}',\n"
+            ruby_content += "}.freeze\n"
+
+            log_and_print(f"Writing Ruby content: {ruby_content[:100]}...")
+            with open(ruby_file, 'w') as f:
+                f.write(ruby_content)
+            log_and_print(f"Wrote Ruby file: {ruby_file} (size: {ruby_file.stat().st_size} bytes)")
+        except Exception as e:
+            log_and_print(f"Failed to write Ruby file: {e}", "error")
+            return False
+
+        # Final verification
+        if not json_file.exists() or not ruby_file.exists():
+            log_and_print("One or both files missing after writing!", "error")
+            log_and_print(f"JSON exists: {json_file.exists()}", "error")
+            log_and_print(f"Ruby exists: {ruby_file.exists()}", "error")
+            return False
+
+        log_and_print("✓ Successfully updated both mapping files")
         return True
 
     except Exception as e:
-        logger.error(f"Failed to update genome browser mapping: {str(e)}", exc_info=True)
+        log_and_print(f"Failed to update mapping: {str(e)}", "error")
         return False
