@@ -16,6 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from shutil import rmtree
 from subprocess import PIPE, Popen
+from typing import Any, Dict, List, Optional, Tuple
 
 import click
 import yaml
@@ -30,6 +31,7 @@ from utils import (
     needs_parse_seqids,
     s3_sync,
     slack_message,
+    setup_detailed_logger as setup_logger,
 )
 
 console = Console()
@@ -231,20 +233,13 @@ def process_files(
     db_list: Optional[List[str]] = None,
     check_only: bool = False,
     store_files: bool = False,
+    cleanup: bool = False,
 ) -> None:
     """
     Process configuration files with enhanced logging.
-
-    Args:
-        config_yaml: Path to YAML config file
-        input_json: Path to JSON config file
-        environment: Deployment environment
-        db_list: List of specific databases to process
-        check_only: Whether to only check parse_seqids
-        store_files: Whether to store original files
     """
     LOGGER.info("Starting configuration file processing")
-    LOGGER.info(f"Parameters: check_only={check_only}, store_files={store_files}")
+    LOGGER.info(f"Parameters: check_only={check_only}, store_files={store_files}, cleanup={cleanup}")
 
     try:
         if config_yaml:
@@ -271,6 +266,7 @@ def process_files(
                             db_list,
                             check_only,
                             store_files,
+                            cleanup
                         )
                     else:
                         LOGGER.warning(f"JSON file not found: {json_file}")
@@ -283,13 +279,12 @@ def process_files(
         elif input_json:
             LOGGER.info(f"Processing single JSON file: {input_json}")
             process_json_entries(
-                input_json, environment, None, db_list, check_only, store_files
+                input_json, environment, None, db_list, check_only, store_files, cleanup
             )
 
     except Exception as e:
         LOGGER.error(f"Failed to process configuration files: {str(e)}", exc_info=True)
         raise
-
 
 def process_json_entries(
     json_file: str,
@@ -298,6 +293,7 @@ def process_json_entries(
     db_list: Optional[List[str]] = None,
     check_only: bool = False,
     store_files: bool = False,
+    cleanup: bool = True,
 ) -> bool:
     """
     Process entries from a JSON configuration file with enhanced logging.
@@ -305,10 +301,11 @@ def process_json_entries(
     Args:
         json_file: Path to JSON config file
         environment: Deployment environment
-        mod: Model organism database identifier
-        db_list: List of specific databases to process
+        mod: Model organism database identifier (optional)
+        db_list: List of specific databases to process (optional)
         check_only: Whether to only check parse_seqids
         store_files: Whether to store original files
+        cleanup: Whether to clean up FASTA files after processing (defaults to True)
 
     Returns:
         bool: Success status
@@ -316,7 +313,8 @@ def process_json_entries(
     start_time = datetime.now()
     LOGGER.info(f"Processing JSON entries from: {json_file}")
     LOGGER.info(
-        f"Environment: {environment}, Check only: {check_only}, Store files: {store_files}"
+        f"Environment: {environment}, Check only: {check_only}, "
+        f"Store files: {store_files}, Cleanup: {cleanup}"
     )
 
     try:
@@ -365,6 +363,11 @@ def process_json_entries(
                     exc_info=True,
                 )
 
+        # Clean up all FASTA files after processing all entries if cleanup is enabled
+        if cleanup and not check_only:
+            LOGGER.info("Starting post-processing cleanup")
+            cleanup_fasta_files(Path("../data"), LOGGER)
+
         # Log summary
         duration = datetime.now() - start_time
         LOGGER.info(f"\nJSON processing summary:")
@@ -381,7 +384,6 @@ def process_json_entries(
             f"Failed to process JSON file {json_file}: {str(e)}", exc_info=True
         )
         return False
-
 
 def process_entry(
     entry: Dict,
@@ -525,12 +527,11 @@ def process_entry(
 @click.option("-j", "--input_json", help="JSON file input coordinates")
 @click.option("-e", "--environment", help="Environment", default="dev")
 @click.option("-m", "--mod", help="Model organism")
-@click.option(
-    "-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=False
-)
+@click.option("-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=False)
 @click.option("-u", "--update-slack", help="Update Slack", is_flag=True, default=False)
 @click.option("-s3", "--sync-s3", help="Sync to S3", is_flag=True, default=False)
 @click.option("--store-files", help="Store original files", is_flag=True, default=False)
+@click.option("-cl", "--cleanup", help="Clean up FASTA files after processing", is_flag=True, default=True)
 @click.option(
     "-d",
     "--db_names",
@@ -561,6 +562,7 @@ def create_dbs(
     update_slack: bool,
     sync_s3: bool,
     store_files: bool,
+    cleanup: bool,
     db_names: Optional[str],
     list_dbs: bool,
     check_parse_seqids: bool,
@@ -571,7 +573,7 @@ def create_dbs(
     start_time = datetime.now()
     LOGGER.info("Starting BLAST database creation process")
     LOGGER.info(
-        f"Parameters: environment={environment}, mod={mod}, store_files={store_files}"
+        f"Parameters: environment={environment}, mod={mod}, store_files={store_files}, cleanup={cleanup}"
     )
 
     try:
@@ -599,12 +601,12 @@ def create_dbs(
         if config_yaml:
             LOGGER.info(f"Processing YAML config: {config_yaml}")
             process_files(
-                config_yaml, None, None, db_list, check_parse_seqids, store_files
+                config_yaml, None, None, db_list, check_parse_seqids, store_files, cleanup
             )
         elif input_json:
             LOGGER.info(f"Processing JSON config: {input_json}")
             process_files(
-                None, input_json, environment, db_list, check_parse_seqids, store_files
+                None, input_json, environment, db_list, check_parse_seqids, store_files, cleanup
             )
 
         if update_slack and not check_parse_seqids:

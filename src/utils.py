@@ -17,7 +17,7 @@ from ftplib import FTP
 from pathlib import Path
 from shutil import copyfile
 from subprocess import PIPE, Popen
-from typing import Any
+from typing import Any, Dict, List, Optional
 
 import wget
 from dotenv import dotenv_values
@@ -89,8 +89,47 @@ def store_fasta_files(fasta_file: str, logger, store_files: bool = False) -> Non
 
     except Exception as e:
         logger.error(f"Failed to store file {fasta_file}: {str(e)}", exc_info=True)
-        raise
+        # Don't raise the exception - make storage truly optional
+        logger.warning("Continuing process despite storage failure")
 
+
+def cleanup_fasta_files(data_dir: Path, logger) -> None:
+    """
+    Cleans up all FASTA files in the specified directory after database generation.
+
+    Args:
+        data_dir (Path): Directory containing FASTA files
+        logger (logging.Logger): Logger instance
+    """
+    logger.info(f"Starting cleanup of FASTA files in {data_dir}")
+
+    try:
+        # Find all FASTA files (both gzipped and uncompressed)
+        fasta_files = list(data_dir.glob("*.fa*")) + list(data_dir.glob("*.fasta*")) + list(data_dir.glob("*.fna*"))
+
+        if not fasta_files:
+            logger.info("No FASTA files found for cleanup")
+            return
+
+        logger.info(f"Found {len(fasta_files)} FASTA files to clean up")
+
+        for fasta_file in fasta_files:
+            try:
+                file_size = fasta_file.stat().st_size
+                logger.info(f"Removing {fasta_file.name} (size: {file_size:,} bytes)")
+                fasta_file.unlink()
+                logger.info(f"Successfully removed {fasta_file.name}")
+            except Exception as e:
+                logger.error(f"Failed to remove {fasta_file.name}: {str(e)}")
+                # Continue with other files even if one fails
+                continue
+
+        logger.info("FASTA file cleanup completed")
+
+    except Exception as e:
+        logger.error(f"Error during FASTA cleanup: {str(e)}", exc_info=True)
+        # Don't raise the exception - cleanup should be non-blocking
+        logger.warning("Cleanup process encountered errors but continuing")
 
 def extendable_logger(log_name, file_name, level=logging.INFO) -> Any:
     """
