@@ -12,6 +12,7 @@ Date: started September 2023
 import hashlib
 import json
 import logging
+import re
 from datetime import datetime
 from ftplib import FTP
 from pathlib import Path
@@ -593,24 +594,24 @@ def needs_parse_seqids(fasta_file: str) -> bool:
     return False
 
 
-# Add to utils.py
 def process_entry(entry, mod_code, file_logger, environment=None, check_only=False):
-    """
-    Process a single database entry by downloading, checking, and optionally creating the database.
-
-    Parameters:
-    entry (dict): Database entry configuration
-    mod_code (str): Model organism code
-    file_logger (logging.Logger): Logger instance
-    environment (str, optional): Environment name, needed for database creation
-    check_only (bool): If True, only check parse_seqids without creating database
-    """
+    """Helper function to process a single database entry"""
     fasta_file = Path(entry["uri"]).name
     unzipped_fasta = f"../data/{fasta_file.replace('.gz', '')}"
 
+    # Only show checking message if in check mode
+    if check_only:
+        console.log(f"\n[bold]Checking {entry['blast_title']}[/bold]")
+
     # Download and verify the file
-    if not get_files_ftp(entry["uri"], entry["md5sum"], file_logger):
-        console.log(f"[red]Error downloading {fasta_file}[/red]")
+    if entry["uri"].startswith('ftp://'):
+        success = get_files_ftp(entry["uri"], entry["md5sum"], file_logger, mod=mod_code)
+    else:
+        success = get_files_http(entry["uri"], entry["md5sum"], file_logger, mod=mod_code)
+
+    if not success:
+        if check_only:
+            console.log(f"[red]Could not download {fasta_file} - skipping check[/red]")
         return
 
     # Unzip if needed
@@ -619,18 +620,17 @@ def process_entry(entry, mod_code, file_logger, environment=None, check_only=Fal
         p = Popen(unzip_command, shell=True, stdout=PIPE, stderr=PIPE)
         p.wait()
 
-    # Check if parse_seqids is needed
-    needs_parse = needs_parse_seqids(unzipped_fasta)
-    status = "requires" if needs_parse else "does not require"
-    console.log(f"{entry['blast_title']}: {status} -parse_seqids")
-    file_logger.info(f"{entry['blast_title']}: {status} -parse_seqids")
+    # Check parse_seqids requirement
+    if Path(unzipped_fasta).exists():
+        needs_parse = needs_parse_seqids(unzipped_fasta)
+        if check_only:
+            status = "[green]requires[/green]" if needs_parse else "[yellow]does not require[/yellow]"
+            console.log(f"{entry['blast_title']}: {status} -parse_seqids")
 
     # Clean up if we're only checking
     if check_only:
         if Path(unzipped_fasta).exists():
             Path(unzipped_fasta).unlink()
-            file_logger.info(f"Removed {fasta_file.replace('.gz', '')}")
-        return
 
     # If not check_only, proceed with database creation
     if not check_only:
@@ -716,62 +716,8 @@ def process_files(config_yaml, input_json, environment, db_list=None, check_only
         process_json_entries(input_json, environment, None, db_list, check_only)
 
 
-def get_files_ftp(fasta_uri, md5sum, file_logger) -> bool:
-    """
-    Function to download files from an FTP site.
-
-    Parameters:
-    fasta_uri (str): The URI of the FASTA file that needs to be downloaded.
-    md5sum (str): The MD5 checksum of the file.
-    file_logger (logging.Logger): The logger object used for logging the process of downloading the files.
-
-    Returns:
-    bool: True if the file was successfully downloaded and the MD5 checksum matches, False otherwise.
-    """
-
-    # Log the start of the download process
-    file_logger.info(f"Downloading {fasta_uri}")
-
-    # Get the current date in the format "YYYY_MMM_DD"
-    today_date = datetime.now().strftime("%Y_%b_%d")
-    try:
-        # Log the download process
-        console.log(f"Downloading {fasta_uri}")
-
-        # Define the path where the downloaded file will be stored
-        fasta_file = f"../data/{Path(fasta_uri).name}"
-        fasta_name = f"{Path(fasta_uri).name}"
-
-        # Log the path where the file will be stored
-        console.log(f"Saving to {fasta_file}")
-        file_logger.info(f"Saving to {fasta_file}")
-
-        # If the file does not already exist, download it and store it
-        if not Path(f"../data/database_{today_date}/{fasta_name}").exists():
-            wget.download(fasta_uri, fasta_file)
-            store_fasta_files(fasta_file, file_logger)
-        else:
-            # If the file already exists, log this information and return False
-            console.log(f"{fasta_name} already processed")
-            file_logger.info(f"{fasta_file} already processed")
-            return False
-
-        # Check the MD5 checksum of the downloaded file
-        if check_md5sum(fasta_file, md5sum):
-            # If the checksum is correct, return True
-            return True
-        else:
-            # If the MD5 checksum does not match, log this information
-            file_logger.info("MD5sums do not match")
-    except Exception as e:
-        # If an error occurs during the download process, log the error and return False
-        console.log(f"Error downloading {fasta_uri}: {e}")
-        return False
-
-    return True
-
-
-def get_files_http(file_uri, md5sum, file_logger) -> bool:
+# In utils.py
+def get_files_http(file_uri, md5sum, file_logger, mod=None) -> bool:
     """
     Function to download files from an HTTP/HTTPS site.
 
@@ -779,9 +725,10 @@ def get_files_http(file_uri, md5sum, file_logger) -> bool:
     file_uri (str): The URI of the file that needs to be downloaded.
     md5sum (str): The MD5 checksum of the file.
     file_logger (logging.Logger): The logger object used for logging the process.
+    mod (str, optional): Model organism identifier to determine if MD5 check should be skipped.
 
     Returns:
-    bool: True if the file was successfully downloaded and verified, False otherwise.
+    bool: True if the file was successfully downloaded and verified (unless verification is skipped), False otherwise.
     """
     today_date = datetime.now().strftime("%Y_%b_%d")
     try:
@@ -799,6 +746,12 @@ def get_files_http(file_uri, md5sum, file_logger) -> bool:
             file_logger.info(f"{file_name} already processed")
             return False
 
+        # Skip MD5 check for ZFIN
+        if mod == "ZFIN":
+            file_logger.info("Skipping MD5 check for ZFIN")
+            console.log("Skipping MD5 check for ZFIN")
+            return True
+
         if check_md5sum(file_name, md5sum):
             return True
         else:
@@ -807,6 +760,52 @@ def get_files_http(file_uri, md5sum, file_logger) -> bool:
 
     except Exception as e:
         console.log(f"Error downloading {file_uri}: {e}")
+        return False
+
+
+def get_files_ftp(fasta_uri, md5sum, file_logger, mod=None) -> bool:
+    """
+    Function to download files from an FTP site.
+
+    Parameters:
+    fasta_uri (str): The URI of the file that needs to be downloaded.
+    md5sum (str): The MD5 checksum of the file.
+    file_logger (logging.Logger): The logger object used for logging the process.
+    mod (str, optional): Model organism identifier to determine if MD5 check should be skipped.
+
+    Returns:
+    bool: True if the file was successfully downloaded and verified (unless verification is skipped), False otherwise.
+    """
+    today_date = datetime.now().strftime("%Y_%b_%d")
+    try:
+        console.log(f"Downloading {fasta_uri}")
+        fasta_file = f"../data/{Path(fasta_uri).name}"
+        fasta_name = f"{Path(fasta_uri).name}"
+
+        console.log(f"Saving to {fasta_file}")
+        file_logger.info(f"Saving to {fasta_file}")
+
+        if not Path(f"../data/database_{today_date}/{fasta_name}").exists():
+            wget.download(fasta_uri, fasta_file)
+            store_fasta_files(fasta_file, file_logger)
+        else:
+            console.log(f"{fasta_name} already processed")
+            file_logger.info(f"{fasta_file} already processed")
+            return False
+
+        # Skip MD5 check for ZFIN
+        if mod == "ZFIN":
+            file_logger.info("Skipping MD5 check for ZFIN")
+            console.log("Skipping MD5 check for ZFIN")
+            return True
+
+        if check_md5sum(fasta_file, md5sum):
+            return True
+        else:
+            file_logger.info("MD5sums do not match")
+            return False
+    except Exception as e:
+        console.log(f"Error downloading {fasta_uri}: {e}")
         return False
 
     return True

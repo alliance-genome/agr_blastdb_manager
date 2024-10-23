@@ -22,16 +22,15 @@ import yaml
 from dotenv import dotenv_values
 from rich.console import Console
 
-from utils import (check_md5sum, check_output,  # Added imports
-                   extendable_logger, get_files_ftp, get_files_http,
-                   get_mod_from_json, list_databases_from_config,
-                   needs_parse_seqids, process_files, s3_sync, slack_message,
-                   store_fasta_files)
+from utils import check_output  # Added imports
+from utils import (check_md5sum, extendable_logger, get_files_ftp,
+                   get_files_http, get_mod_from_json,
+                   list_databases_from_config, needs_parse_seqids,
+                   process_files, s3_sync, slack_message, store_fasta_files)
 
 console = Console()
 
 slack_messages = []
-
 
 
 def create_db_structure(environment, mod, config_entry, file_logger) -> tuple[str, str]:
