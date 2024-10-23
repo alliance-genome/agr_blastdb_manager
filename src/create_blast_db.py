@@ -23,10 +23,10 @@ import yaml
 
 from terminal import (create_progress, log_error, print_header, print_status,
                       show_summary)
-from utils import cleanup_fasta_files  # Add this import
 from utils import (check_output, extendable_logger, get_files_ftp,
                    get_files_http, get_mod_from_json, needs_parse_seqids,
-                   s3_sync, setup_detailed_logger, slack_message, copy_config_file, update_genome_browser_map)
+                   s3_sync, setup_detailed_logger, slack_message, copy_config_file,
+                   cleanup_fasta_files, update_genome_browser_map)
 
 # Global variables
 SLACK_MESSAGES: List[Dict[str, str]] = []
@@ -89,14 +89,6 @@ def create_db_structure(
 def run_makeblastdb(config_entry: Dict, output_dir: str, logger) -> bool:
     """
     Runs the makeblastdb command to create a BLAST database.
-
-    Args:
-        config_entry: Configuration dictionary containing database details
-        output_dir: Directory where the database will be created
-        logger: Logger instance for tracking operations
-
-    Returns:
-        bool: True if database creation was successful, False otherwise
     """
     start_time = datetime.now()
     fasta_file = Path(config_entry["uri"]).name
@@ -106,18 +98,10 @@ def run_makeblastdb(config_entry: Dict, output_dir: str, logger) -> bool:
     logger.info(f"Configuration: {json.dumps(config_entry, indent=2)}")
 
     try:
-        # Unzip if necessary
+        # Check if unzipped FASTA exists
         if not Path(unzipped_fasta).exists():
-            logger.info(f"Unzipping {fasta_file}")
-            unzip_command = f"gunzip -v ../data/{fasta_file}"
-            p = Popen(unzip_command, shell=True, stdout=PIPE, stderr=PIPE)
-            stdout, stderr = p.communicate()
-
-            if p.returncode != 0:
-                logger.error(f"Unzip failed: {stderr.decode('utf-8')}")
-                return False
-
-            logger.info("File unzipped successfully")
+            logger.error(f"Unzipped FASTA file not found: {unzipped_fasta}")
+            return False
 
         # Check for parse_seqids requirement
         parse_ids_flag = ""
@@ -146,51 +130,50 @@ def run_makeblastdb(config_entry: Dict, output_dir: str, logger) -> bool:
 
         # Log command output
         if stdout:
-            logger.debug(f"makeblastdb stdout: {stdout.decode('utf-8')}")
+            stdout_str = stdout.decode('utf-8')
+            logger.info(f"makeblastdb stdout: {stdout_str}")
         if stderr:
-            logger.debug(f"makeblastdb stderr: {stderr.decode('utf-8')}")
+            stderr_str = stderr.decode('utf-8')
+            logger.warning(f"makeblastdb stderr: {stderr_str}")
 
-        if check_output(stdout, stderr):
-            duration = datetime.now() - start_time
-            logger.info(f"makeblastdb completed successfully in {duration}")
-
-            # Update genome browser mapping if applicable
-            if "genome_browser" in config_entry:
-                logger.info("Updating genome browser mapping")
-                if update_genome_browser_map(config_entry, mod, environment, logger):
-                    logger.info("Genome browser mapping updated successfully")
-                else:
-                    logger.error("Failed to update genome browser mapping")
-
-            # Clean up unzipped file
-            if Path(unzipped_fasta).exists():
-                file_size = Path(unzipped_fasta).stat().st_size
-                logger.info(
-                    f"Cleaning up unzipped file: {unzipped_fasta} (size: {file_size} bytes)"
-                )
-                Path(unzipped_fasta).unlink()
-
-            # Clean up original gzipped file
-            original_gzip = f"../data/{fasta_file}"
-            if Path(original_gzip).exists():
-                file_size = Path(original_gzip).stat().st_size
-                logger.info(
-                    f"Cleaning up original gzipped file: {original_gzip} (size: {file_size} bytes)"
-                )
-                Path(original_gzip).unlink()
-
-            return True
-
-        else:
-            logger.error("makeblastdb command failed")
-            logger.error(f"stderr: {stderr.decode('utf-8')}")
-            rmtree(output_dir)
+        if p.returncode != 0:
+            logger.error(f"makeblastdb command failed with return code {p.returncode}")
+            logger.error(f"Command: {makeblast_command}")
+            logger.error(f"Error output: {stderr.decode('utf-8')}")
+            print_status(f"makeblastdb error: {stderr.decode('utf-8')}", "error")
+            if Path(output_dir).exists():
+                rmtree(output_dir)
             return False
+
+        logger.info("makeblastdb completed successfully")
+        duration = datetime.now() - start_time
+        logger.info(f"Process completed in {duration}")
+
+        # Clean up unzipped file
+        if Path(unzipped_fasta).exists():
+            file_size = Path(unzipped_fasta).stat().st_size
+            logger.info(
+                f"Cleaning up unzipped file: {unzipped_fasta} (size: {file_size} bytes)"
+            )
+            Path(unzipped_fasta).unlink()
+
+        # Clean up original gzipped file
+        original_gzip = f"../data/{fasta_file}"
+        if Path(original_gzip).exists():
+            file_size = Path(original_gzip).stat().st_size
+            logger.info(
+                f"Cleaning up original gzipped file: {original_gzip} (size: {file_size} bytes)"
+            )
+            Path(original_gzip).unlink()
+
+        return True
 
     except Exception as e:
         logger.error(f"Error in makeblastdb process: {str(e)}", exc_info=True)
+        print_status(f"makeblastdb error: {str(e)}", "error")
+        if Path(output_dir).exists():
+            rmtree(output_dir)
         return False
-
 
 def list_databases_from_config(config_file: str) -> None:
     """
