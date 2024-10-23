@@ -9,26 +9,21 @@ Author: Paulo Nuin, Adam Wright
 Date: started September 2023
 """
 
-import gzip
 import hashlib
-import json
 import logging
 import re
 from datetime import datetime
 from ftplib import FTP
-from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from shutil import copyfile
 from subprocess import PIPE, Popen
 from typing import Any
 
 import wget
-import yaml
 from dotenv import dotenv_values
 from rich.console import Console
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
-from slack_sdk.webhook import WebhookClient
 
 console = Console()
 
@@ -36,18 +31,65 @@ console = Console()
 MODS = ["FB", "SGD", "WB", "XB", "ZFIN"]
 
 
-def store_fasta_files(fasta_file, file_logger) -> None:
+def setup_detailed_logger(
+    log_name: str, file_name: str, level=logging.INFO
+) -> logging.Logger:
     """
-    Function to store the downloaded FASTA files in a specific directory.
+    Creates a detailed logger with comprehensive formatting.
     """
+    formatter = logging.Formatter(
+        "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    logger = logging.getLogger(log_name)
+    logger.setLevel(level)
+
+    # Prevent duplicate handlers
+    if logger.handlers:
+        return logger
+
+    # File handler
+    handler = logging.FileHandler(file_name)
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+    return logger
+
+
+def store_fasta_files(fasta_file: str, logger, store_files: bool = False) -> None:
+    """
+    Stores FASTA files in a dated directory if storage is enabled.
+
+    Args:
+        fasta_file (str): Path to the FASTA file
+        logger (logging.Logger): Logger instance
+        store_files (bool): Whether to store the file
+    """
+    if not store_files:
+        logger.info(f"File storage disabled, skipping storage of {fasta_file}")
+        return
+
     date_to_add = datetime.now().strftime("%Y_%b_%d")
     original_files_store = Path(f"../data/database_{date_to_add}")
 
-    if not Path(original_files_store).exists():
-        console.log(f"Creating {original_files_store}")
-        Path(original_files_store).mkdir(parents=True, exist_ok=True)
+    try:
+        if not original_files_store.exists():
+            logger.info(f"Creating storage directory: {original_files_store}")
+            original_files_store.mkdir(parents=True, exist_ok=True)
 
-    copyfile(fasta_file, original_files_store / Path(fasta_file).name)
+        file_size = Path(fasta_file).stat().st_size
+        dest_path = original_files_store / Path(fasta_file).name
+
+        logger.info(
+            f"Storing file {fasta_file} (size: {file_size} bytes) to {dest_path}"
+        )
+        copyfile(fasta_file, dest_path)
+        logger.info(f"File stored successfully")
+
+    except Exception as e:
+        logger.error(f"Failed to store file {fasta_file}: {str(e)}", exc_info=True)
+        raise
 
 
 def extendable_logger(log_name, file_name, level=logging.INFO) -> Any:
@@ -64,42 +106,43 @@ def extendable_logger(log_name, file_name, level=logging.INFO) -> Any:
     return specified_logger
 
 
-def check_md5sum(fasta_file, md5sum) -> bool:
+def check_md5sum(fasta_file: str, expected_md5: str, logger) -> bool:
     """
-    Checks the MD5 checksum of a downloaded file.
+    Checks MD5 checksum of a file with detailed logging.
+
+    Args:
+        fasta_file (str): Path to the file
+        expected_md5 (str): Expected MD5 checksum
+        logger (logging.Logger): Logger instance
+
+    Returns:
+        bool: True if checksums match, False otherwise
     """
-    downloaded_md5sum = hashlib.md5(open(fasta_file, "rb").read()).hexdigest()
-    if downloaded_md5sum != md5sum:
-        console.log(f"MD5sums do not match: {md5sum} != {downloaded_md5sum}")
+    logger.info(f"Calculating MD5 checksum for {fasta_file}")
+    try:
+        with open(fasta_file, "rb") as f:
+            file_size = Path(fasta_file).stat().st_size
+            logger.info(f"File size: {file_size} bytes")
+
+            # Calculate MD5
+            start_time = datetime.now()
+            calculated_md5 = hashlib.md5(f.read()).hexdigest()
+            duration = datetime.now() - start_time
+
+            logger.info(f"MD5 calculation completed in {duration}")
+            logger.info(f"Expected MD5: {expected_md5}")
+            logger.info(f"Calculated MD5: {calculated_md5}")
+
+            if calculated_md5 != expected_md5:
+                logger.error("MD5 checksums do not match")
+                return False
+
+            logger.info("MD5 checksums match")
+            return True
+
+    except Exception as e:
+        logger.error(f"MD5 checksum verification failed: {str(e)}", exc_info=True)
         return False
-
-    console.log(f"MD5sums match: {md5sum} {downloaded_md5sum}")
-    return True
-
-
-def get_ftp_file_size(fasta_uri, file_logger) -> int:
-    """
-    Function to get the size of a file on an FTP server.
-    """
-    size = 0
-    ftp = FTP(Path(fasta_uri).parts[1])
-    ftp.login()
-    ftp.cwd("/".join(Path(fasta_uri).parts[2:-1]))
-    filename = Path(fasta_uri).name
-
-    if filename is not None:
-        size = ftp.size(filename)
-        if size is not None:
-            console.log(f"File size is {size} bytes")
-            file_logger.info(f"File size is {size} bytes")
-        else:
-            console.log("Error: File size is not available.")
-            return 0
-    else:
-        console.log("Error: Filename is None.")
-        return 0
-
-    return size
 
 
 def get_mod_from_json(input_json) -> str:
@@ -317,78 +360,226 @@ def needs_parse_seqids(fasta_file: str) -> bool:
     return False
 
 
-def get_files_http(file_uri, md5sum, file_logger, mod=None) -> bool:
+def get_files_http(
+    file_uri: str,
+    md5sum: str,
+    logger,
+    mod: Optional[str] = None,
+    store_files: bool = False,
+) -> bool:
     """
-    Function to download files from an HTTP/HTTPS site.
+    Downloads files from HTTP/HTTPS sites with comprehensive logging.
     """
-    today_date = datetime.now().strftime("%Y_%b_%d")
+    start_time = datetime.now()
+    logger.info(f"Starting HTTP download from: {file_uri}")
+
     try:
-        console.log(f"Downloading {file_uri}")
         file_name = f"../data/{Path(file_uri).name}"
+        logger.info(f"Download target: {file_name}")
 
-        console.log(f"Saving to {file_name}")
-        file_logger.info(f"Saving to {file_name}")
+        # Download file
+        download_start = datetime.now()
+        wget.download(file_uri, file_name)
+        download_duration = datetime.now() - download_start
 
-        if not Path(f"../data/database_{today_date}/{Path(file_uri).name}").exists():
-            wget.download(file_uri, file_name)
-            store_fasta_files(file_name, file_logger)
+        # Log download statistics
+        file_size = Path(file_name).stat().st_size
+        logger.info(
+            f"Download completed | Size: {file_size} bytes | "
+            f"Duration: {download_duration} | "
+            f"Speed: {file_size / download_duration.total_seconds() / 1024:.2f} KB/s"
+        )
+
+        # Store file if requested
+        if store_files:
+            logger.info(f"Storing original file (store_files=True)")
+            store_fasta_files(file_name, logger)
+
+        # Verify checksum
+        if mod != "ZFIN":
+            logger.info(f"Verifying MD5 checksum: expected={md5sum}")
+            if not check_md5sum(file_name, md5sum):
+                logger.error("MD5 checksum verification failed")
+                return False
+            logger.info("MD5 checksum verified successfully")
         else:
-            console.log(f"{Path(file_uri).name} already processed")
-            file_logger.info(f"{file_name} already processed")
-            return False
+            logger.info("Skipping MD5 check for ZFIN")
 
-        if mod == "ZFIN":
-            file_logger.info("Skipping MD5 check for ZFIN")
-            console.log("Skipping MD5 check for ZFIN")
-            return True
-
-        if check_md5sum(file_name, md5sum):
-            return True
-        else:
-            file_logger.info("MD5sums do not match")
-            return False
+        return True
 
     except Exception as e:
-        console.log(f"Error downloading {file_uri}: {e}")
+        logger.error(f"Download failed: {str(e)}", exc_info=True)
         return False
 
 
-def get_files_ftp(fasta_uri, md5sum, file_logger, mod=None) -> bool:
+def get_files_ftp(
+    fasta_uri: str,
+    md5sum: str,
+    logger,
+    mod: Optional[str] = None,
+    store_files: bool = False,
+) -> bool:
     """
-    Function to download files from an FTP site.
+    Downloads files from FTP sites with comprehensive logging and optional storage.
+
+    Args:
+        fasta_uri (str): FTP URI of the file to download
+        md5sum (str): Expected MD5 checksum
+        logger (logging.Logger): Logger instance
+        mod (Optional[str]): Model organism database identifier
+        store_files (bool): Whether to store the original file
+
+    Returns:
+        bool: Success status of the download operation
     """
-    today_date = datetime.now().strftime("%Y_%b_%d")
+    start_time = datetime.now()
+    logger.info(f"Starting FTP download from: {fasta_uri}")
+
     try:
-        console.log(f"Downloading {fasta_uri}")
+        # Parse FTP URI components
+        ftp_host = Path(fasta_uri).parts[1]
+        ftp_path = "/".join(Path(fasta_uri).parts[2:-1])
         fasta_file = f"../data/{Path(fasta_uri).name}"
-        fasta_name = f"{Path(fasta_uri).name}"
+        fasta_name = Path(fasta_uri).name
 
-        console.log(f"Saving to {fasta_file}")
-        file_logger.info(f"Saving to {fasta_file}")
+        logger.info(f"FTP Details:")
+        logger.info(f"  Host: {ftp_host}")
+        logger.info(f"  Path: {ftp_path}")
+        logger.info(f"  File: {fasta_name}")
+        logger.info(f"Local target: {fasta_file}")
 
-        if not Path(f"../data/database_{today_date}/{fasta_name}").exists():
+        # Check if file already exists in storage
+        if store_files:
+            date_to_add = datetime.now().strftime("%Y_%b_%d")
+            stored_path = Path(f"../data/database_{date_to_add}/{fasta_name}")
+            if stored_path.exists():
+                logger.info(f"File already exists in storage: {stored_path}")
+                return False
+
+        # Get remote file size
+        try:
+            remote_size = get_ftp_file_size(fasta_uri, logger)
+            logger.info(f"Remote file size: {remote_size:,} bytes")
+        except Exception as e:
+            logger.warning(f"Could not get remote file size: {str(e)}")
+            remote_size = None
+
+        # Download file
+        download_start = datetime.now()
+        logger.info("Starting file download")
+
+        try:
             wget.download(fasta_uri, fasta_file)
-            store_fasta_files(fasta_file, file_logger)
-        else:
-            console.log(f"{fasta_name} already processed")
-            file_logger.info(f"{fasta_file} already processed")
+            download_duration = datetime.now() - download_start
+
+            # Verify downloaded file
+            if Path(fasta_file).exists():
+                local_size = Path(fasta_file).stat().st_size
+                logger.info(
+                    f"Download completed:\n"
+                    f"  Duration: {download_duration}\n"
+                    f"  Local size: {local_size:,} bytes\n"
+                    f"  Speed: {local_size / download_duration.total_seconds() / 1024:.2f} KB/s"
+                )
+
+                # Verify size if remote size is known
+                if remote_size and remote_size != local_size:
+                    logger.error(
+                        f"Size mismatch - Remote: {remote_size:,} bytes, Local: {local_size:,} bytes"
+                    )
+                    return False
+            else:
+                logger.error("Downloaded file not found")
+                return False
+
+        except Exception as e:
+            logger.error(f"Download failed: {str(e)}", exc_info=True)
             return False
 
+        # Store file if requested
+        if store_files:
+            logger.info(f"Storing original file (store_files=True)")
+            try:
+                store_fasta_files(fasta_file, logger, store_files)
+                logger.info(f"File stored successfully")
+            except Exception as e:
+                logger.error(f"File storage failed: {str(e)}", exc_info=True)
+                return False
+
+        # Skip MD5 check for ZFIN
         if mod == "ZFIN":
-            file_logger.info("Skipping MD5 check for ZFIN")
-            console.log("Skipping MD5 check for ZFIN")
+            logger.info("Skipping MD5 check for ZFIN")
             return True
 
-        if check_md5sum(fasta_file, md5sum):
+        # Verify MD5 checksum
+        logger.info(f"Verifying MD5 checksum: expected={md5sum}")
+        if check_md5sum(fasta_file, md5sum, logger):
+            logger.info("MD5 checksum verification successful")
+
+            # Log overall success
+            duration = datetime.now() - start_time
+            logger.info(
+                f"FTP download and verification completed successfully in {duration}"
+            )
             return True
         else:
-            file_logger.info("MD5sums do not match")
+            logger.error(
+                f"MD5 checksum verification failed:\n"
+                f"  File: {fasta_file}\n"
+                f"  Expected: {md5sum}"
+            )
             return False
 
     except Exception as e:
-        console.log(f"Error downloading {fasta_uri}: {e}")
+        logger.error(
+            f"FTP download process failed:\n"
+            f"  URI: {fasta_uri}\n"
+            f"  Error: {str(e)}",
+            exc_info=True,
+        )
         return False
 
+
+def get_ftp_file_size(fasta_uri: str, logger) -> int:
+    """
+    Gets the size of a file on an FTP server with enhanced logging.
+
+    Args:
+        fasta_uri (str): FTP URI of the file
+        logger (logging.Logger): Logger instance
+
+    Returns:
+        int: Size of the file in bytes
+    """
+    logger.info(f"Getting file size from FTP: {fasta_uri}")
+
+    try:
+        # Parse FTP URI
+        ftp_host = Path(fasta_uri).parts[1]
+        ftp_path = "/".join(Path(fasta_uri).parts[2:-1])
+        filename = Path(fasta_uri).name
+
+        logger.info(f"Connecting to FTP server: {ftp_host}")
+
+        # Connect to FTP server
+        ftp = FTP(ftp_host)
+        ftp.login()
+
+        logger.info(f"Navigating to directory: {ftp_path}")
+        ftp.cwd(ftp_path)
+
+        # Get file size
+        size = ftp.size(filename)
+
+        if size is not None:
+            logger.info(f"File size retrieved: {size:,} bytes")
+            ftp.quit()
+            return size
+        else:
+            logger.error("File size not available")
+            ftp.quit()
+            return 0
+
     except Exception as e:
-        console.log(f"Error getting FTP file size: {e}")
+        logger.error(f"Failed to get FTP file size: {str(e)}", exc_info=True)
         return 0

@@ -11,9 +11,7 @@ Date: Started July 2023, Refactored [Current Date]
 
 import json
 import re
-import subprocess
 import sys
-import time
 from datetime import datetime
 from pathlib import Path
 from shutil import rmtree
@@ -21,18 +19,18 @@ from subprocess import PIPE, Popen
 
 import click
 import yaml
-from dotenv import load_dotenv
 from rich.console import Console
-from rich.panel import Panel
-from rich.progress import (BarColumn, Progress, SpinnerColumn, TaskID,
-                           TextColumn)
-from rich.style import Style
-from rich.table import Table
 
-from utils import (check_md5sum, check_output, extendable_logger,
-                   get_files_ftp, get_files_http, get_mod_from_json,
-                   needs_parse_seqids, s3_sync, slack_message,
-                   store_fasta_files)
+from utils import (
+    check_output,
+    extendable_logger,
+    get_files_ftp,
+    get_files_http,
+    get_mod_from_json,
+    needs_parse_seqids,
+    s3_sync,
+    slack_message,
+)
 
 console = Console()
 
@@ -41,67 +39,103 @@ SLACK_MESSAGES: List[Dict[str, str]] = []
 LOGGER = setup_logger("create_blast_db", "blast_db_creation.log")
 
 
-def create_db_structure(environment, mod, config_entry, file_logger) -> tuple[str, str]:
+def create_db_structure(
+    environment: str, mod: str, config_entry: Dict, logger
+) -> Tuple[str, str]:
     """
-    Function that creates the database and folder structure for storing the downloaded FASTA files.
+    Creates the database and folder structure for storing the BLAST databases.
+
+    Args:
+        environment: The deployment environment (dev, stage, prod)
+        mod: The model organism database identifier
+        config_entry: Configuration dictionary containing database details
+        logger: Logger instance for tracking operations
+
+    Returns:
+        Tuple containing paths to database and config directories
     """
+    start_time = datetime.now()
+    logger.info(
+        f"Starting database structure creation for {config_entry['blast_title']}"
+    )
+
     blast_title = config_entry["blast_title"]
     sanitized_blast_title = re.sub(r"\W+", "_", blast_title)
-    file_logger.info("Creating database structure")
 
-    if "seqcol" in config_entry.keys():
-        file_logger.info("seqcol found in config file")
-        p = f"../data/blast/{mod}/{environment}/databases/{config_entry['seqcol']}/{sanitized_blast_title}/"
+    # Determine the path based on config
+    if "seqcol" in config_entry:
+        db_path = f"../data/blast/{mod}/{environment}/databases/{config_entry['seqcol']}/{sanitized_blast_title}/"
+        logger.info(f"Using seqcol path structure: {db_path}")
     else:
-        file_logger.info("seqcol not found in config file")
-        p = (
+        db_path = (
             f"../data/blast/{mod}/{environment}/databases/{config_entry['genus']}/{config_entry['species']}/"
             f"{sanitized_blast_title.replace(' ', '_')}/"
         )
-    c = f"../data/config/{mod}/{environment}"
+        logger.info(f"Using species path structure: {db_path}")
 
-    Path(p).mkdir(parents=True, exist_ok=True)
-    Path(c).mkdir(parents=True, exist_ok=True)
+    config_path = f"../data/config/{mod}/{environment}"
 
-    console.log(f"Directory {p} created")
-    file_logger.info(f"Directory {p} created")
+    # Create directories
+    try:
+        Path(db_path).mkdir(parents=True, exist_ok=True)
+        Path(config_path).mkdir(parents=True, exist_ok=True)
+        logger.info(
+            f"Created directory structure - DB: {db_path}, Config: {config_path}"
+        )
+    except Exception as e:
+        logger.error(f"Failed to create directory structure: {str(e)}")
+        raise
 
-    return p, c
+    duration = datetime.now() - start_time
+    logger.info(f"Database structure creation completed in {duration}")
+
+    return db_path, config_path
 
 
-def run_makeblastdb(config_entry, output_dir, file_logger):
+def run_makeblastdb(config_entry: Dict, output_dir: str, logger) -> bool:
     """
-    This function runs the makeblastdb command to create a BLAST database.
+    Runs the makeblastdb command to create a BLAST database.
+
+    Args:
+        config_entry: Configuration dictionary containing database details
+        output_dir: Directory where the database will be created
+        logger: Logger instance for tracking operations
+
+    Returns:
+        bool: True if database creation was successful, False otherwise
     """
-    env = dotenv_values(f"{Path.cwd()}/.env")
+    start_time = datetime.now()
     fasta_file = Path(config_entry["uri"]).name
     unzipped_fasta = f"../data/{fasta_file.replace('.gz', '')}"
 
-    console.log(f"Running makeblastdb for {fasta_file}")
-    slack_messages.append(
-        {"title": "Running makeblastdb", "text": fasta_file, "color": "#36a64f"},
-    )
-    LOGGER.info(f"Directory {db_path} created")
-
-    if not Path(unzipped_fasta).exists():
-        file_logger.info(f"Unzipping {fasta_file}")
-        unzip_command = f"gunzip -v ../data/{fasta_file}"
-        p = Popen(unzip_command, shell=True, stdout=PIPE, stderr=PIPE)
-        p.wait()
-        console.log("Unzip: done\nEditing FASTA file")
-        file_logger.info(f"Unzipping {fasta_file}: done")
-
-    parse_ids_flag = ""
-    if needs_parse_seqids(unzipped_fasta):
-        parse_ids_flag = "-parse_seqids"
-        file_logger.info("FASTA headers require -parse_seqids flag")
-        console.log("FASTA headers require -parse_seqids flag")
-
-    blast_title = config_entry["blast_title"]
-    sanitized_blast_title = re.sub(r"\W+", "_", blast_title)
-    extensions = "".join(Path(fasta_file).suffixes)
+    logger.info(f"Starting makeblastdb process for {fasta_file}")
+    logger.info(f"Configuration: {json.dumps(config_entry, indent=2)}")
 
     try:
+        # Unzip if necessary
+        if not Path(unzipped_fasta).exists():
+            logger.info(f"Unzipping {fasta_file}")
+            unzip_command = f"gunzip -v ../data/{fasta_file}"
+            p = Popen(unzip_command, shell=True, stdout=PIPE, stderr=PIPE)
+            stdout, stderr = p.communicate()
+
+            if p.returncode != 0:
+                logger.error(f"Unzip failed: {stderr.decode('utf-8')}")
+                return False
+
+            logger.info("File unzipped successfully")
+
+        # Check for parse_seqids requirement
+        parse_ids_flag = ""
+        if needs_parse_seqids(unzipped_fasta):
+            parse_ids_flag = "-parse_seqids"
+            logger.info("FASTA headers require -parse_seqids flag")
+
+        # Prepare makeblastdb command
+        blast_title = config_entry["blast_title"]
+        sanitized_blast_title = re.sub(r"\W+", "_", blast_title)
+        extensions = "".join(Path(fasta_file).suffixes)
+
         makeblast_command = (
             f"makeblastdb -in {unzipped_fasta} -dbtype {config_entry['seqtype']} "
             f"-title '{sanitized_blast_title}' "
@@ -110,55 +144,49 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
             f"{parse_ids_flag}"
         ).strip()
 
-        file_logger.info(f"Running makeblastdb: {makeblast_command}")
-        console.log(f"Running makeblastdb:\n {makeblast_command}")
+        logger.info(f"Executing makeblastdb command: {makeblast_command}")
 
+        # Run makeblastdb
         p = Popen(makeblast_command, shell=True, stdout=PIPE, stderr=PIPE)
         stdout, stderr = p.communicate()
-        p.wait()
+
+        # Log command output
+        if stdout:
+            logger.debug(f"makeblastdb stdout: {stdout.decode('utf-8')}")
+        if stderr:
+            logger.debug(f"makeblastdb stderr: {stderr.decode('utf-8')}")
 
         if check_output(stdout, stderr):
-            console.log("Makeblastdb: done")
-            slack_messages.append(
-                {
-                    "title": "Makeblastdb completed",
-                    "text": fasta_file,
-                    "color": "#36a64f",
-                },
-            )
-            file_logger.info("Makeblastdb: done")
+            duration = datetime.now() - start_time
+            logger.info(f"makeblastdb completed successfully in {duration}")
 
-            Path(unzipped_fasta).unlink()
-            file_logger.info(f"Removed {fasta_file.replace('.gz', '')}")
-            console.log("Removed unzipped file")
+            # Clean up unzipped file
+            if Path(unzipped_fasta).exists():
+                file_size = Path(unzipped_fasta).stat().st_size
+                logger.info(
+                    f"Cleaning up unzipped file: {unzipped_fasta} (size: {file_size} bytes)"
+                )
+                Path(unzipped_fasta).unlink()
+
+            # Clean up original gzipped file
+            original_gzip = f"../data/{fasta_file}"
+            if Path(original_gzip).exists():
+                file_size = Path(original_gzip).stat().st_size
+                logger.info(
+                    f"Cleaning up original gzipped file: {original_gzip} (size: {file_size} bytes)"
+                )
+                Path(original_gzip).unlink()
+
+            return True
+
         else:
-            console.log("Error running makeblastdb")
-            slack_messages.append(
-                {
-                    "title": "Error running makeblastdb",
-                    "text": fasta_file,
-                    "color": "#8D2707",
-                },
-            )
-            file_logger.info("Error running makeblastdb")
-            console.log("Removing folders")
+            logger.error("makeblastdb command failed")
+            logger.error(f"stderr: {stderr.decode('utf-8')}")
             rmtree(output_dir)
             return False
+
     except Exception as e:
-        console.log(f"Error running makeblastdb: {e}")
-        slack_messages.append(
-            {
-                "title": "Makeblastdb completed",
-                "text": f"Successfully processed {fasta_file}",
-            }
-        )
-        return True
-    else:
-        LOGGER.error(f"Error running makeblastdb: {output}")
-        SLACK_MESSAGES.append(
-            {"title": "Makeblastdb Error", "text": f"Failed to process {fasta_file}"}
-        )
-        file_logger.info(f"Error running makeblastdb: {e}")
+        logger.error(f"Error in makeblastdb process: {str(e)}", exc_info=True)
         return False
 
 
@@ -193,111 +221,303 @@ def list_databases_from_config(config_file: str) -> None:
         console.log("[red]Error: Config file must be either YAML or JSON[/red]")
 
 
-def process_entry(entry, mod_code, file_logger, environment=None, check_only=False):
-    """Helper function to process a single database entry"""
-    fasta_file = Path(entry["uri"]).name
-    unzipped_fasta = f"../data/{fasta_file.replace('.gz', '')}"
+# In create_blast_db.py
 
-    if check_only:
-        console.log(f"\n[bold]Checking {entry['blast_title']}[/bold]")
 
-    if entry["uri"].startswith("ftp://"):
-        success = get_files_ftp(
-            entry["uri"], entry["md5sum"], file_logger, mod=mod_code
-        )
-    else:
-        success = get_files_http(
-            entry["uri"], entry["md5sum"], file_logger, mod=mod_code
-        )
+def process_files(
+    config_yaml: Optional[str],
+    input_json: Optional[str],
+    environment: str,
+    db_list: Optional[List[str]] = None,
+    check_only: bool = False,
+    store_files: bool = False,
+) -> None:
+    """
+    Process configuration files with enhanced logging.
 
-    if not success:
-        if check_only:
-            console.log(f"[red]Could not download {fasta_file} - skipping check[/red]")
-        return
+    Args:
+        config_yaml: Path to YAML config file
+        input_json: Path to JSON config file
+        environment: Deployment environment
+        db_list: List of specific databases to process
+        check_only: Whether to only check parse_seqids
+        store_files: Whether to store original files
+    """
+    LOGGER.info("Starting configuration file processing")
+    LOGGER.info(f"Parameters: check_only={check_only}, store_files={store_files}")
 
-    if not Path(unzipped_fasta).exists():
-        unzip_command = f"gunzip -v ../data/{fasta_file}"
-        p = Popen(unzip_command, shell=True, stdout=PIPE, stderr=PIPE)
-        p.wait()
+    try:
+        if config_yaml:
+            LOGGER.info(f"Processing YAML config: {config_yaml}")
+            with open(config_yaml) as f:
+                config = yaml.safe_load(f)
 
-    if Path(unzipped_fasta).exists():
-        needs_parse = needs_parse_seqids(unzipped_fasta)
-        if check_only:
-            status = (
-                "[green]requires[/green]"
-                if needs_parse
-                else "[yellow]does not require[/yellow]"
+            for provider in config["data_providers"]:
+                provider_start = datetime.now()
+                LOGGER.info(f"Processing provider: {provider['name']}")
+
+                for env in provider["environments"]:
+                    json_file = (
+                        Path(config_yaml).parent
+                        / f"{provider['name']}/databases.{provider['name']}.{env}.json"
+                    )
+
+                    if json_file.exists():
+                        LOGGER.info(f"Found JSON file: {json_file}")
+                        process_json_entries(
+                            str(json_file),
+                            env,
+                            provider["name"],
+                            db_list,
+                            check_only,
+                            store_files,
+                        )
+                    else:
+                        LOGGER.warning(f"JSON file not found: {json_file}")
+
+                duration = datetime.now() - provider_start
+                LOGGER.info(
+                    f"Completed processing provider {provider['name']} in {duration}"
+                )
+
+        elif input_json:
+            LOGGER.info(f"Processing single JSON file: {input_json}")
+            process_json_entries(
+                input_json, environment, None, db_list, check_only, store_files
             )
-            console.log(f"{entry['blast_title']}: {status} -parse_seqids")
 
-    if check_only:
-        if Path(unzipped_fasta).exists():
-            Path(unzipped_fasta).unlink()
-
-    if not check_only:
-        output_dir, config_dir = create_db_structure(
-            environment, mod_code, entry, file_logger
-        )
-        if not run_makeblastdb(entry, output_dir, file_logger):
-            console.log(
-                f"[red]Error creating database for {entry['blast_title']}[/red]"
-            )
+    except Exception as e:
+        LOGGER.error(f"Failed to process configuration files: {str(e)}", exc_info=True)
+        raise
 
 
 def process_json_entries(
-    json_file, environment, mod=None, db_list=None, check_only=False
-):
+    json_file: str,
+    environment: str,
+    mod: Optional[str] = None,
+    db_list: Optional[List[str]] = None,
+    check_only: bool = False,
+    store_files: bool = False,
+) -> bool:
     """
-    Process entries from a JSON configuration file.
+    Process entries from a JSON configuration file with enhanced logging.
+
+    Args:
+        json_file: Path to JSON config file
+        environment: Deployment environment
+        mod: Model organism database identifier
+        db_list: List of specific databases to process
+        check_only: Whether to only check parse_seqids
+        store_files: Whether to store original files
+
+    Returns:
+        bool: Success status
     """
+    start_time = datetime.now()
+    LOGGER.info(f"Processing JSON entries from: {json_file}")
+    LOGGER.info(
+        f"Environment: {environment}, Check only: {check_only}, Store files: {store_files}"
+    )
+
     try:
         with open(json_file, "r") as f:
             db_coordinates = json.load(f)
-    except json.JSONDecodeError as e:
-        console.log(f"[red]Error: Invalid JSON file: {e}[/red]")
-        return False
+            LOGGER.info("Successfully loaded JSON configuration")
 
-    mod_code = mod if mod is not None else get_mod_from_json(json_file)
-    if not mod_code:
-        console.log("[red]Error: Invalid or missing MOD code[/red]")
-        return False
+        # Get MOD code
+        mod_code = mod if mod is not None else get_mod_from_json(json_file)
+        if not mod_code:
+            LOGGER.error("Invalid or missing MOD code")
+            console.log("[red]Error: Invalid or missing MOD code[/red]")
+            return False
 
-    date_to_add = datetime.now().strftime("%Y_%b_%d")
-    Path("../logs").mkdir(parents=True, exist_ok=True)
+        LOGGER.info(f"Using MOD code: {mod_code}")
 
-    for entry in db_coordinates.get("data", []):
-        if db_list and entry["blast_title"] not in db_list:
-            continue
+        # Create logs directory
+        Path("../logs").mkdir(parents=True, exist_ok=True)
 
-        log_path = f"../logs/{entry['genus']}_{entry['species']}_{entry['seqtype']}_{date_to_add}.log"
-        file_logger = extendable_logger(entry["blast_title"], log_path)
-        file_logger.info(f"Mod found/provided: {mod_code}")
+        # Process entries
+        entries = db_coordinates.get("data", [])
+        total_entries = len(entries)
+        processed = 0
+        successful = 0
 
-        process_entry(entry, mod_code, file_logger, environment, check_only)
+        LOGGER.info(f"Found {total_entries} entries to process")
 
-    return True
+        for entry in entries:
+            processed += 1
+            LOGGER.info(
+                f"\nProcessing entry {processed}/{total_entries}: {entry['blast_title']}"
+            )
 
+            # Skip if not in requested list
+            if db_list and entry["blast_title"] not in db_list:
+                LOGGER.info(f"Skipping {entry['blast_title']} (not in requested list)")
+                continue
 
-def process_files(config_yaml, input_json, environment, db_list=None, check_only=False):
-    """
-    Process files either from YAML or JSON configuration.
-    """
-    if config_yaml:
-        config = yaml.load(open(config_yaml), Loader=yaml.FullLoader)
-        for provider in config["data_providers"]:
-            console.log(f"Processing {provider['name']}")
-            for env in provider["environments"]:
-                json_file = (
-                    Path(config_yaml).parent
-                    / f"{provider['name']}/databases.{provider['name']}.{env}.json"
+            # Process entry
+            try:
+                if process_entry(entry, mod_code, environment, check_only, store_files):
+                    successful += 1
+            except Exception as e:
+                LOGGER.error(
+                    f"Failed to process entry {entry['blast_title']}: {str(e)}",
+                    exc_info=True,
                 )
-                if json_file.exists():
-                    process_json_entries(
-                        json_file, env, provider["name"], db_list, check_only
-                    )
 
-    elif input_json:
-        process_json_entries(input_json, environment, None, db_list, check_only)
+        # Log summary
+        duration = datetime.now() - start_time
+        LOGGER.info(f"\nJSON processing summary:")
+        LOGGER.info(f"Total entries: {total_entries}")
+        LOGGER.info(f"Processed: {processed}")
+        LOGGER.info(f"Successful: {successful}")
+        LOGGER.info(f"Failed: {processed - successful}")
+        LOGGER.info(f"Total duration: {duration}")
+
+        return successful > 0
+
+    except Exception as e:
+        LOGGER.error(
+            f"Failed to process JSON file {json_file}: {str(e)}", exc_info=True
+        )
+        return False
+
+
+def process_entry(
+    entry: Dict,
+    mod_code: str,
+    environment: str,
+    check_only: bool = False,
+    store_files: bool = False,
+) -> bool:
+    """
+    Process a single database entry with comprehensive logging.
+
+    Args:
+        entry: Database entry configuration
+        mod_code: Model organism database identifier
+        environment: Deployment environment
+        check_only: Whether to only check parse_seqids
+        store_files: Whether to store original files
+
+    Returns:
+        bool: Success status
+    """
+    start_time = datetime.now()
+    entry_name = entry["blast_title"]
+
+    # Setup entry-specific logging
+    date_to_add = datetime.now().strftime("%Y_%b_%d")
+    log_path = f"../logs/{entry['genus']}_{entry['species']}_{entry['seqtype']}_{date_to_add}.log"
+    logger = extendable_logger(entry_name, log_path)
+
+    logger.info(f"Starting processing of entry: {entry_name}")
+    logger.info(
+        f"Configuration details: {json.dumps({k: v for k, v in entry.items() if k != 'uri'}, indent=2)}"
+    )
+
+    try:
+        fasta_file = Path(entry["uri"]).name
+        unzipped_fasta = f"../data/{fasta_file.replace('.gz', '')}"
+
+        # Log processing parameters
+        logger.info(f"Processing parameters:")
+        logger.info(f"  MOD code: {mod_code}")
+        logger.info(f"  Environment: {environment}")
+        logger.info(f"  Check only: {check_only}")
+        logger.info(f"  Store files: {store_files}")
+
+        # Download file
+        logger.info(f"Downloading file from {entry['uri']}")
+        if entry["uri"].startswith("ftp://"):
+            success = get_files_ftp(
+                entry["uri"],
+                entry["md5sum"],
+                logger,
+                mod=mod_code,
+                store_files=store_files,
+            )
+        else:
+            success = get_files_http(
+                entry["uri"],
+                entry["md5sum"],
+                logger,
+                mod=mod_code,
+                store_files=store_files,
+            )
+
+        if not success:
+            logger.error("File download failed")
+            return False
+
+        # Create database if not check_only
+        if not check_only:
+            logger.info("Creating database structure")
+            output_dir, config_dir = create_db_structure(
+                environment, mod_code, entry, logger
+            )
+
+            logger.info("Running makeblastdb")
+            if not run_makeblastdb(entry, output_dir, logger):
+                logger.error("Database creation failed")
+                return False
+
+            SLACK_MESSAGES.append(
+                {
+                    "title": "Database Creation Success",
+                    "text": f"Successfully processed {entry_name}",
+                    "color": "#36a64f",
+                }
+            )
+        else:
+            # Check parse_seqids requirement
+            if Path(unzipped_fasta).exists():
+                needs_parse = needs_parse_seqids(unzipped_fasta)
+                status = "requires" if needs_parse else "does not require"
+                logger.info(f"Parse seqids check: {entry_name} {status} -parse_seqids")
+                console.log(
+                    f"{entry_name}: " f"[green]requires[/green]"
+                    if needs_parse
+                    else "[yellow]does not require[/yellow]" f" -parse_seqids"
+                )
+
+        # Clean up files
+        try:
+            if Path(unzipped_fasta).exists():
+                if check_only or not store_files:
+                    file_size = Path(unzipped_fasta).stat().st_size
+                    logger.info(
+                        f"Cleaning up unzipped file: {unzipped_fasta} (size: {file_size:,} bytes)"
+                    )
+                    Path(unzipped_fasta).unlink()
+
+            original_gzip = f"../data/{fasta_file}"
+            if Path(original_gzip).exists() and not store_files:
+                file_size = Path(original_gzip).stat().st_size
+                logger.info(
+                    f"Cleaning up original gzipped file: {original_gzip} (size: {file_size:,} bytes)"
+                )
+                Path(original_gzip).unlink()
+
+        except Exception as e:
+            logger.error(f"Cleanup failed: {str(e)}", exc_info=True)
+            # Don't fail the whole process for cleanup errors
+
+        # Log completion
+        duration = datetime.now() - start_time
+        logger.info(f"Entry processing completed successfully in {duration}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Entry processing failed: {str(e)}", exc_info=True)
+        SLACK_MESSAGES.append(
+            {
+                "title": "Processing Error",
+                "text": f"Failed to process {entry_name}: {str(e)}",
+                "color": "#8D2707",
+            }
+        )
+        return False
 
 
 @click.command()
@@ -310,6 +530,7 @@ def process_files(config_yaml, input_json, environment, db_list=None, check_only
 )
 @click.option("-u", "--update-slack", help="Update Slack", is_flag=True, default=False)
 @click.option("-s3", "--sync-s3", help="Sync to S3", is_flag=True, default=False)
+@click.option("--store-files", help="Store original files", is_flag=True, default=False)
 @click.option(
     "-d",
     "--db_names",
@@ -332,52 +553,73 @@ def process_files(config_yaml, input_json, environment, db_list=None, check_only
     default=False,
 )
 def create_dbs(
-    config_yaml,
-    input_json,
-    environment,
-    mod,
-    skip_efs_sync,
-    update_slack,
-    sync_s3,
-    db_names,
-    list_dbs,
-    check_parse_seqids,
+    config_yaml: str,
+    input_json: str,
+    environment: str,
+    mod: str,
+    skip_efs_sync: bool,
+    update_slack: bool,
+    sync_s3: bool,
+    store_files: bool,
+    db_names: Optional[str],
+    list_dbs: bool,
+    check_parse_seqids: bool,
 ) -> None:
     """
-    Main function that runs the pipeline for processing the configuration files and creating the BLAST databases.
+    Main function that runs the pipeline for processing configuration files and creating BLAST databases.
     """
-    db_list = None
-    if db_names:
-        db_list = [name.strip() for name in db_names.split(",")]
-
-    if list_dbs:
-        if config_yaml:
-            list_databases_from_config(config_yaml)
-        elif input_json:
-            list_databases_from_config(input_json)
-        else:
-            click.echo(
-                "Please provide either a YAML (-g) or JSON (-j) configuration file to list databases."
-            )
-        return
-
-    if len(sys.argv) == 1:
-        click.echo(create_dbs.get_help(ctx=None))
-        return
+    start_time = datetime.now()
+    LOGGER.info("Starting BLAST database creation process")
+    LOGGER.info(
+        f"Parameters: environment={environment}, mod={mod}, store_files={store_files}"
+    )
 
     try:
+        if db_names:
+            db_list = [name.strip() for name in db_names.split(",")]
+            LOGGER.info(f"Processing specific databases: {db_list}")
+        else:
+            db_list = None
+            LOGGER.info("Processing all databases")
+
+        if list_dbs:
+            if config_yaml or input_json:
+                list_databases_from_config(config_yaml or input_json)
+            else:
+                msg = "Please provide either a YAML (-g) or JSON (-j) configuration file to list databases."
+                LOGGER.error(msg)
+                click.echo(msg)
+            return
+
+        if len(sys.argv) == 1:
+            LOGGER.info("No arguments provided, showing help")
+            click.echo(create_dbs.get_help(ctx=None))
+            return
+
         if config_yaml:
-            process_files(config_yaml, None, None, db_list, check_parse_seqids)
+            LOGGER.info(f"Processing YAML config: {config_yaml}")
+            process_files(
+                config_yaml, None, None, db_list, check_parse_seqids, store_files
+            )
         elif input_json:
-            process_files(None, input_json, environment, db_list, check_parse_seqids)
+            LOGGER.info(f"Processing JSON config: {input_json}")
+            process_files(
+                None, input_json, environment, db_list, check_parse_seqids, store_files
+            )
 
         if update_slack and not check_parse_seqids:
-            slack_message(slack_messages)
+            LOGGER.info("Sending Slack update")
+            slack_message(SLACK_MESSAGES)
 
         if sync_s3 and not check_parse_seqids:
+            LOGGER.info("Starting S3 sync")
             s3_sync(Path("../data"), skip_efs_sync)
 
+        duration = datetime.now() - start_time
+        LOGGER.info(f"Process completed successfully in {duration}")
+
     except Exception as e:
+        LOGGER.error(f"Process failed: {str(e)}", exc_info=True)
         console.log(f"[red]Error: {e}[/red]")
         sys.exit(1)
 
