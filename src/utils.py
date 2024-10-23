@@ -17,13 +17,20 @@ from ftplib import FTP
 from pathlib import Path
 from shutil import copyfile
 from subprocess import PIPE, Popen
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import wget
 from dotenv import dotenv_values
 from rich.console import Console
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
+
+from terminal import (
+    create_progress,
+    log_error,
+    print_status,
+    show_summary,
+)
 
 console = Console()
 
@@ -85,7 +92,7 @@ def store_fasta_files(fasta_file: str, logger, store_files: bool = False) -> Non
             f"Storing file {fasta_file} (size: {file_size} bytes) to {dest_path}"
         )
         copyfile(fasta_file, dest_path)
-        logger.info(f"File stored successfully")
+        logger.info("File stored successfully")
 
     except Exception as e:
         logger.error(f"Failed to store file {fasta_file}: {str(e)}", exc_info=True)
@@ -96,45 +103,47 @@ def store_fasta_files(fasta_file: str, logger, store_files: bool = False) -> Non
 def cleanup_fasta_files(data_dir: Path, logger) -> None:
     """
     Cleans up all FASTA files in the specified directory after database generation.
-
-    Args:
-        data_dir (Path): Directory containing FASTA files
-        logger (logging.Logger): Logger instance
     """
     logger.info(f"Starting cleanup of FASTA files in {data_dir}")
+    print_status("Starting final cleanup...", "info")
 
     try:
         # Find all FASTA files (both gzipped and uncompressed)
-        fasta_files = (
-            list(data_dir.glob("*.fa*"))
-            + list(data_dir.glob("*.fasta*"))
-            + list(data_dir.glob("*.fna*"))
-        )
+        fasta_patterns = ["*.fa*", "*.fasta*", "*.fna*", "*.gz"]
+        fasta_files = []
+        for pattern in fasta_patterns:
+            fasta_files.extend(list(data_dir.glob(pattern)))
 
         if not fasta_files:
             logger.info("No FASTA files found for cleanup")
+            print_status("No files to clean up", "info")
             return
 
-        logger.info(f"Found {len(fasta_files)} FASTA files to clean up")
+        logger.info(f"Found {len(fasta_files)} files to clean up")
+        print_status(f"Found {len(fasta_files)} files to clean up", "info")
 
-        for fasta_file in fasta_files:
-            try:
-                file_size = fasta_file.stat().st_size
-                logger.info(f"Removing {fasta_file.name} (size: {file_size:,} bytes)")
-                fasta_file.unlink()
-                logger.info(f"Successfully removed {fasta_file.name}")
-            except Exception as e:
-                logger.error(f"Failed to remove {fasta_file.name}: {str(e)}")
-                # Continue with other files even if one fails
-                continue
+        with create_progress() as progress:
+            cleanup_task = progress.add_task("Cleaning up files...", total=len(fasta_files))
 
+            for fasta_file in fasta_files:
+                try:
+                    file_size = fasta_file.stat().st_size
+                    logger.info(f"Removing {fasta_file.name} (size: {file_size:,} bytes)")
+                    fasta_file.unlink()
+                    logger.info(f"Successfully removed {fasta_file.name}")
+                except Exception as e:
+                    logger.error(f"Failed to remove {fasta_file.name}: {str(e)}")
+                    print_status(f"Failed to remove {fasta_file.name}", "warning")
+
+                progress.advance(cleanup_task)
+
+        print_status("Cleanup completed successfully", "success")
         logger.info("FASTA file cleanup completed")
 
     except Exception as e:
-        logger.error(f"Error during FASTA cleanup: {str(e)}", exc_info=True)
-        # Don't raise the exception - cleanup should be non-blocking
-        logger.warning("Cleanup process encountered errors but continuing")
-
+        error_msg = f"Error during FASTA cleanup: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        print_status(error_msg, "error")
 
 def extendable_logger(log_name, file_name, level=logging.INFO) -> Any:
     """
@@ -349,23 +358,31 @@ def check_output(stdout: bytes, stderr: bytes) -> bool:
 def slack_message(messages: list, subject="BLAST Database Update") -> bool:
     """
     Sends a message to a Slack channel using the Slack API.
+    If no Slack configuration is found, skips silently.
     """
     env = dotenv_values(f"{Path.cwd()}/.env")
-    client = WebClient(token=env["SLACK"])
+
+    # Check if Slack token is configured
+    if "SLACK" not in env:
+        print_status("Skipping Slack update - no Slack token configured", "warning")
+        return True
 
     try:
+        client = WebClient(token=env["SLACK"])
         response = client.chat_postMessage(
             channel="#blast-status",
             text=subject,
             attachments=messages,
         )
-        console.log("Done sending message to Slack channel")
-    except SlackApiError as e:
-        assert e.response["ok"] is False
-        assert e.response["error"]
-        print(f"Got an error: {e.response['error']}")
+        print_status("Slack message sent successfully", "success")
+        return True
 
-    return True
+    except SlackApiError as e:
+        log_error(f"Failed to send Slack message: {e.response['error']}")
+        return False
+    except Exception as e:
+        log_error(f"Unexpected error sending Slack message", e)
+        return False
 
 
 def needs_parse_seqids(fasta_file: str) -> bool:
@@ -405,14 +422,14 @@ def needs_parse_seqids(fasta_file: str) -> bool:
 
 
 def get_files_http(
-    file_uri: str,
-    md5sum: str,
-    logger,
-    mod: Optional[str] = None,
-    store_files: bool = False,
+        file_uri: str,
+        md5sum: str,
+        logger,
+        mod: Optional[str] = None,
+        store_files: bool = False,
 ) -> bool:
     """
-    Downloads files from HTTP/HTTPS sites with comprehensive logging.
+    Downloads files from HTTP/HTTPS sites with controlled output.
     """
     start_time = datetime.now()
     logger.info(f"Starting HTTP download from: {file_uri}")
@@ -421,28 +438,27 @@ def get_files_http(
         file_name = f"../data/{Path(file_uri).name}"
         logger.info(f"Download target: {file_name}")
 
-        # Download file
+        # Download file with quiet output
         download_start = datetime.now()
-        wget.download(file_uri, file_name)
+        wget.download(file_uri, file_name, bar=None)  # Suppress wget progress bar
+        print()  # Add newline after download
         download_duration = datetime.now() - download_start
 
-        # Log download statistics
+        # Rest of the function remains the same
         file_size = Path(file_name).stat().st_size
         logger.info(
-            f"Download completed | Size: {file_size} bytes | "
+            f"Download completed | Size: {file_size:,} bytes | "
             f"Duration: {download_duration} | "
             f"Speed: {file_size / download_duration.total_seconds() / 1024:.2f} KB/s"
         )
 
-        # Store file if requested
         if store_files:
-            logger.info(f"Storing original file (store_files=True)")
+            logger.info("Storing original file (store_files=True)")
             store_fasta_files(file_name, logger)
 
-        # Verify checksum
         if mod != "ZFIN":
             logger.info(f"Verifying MD5 checksum: expected={md5sum}")
-            if not check_md5sum(file_name, md5sum):
+            if not check_md5sum(file_name, md5sum, logger):
                 logger.error("MD5 checksum verification failed")
                 return False
             logger.info("MD5 checksum verified successfully")
@@ -457,42 +473,30 @@ def get_files_http(
 
 
 def get_files_ftp(
-    fasta_uri: str,
-    md5sum: str,
-    logger,
-    mod: Optional[str] = None,
-    store_files: bool = False,
+        fasta_uri: str,
+        md5sum: str,
+        logger,
+        mod: Optional[str] = None,
+        store_files: bool = False,
 ) -> bool:
     """
-    Downloads files from FTP sites with comprehensive logging and optional storage.
-
-    Args:
-        fasta_uri (str): FTP URI of the file to download
-        md5sum (str): Expected MD5 checksum
-        logger (logging.Logger): Logger instance
-        mod (Optional[str]): Model organism database identifier
-        store_files (bool): Whether to store the original file
-
-    Returns:
-        bool: Success status of the download operation
+    Downloads files from FTP sites with controlled output.
     """
     start_time = datetime.now()
     logger.info(f"Starting FTP download from: {fasta_uri}")
 
     try:
-        # Parse FTP URI components
         ftp_host = Path(fasta_uri).parts[1]
         ftp_path = "/".join(Path(fasta_uri).parts[2:-1])
         fasta_file = f"../data/{Path(fasta_uri).name}"
         fasta_name = Path(fasta_uri).name
 
-        logger.info(f"FTP Details:")
+        logger.info("FTP Details:")
         logger.info(f"  Host: {ftp_host}")
         logger.info(f"  Path: {ftp_path}")
         logger.info(f"  File: {fasta_name}")
         logger.info(f"Local target: {fasta_file}")
 
-        # Check if file already exists in storage
         if store_files:
             date_to_add = datetime.now().strftime("%Y_%b_%d")
             stored_path = Path(f"../data/database_{date_to_add}/{fasta_name}")
@@ -508,15 +512,16 @@ def get_files_ftp(
             logger.warning(f"Could not get remote file size: {str(e)}")
             remote_size = None
 
-        # Download file
+        # Download file with quiet output
         download_start = datetime.now()
         logger.info("Starting file download")
 
         try:
-            wget.download(fasta_uri, fasta_file)
+            wget.download(fasta_uri, fasta_file, bar=None)  # Suppress wget progress bar
+            print()  # Add newline after download
             download_duration = datetime.now() - download_start
 
-            # Verify downloaded file
+            # Rest of the verification code...
             if Path(fasta_file).exists():
                 local_size = Path(fasta_file).stat().st_size
                 logger.info(
@@ -526,7 +531,6 @@ def get_files_ftp(
                     f"  Speed: {local_size / download_duration.total_seconds() / 1024:.2f} KB/s"
                 )
 
-                # Verify size if remote size is known
                 if remote_size and remote_size != local_size:
                     logger.error(
                         f"Size mismatch - Remote: {remote_size:,} bytes, Local: {local_size:,} bytes"
@@ -540,27 +544,23 @@ def get_files_ftp(
             logger.error(f"Download failed: {str(e)}", exc_info=True)
             return False
 
-        # Store file if requested
+        # Rest of the function remains the same...
         if store_files:
-            logger.info(f"Storing original file (store_files=True)")
+            logger.info("Storing original file (store_files=True)")
             try:
                 store_fasta_files(fasta_file, logger, store_files)
-                logger.info(f"File stored successfully")
+                logger.info("File stored successfully")
             except Exception as e:
                 logger.error(f"File storage failed: {str(e)}", exc_info=True)
                 return False
 
-        # Skip MD5 check for ZFIN
         if mod == "ZFIN":
             logger.info("Skipping MD5 check for ZFIN")
             return True
 
-        # Verify MD5 checksum
         logger.info(f"Verifying MD5 checksum: expected={md5sum}")
         if check_md5sum(fasta_file, md5sum, logger):
             logger.info("MD5 checksum verification successful")
-
-            # Log overall success
             duration = datetime.now() - start_time
             logger.info(
                 f"FTP download and verification completed successfully in {duration}"

@@ -16,22 +16,21 @@ from datetime import datetime
 from pathlib import Path
 from shutil import rmtree
 from subprocess import PIPE, Popen
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import click
 import yaml
 
 from terminal import (create_progress, log_error, print_header, print_status,
                       show_summary)
+from utils import cleanup_fasta_files  # Add this import
 from utils import (check_output, extendable_logger, get_files_ftp,
                    get_files_http, get_mod_from_json, needs_parse_seqids,
-                   s3_sync)
-from utils import setup_detailed_logger as setup_logger
-from utils import slack_message, update_genome_browser_map
+                   s3_sync, setup_detailed_logger, slack_message)
 
 # Global variables
 SLACK_MESSAGES: List[Dict[str, str]] = []
-LOGGER = setup_logger("create_blast_db", "blast_db_creation.log")
+LOGGER = setup_detailed_logger("create_blast_db", "blast_db_creation.log")
 
 
 def create_db_structure(
@@ -197,34 +196,38 @@ def list_databases_from_config(config_file: str) -> None:
     """
     Lists all database names from either a YAML or JSON configuration file.
     """
-    console.log("\n[bold]Available databases:[/bold]")
+    print_header("Available Databases")
 
-    if config_file.endswith(".yaml") or config_file.endswith(".yml"):
-        config = yaml.load(open(config_file), Loader=yaml.FullLoader)
+    try:
+        if config_file.endswith(".yaml") or config_file.endswith(".yml"):
+            with open(config_file) as f:
+                config = yaml.safe_load(f)
 
-        for provider in config["data_providers"]:
-            console.log(f"\n[bold cyan]{provider['name']}:[/bold cyan]")
-            for environment in provider["environments"]:
-                json_file = (
-                    Path(config_file).parent
-                    / f"{provider['name']}/databases.{provider['name']}.{environment}.json"
-                )
-                if json_file.exists():
-                    db_coordinates = json.load(open(json_file, "r"))
-                    for entry in db_coordinates["data"]:
-                        console.log(f"  • {entry['blast_title']}")
-                else:
-                    console.log(f"  Warning: JSON file not found - {json_file}")
+            for provider in config["data_providers"]:
+                print_header(provider["name"])  # Using header for provider names
+                for environment in provider["environments"]:
+                    json_file = (
+                        Path(config_file).parent
+                        / f"{provider['name']}/databases.{provider['name']}.{environment}.json"
+                    )
+                    if json_file.exists():
+                        with open(json_file, "r") as f:
+                            db_coordinates = json.load(f)
+                        for entry in db_coordinates["data"]:
+                            print_status(f"• {entry['blast_title']}", "info")
+                    else:
+                        print_status(f"JSON file not found - {json_file}", "warning")
 
-    elif config_file.endswith(".json"):
-        db_coordinates = json.load(open(config_file, "r"))
-        for entry in db_coordinates["data"]:
-            console.log(f"  • {entry['blast_title']}")
-    else:
-        console.log("[red]Error: Config file must be either YAML or JSON[/red]")
+        elif config_file.endswith(".json"):
+            with open(config_file, "r") as f:
+                db_coordinates = json.load(f)
+            for entry in db_coordinates["data"]:
+                print_status(f"• {entry['blast_title']}", "info")
+        else:
+            log_error("Config file must be either YAML or JSON")
 
-
-# In create_blast_db.py
+    except Exception as e:
+        log_error("Failed to list databases", e)
 
 
 def process_files(
@@ -291,11 +294,11 @@ def process_files(
 
 
 def process_entry(
-        entry: Dict,
-        mod_code: str,
-        environment: str,
-        check_only: bool = False,
-        store_files: bool = False,
+    entry: Dict,
+    mod_code: str,
+    environment: str,
+    check_only: bool = False,
+    store_files: bool = False,
 ) -> bool:
     """
     Process a single database entry with comprehensive logging and progress display.
@@ -350,6 +353,32 @@ def process_entry(
 
         print_status("File download complete", "success")
 
+        # Unzip file if needed
+        if not Path(unzipped_fasta).exists() and Path(f"../data/{fasta_file}").exists():
+            logger.info(f"Unzipping {fasta_file}")
+            print_status(f"Unzipping {fasta_file}...", "info")
+            unzip_command = f"gunzip -v ../data/{fasta_file}"
+            p = Popen(unzip_command, shell=True, stdout=PIPE, stderr=PIPE)
+            stdout, stderr = p.communicate()
+
+            if p.returncode != 0:
+                log_error(f"Unzip failed: {stderr.decode('utf-8')}")
+                return False
+
+        # Check parse_seqids requirement if in check_only mode
+        if check_only:
+            if Path(unzipped_fasta).exists():
+                needs_parse = needs_parse_seqids(unzipped_fasta)
+                status = (
+                    "[green]requires[/green]"
+                    if needs_parse
+                    else "[yellow]does not require[/yellow]"
+                )
+                print_status(f"{entry_name}: {status} -parse_seqids flag", "info")
+                logger.info(
+                    f"Parse seqids check: {entry_name} {'requires' if needs_parse else 'does not require'} -parse_seqids"
+                )
+
         # Create database if not check_only
         if not check_only:
             print_status("Creating database structure", "info")
@@ -371,15 +400,6 @@ def process_entry(
                     "color": "#36a64f",
                 }
             )
-        else:
-            # Check parse_seqids requirement
-            if Path(unzipped_fasta).exists():
-                needs_parse = needs_parse_seqids(unzipped_fasta)
-                status = "requires" if needs_parse else "does not require"
-                print_status(
-                    f"Parse seqids check: {entry_name} {status} -parse_seqids",
-                    "info"
-                )
 
         # Clean up files
         try:
@@ -403,22 +423,15 @@ def process_entry(
 
         except Exception as e:
             log_error("Cleanup failed", e)
+            logger.error(f"Cleanup failed: {str(e)}", exc_info=True)
 
-        # Log completion and show summary
         duration = datetime.now() - start_time
-        show_summary(
-            f"Entry Processing: {entry_name}",
-            {
-                "Status": "Completed",
-                "Files Cleaned": "Yes" if not store_files else "No",
-                "Check Only Mode": str(check_only),
-            },
-            duration,
-        )
+        logger.info(f"Entry processing completed in {duration}")
         return True
 
     except Exception as e:
-        log_error(f"Entry processing failed", e)
+        log_error("Entry processing failed", e)
+        logger.error(f"Entry processing failed: {str(e)}", exc_info=True)
         SLACK_MESSAGES.append(
             {
                 "title": "Processing Error",
@@ -427,6 +440,7 @@ def process_entry(
             }
         )
         return False
+
 
 def process_json_entries(
     json_file: str,
@@ -494,7 +508,11 @@ def process_json_entries(
         # Clean up all FASTA files after processing if cleanup is enabled
         if cleanup and not check_only:
             print_status("Starting post-processing cleanup", "info")
-            cleanup_fasta_files(Path("../data"), LOGGER)
+            try:
+                cleanup_fasta_files(Path("../data"), LOGGER)
+                print_status("Cleanup completed successfully", "success")
+            except Exception as e:
+                log_error("Cleanup failed", e)
 
         # Show final summary
         duration = datetime.now() - start_time
@@ -593,7 +611,7 @@ def create_dbs(
             else:
                 msg = "Please provide either a YAML (-g) or JSON (-j) configuration file to list databases."
                 LOGGER.error(msg)
-                click.echo(msg)
+                print_status(msg, "error")
             return
 
         if len(sys.argv) == 1:
@@ -624,9 +642,13 @@ def create_dbs(
                 cleanup,
             )
 
-        if update_slack and not check_parse_seqids:
-            LOGGER.info("Sending Slack update")
-            slack_message(SLACK_MESSAGES)
+        # Handle Slack updates with better error checking
+        if update_slack and not check_parse_seqids and SLACK_MESSAGES:
+            try:
+                LOGGER.info("Sending Slack update")
+                slack_message(SLACK_MESSAGES)
+            except Exception as e:
+                log_error("Failed to send Slack update - check SLACK token in .env", e)
 
         if sync_s3 and not check_parse_seqids:
             LOGGER.info("Starting S3 sync")
@@ -637,7 +659,7 @@ def create_dbs(
 
     except Exception as e:
         LOGGER.error(f"Process failed: {str(e)}", exc_info=True)
-        console.log(f"[red]Error: {e}[/red]")
+        log_error(str(e))
         sys.exit(1)
 
 
