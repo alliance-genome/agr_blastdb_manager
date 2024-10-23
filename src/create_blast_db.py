@@ -22,22 +22,15 @@ import yaml
 from dotenv import dotenv_values
 from rich.console import Console
 
-from utils import (
-    check_output,
-    check_md5sum,
-    extendable_logger,
-    get_files_ftp,
-    get_files_http,
-    get_mod_from_json,
-    needs_parse_seqids,
-    s3_sync,
-    slack_message,
-    store_fasta_files,
-)
+from utils import (check_md5sum, check_output, extendable_logger,
+                   get_files_ftp, get_files_http, get_mod_from_json,
+                   needs_parse_seqids, s3_sync, slack_message,
+                   store_fasta_files)
 
 console = Console()
 
 slack_messages = []
+
 
 def create_db_structure(environment, mod, config_entry, file_logger) -> tuple[str, str]:
     """
@@ -65,6 +58,7 @@ def create_db_structure(environment, mod, config_entry, file_logger) -> tuple[st
     file_logger.info(f"Directory {p} created")
 
     return p, c
+
 
 def run_makeblastdb(config_entry, output_dir, file_logger):
     """
@@ -154,6 +148,7 @@ def run_makeblastdb(config_entry, output_dir, file_logger):
 
     return True
 
+
 def list_databases_from_config(config_file: str) -> None:
     """
     Lists all database names from either a YAML or JSON configuration file.
@@ -184,6 +179,7 @@ def list_databases_from_config(config_file: str) -> None:
     else:
         console.log("[red]Error: Config file must be either YAML or JSON[/red]")
 
+
 def process_entry(entry, mod_code, file_logger, environment=None, check_only=False):
     """Helper function to process a single database entry"""
     fasta_file = Path(entry["uri"]).name
@@ -192,10 +188,14 @@ def process_entry(entry, mod_code, file_logger, environment=None, check_only=Fal
     if check_only:
         console.log(f"\n[bold]Checking {entry['blast_title']}[/bold]")
 
-    if entry["uri"].startswith('ftp://'):
-        success = get_files_ftp(entry["uri"], entry["md5sum"], file_logger, mod=mod_code)
+    if entry["uri"].startswith("ftp://"):
+        success = get_files_ftp(
+            entry["uri"], entry["md5sum"], file_logger, mod=mod_code
+        )
     else:
-        success = get_files_http(entry["uri"], entry["md5sum"], file_logger, mod=mod_code)
+        success = get_files_http(
+            entry["uri"], entry["md5sum"], file_logger, mod=mod_code
+        )
 
     if not success:
         if check_only:
@@ -210,7 +210,11 @@ def process_entry(entry, mod_code, file_logger, environment=None, check_only=Fal
     if Path(unzipped_fasta).exists():
         needs_parse = needs_parse_seqids(unzipped_fasta)
         if check_only:
-            status = "[green]requires[/green]" if needs_parse else "[yellow]does not require[/yellow]"
+            status = (
+                "[green]requires[/green]"
+                if needs_parse
+                else "[yellow]does not require[/yellow]"
+            )
             console.log(f"{entry['blast_title']}: {status} -parse_seqids")
 
     if check_only:
@@ -225,6 +229,7 @@ def process_entry(entry, mod_code, file_logger, environment=None, check_only=Fal
             console.log(
                 f"[red]Error creating database for {entry['blast_title']}[/red]"
             )
+
 
 def process_json_entries(
     json_file, environment, mod=None, db_list=None, check_only=False
@@ -259,6 +264,7 @@ def process_json_entries(
 
     return True
 
+
 def process_files(config_yaml, input_json, environment, db_list=None, check_only=False):
     """
     Process files either from YAML or JSON configuration.
@@ -279,6 +285,7 @@ def process_files(config_yaml, input_json, environment, db_list=None, check_only
 
     elif input_json:
         process_json_entries(input_json, environment, None, db_list, check_only)
+
 
 @click.command()
 @click.option("-g", "--config_yaml", help="YAML file with all MODs configuration")
@@ -360,6 +367,7 @@ def create_dbs(
     except Exception as e:
         console.log(f"[red]Error: {e}[/red]")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     create_dbs()

@@ -16,9 +16,10 @@ import re
 from datetime import datetime
 from ftplib import FTP
 from pathlib import Path
+from shutil import copyfile
 from subprocess import PIPE, Popen
 from typing import Any
-from shutil import copyfile
+
 import wget
 import yaml
 from dotenv import dotenv_values
@@ -31,6 +32,7 @@ console = Console()
 
 # TODO: move to ENV
 MODS = ["FB", "SGD", "WB", "XB", "ZFIN"]
+
 
 def store_fasta_files(fasta_file, file_logger) -> None:
     """
@@ -45,6 +47,7 @@ def store_fasta_files(fasta_file, file_logger) -> None:
 
     copyfile(fasta_file, original_files_store / Path(fasta_file).name)
 
+
 def extendable_logger(log_name, file_name, level=logging.INFO) -> Any:
     """
     Creates a logger that can be extended with additional handlers and configurations.
@@ -58,6 +61,7 @@ def extendable_logger(log_name, file_name, level=logging.INFO) -> Any:
 
     return specified_logger
 
+
 def check_md5sum(fasta_file, md5sum) -> bool:
     """
     Checks the MD5 checksum of a downloaded file.
@@ -69,6 +73,7 @@ def check_md5sum(fasta_file, md5sum) -> bool:
 
     console.log(f"MD5sums match: {md5sum} {downloaded_md5sum}")
     return True
+
 
 def get_ftp_file_size(fasta_uri, file_logger) -> int:
     """
@@ -94,6 +99,7 @@ def get_ftp_file_size(fasta_uri, file_logger) -> int:
 
     return size
 
+
 def get_mod_from_json(input_json) -> str | bool:
     """
     Retrieves the model organism (mod) from the input JSON file.
@@ -107,6 +113,7 @@ def get_mod_from_json(input_json) -> str | bool:
 
     console.log(f"Mod found: {mod}")
     return mod
+
 
 def edit_fasta(fasta_file: str, config_entry: dict) -> bool:
     """
@@ -133,6 +140,7 @@ def edit_fasta(fasta_file: str, config_entry: dict) -> bool:
     edited_file.close()
 
     return True
+
 
 def validate_fasta(filename: str) -> bool:
     """
@@ -162,6 +170,7 @@ def validate_fasta(filename: str) -> bool:
     except Exception as e:
         console.log(f"[red]Error validating FASTA file: {e}[/red]")
         return False
+
 
 def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
     """
@@ -201,6 +210,7 @@ def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
 
     return True
 
+
 def sync_to_efs() -> bool:
     """
     Syncs files from an S3 bucket to an EFS volume.
@@ -234,6 +244,7 @@ def sync_to_efs() -> bool:
     console.log(f"Syncing {env['S3']} to {env['EFS']}: done")
     return True
 
+
 def check_output(stdout, stderr) -> bool:
     """
     Checks the output of a command for errors.
@@ -244,6 +255,7 @@ def check_output(stdout, stderr) -> bool:
             console.log(stderr, style="blink bold white on red")
             return False
     return True
+
 
 def slack_message(messages: list, subject="Update") -> bool:
     """
@@ -265,6 +277,7 @@ def slack_message(messages: list, subject="Update") -> bool:
         print(f"Got an error: {e.response['error']}")
 
     return True
+
 
 def needs_parse_seqids(fasta_file: str) -> bool:
     """
@@ -301,6 +314,7 @@ def needs_parse_seqids(fasta_file: str) -> bool:
 
     return False
 
+
 def get_files_http(file_uri, md5sum, file_logger, mod=None) -> bool:
     """
     Function to download files from an HTTP/HTTPS site.
@@ -335,6 +349,7 @@ def get_files_http(file_uri, md5sum, file_logger, mod=None) -> bool:
     except Exception as e:
         console.log(f"Error downloading {file_uri}: {e}")
         return False
+
 
 def get_files_ftp(fasta_uri, md5sum, file_logger, mod=None) -> bool:
     """
