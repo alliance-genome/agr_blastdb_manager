@@ -541,6 +541,23 @@ def process_json_entries(
             duration,
         )
 
+        summary_text = (
+            "*JSON Processing Summary*\n"
+            f"• *Total Entries:* {total_entries}\n"
+            f"• *Processed:* {processed}\n"
+            f"• *Successful:* {successful}\n"
+            f"• *Failed:* {processed - successful}\n"
+            f"• *Cleanup Performed:* {cleanup and not check_only}\n"
+            f"• *Duration:* {duration}"
+        )
+
+        SLACK_MESSAGES.append({
+            "color": "#36a64f" if successful == total_entries else "#ff9900",
+            "title": "Processing Summary",
+            "text": summary_text,
+            "mrkdwn_in": ["text"]
+        })
+
         return successful > 0
 
     except Exception as e:
