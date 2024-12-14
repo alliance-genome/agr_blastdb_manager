@@ -23,10 +23,11 @@ import yaml
 
 from terminal import (create_progress, log_error, print_header, print_status,
                       show_summary)
-from utils import (check_output, extendable_logger, get_files_ftp,
-                   get_files_http, get_mod_from_json, needs_parse_seqids,
-                   s3_sync, setup_detailed_logger, slack_message, copy_config_file,
-                   cleanup_fasta_files, update_genome_browser_map)
+from utils import (cleanup_fasta_files, copy_config_file,
+                   extendable_logger, get_files_ftp, get_files_http,
+                   get_mod_from_json, needs_parse_seqids, s3_sync,
+                   setup_detailed_logger, slack_message,
+                   update_genome_browser_map)
 
 # Global variables
 SLACK_MESSAGES: List[Dict[str, str]] = []
@@ -130,10 +131,10 @@ def run_makeblastdb(config_entry: Dict, output_dir: str, logger) -> bool:
 
         # Log command output
         if stdout:
-            stdout_str = stdout.decode('utf-8')
+            stdout_str = stdout.decode("utf-8")
             logger.info(f"makeblastdb stdout: {stdout_str}")
         if stderr:
-            stderr_str = stderr.decode('utf-8')
+            stderr_str = stderr.decode("utf-8")
             logger.warning(f"makeblastdb stderr: {stderr_str}")
 
         if p.returncode != 0:
@@ -174,6 +175,7 @@ def run_makeblastdb(config_entry: Dict, output_dir: str, logger) -> bool:
         if Path(output_dir).exists():
             rmtree(output_dir)
         return False
+
 
 def list_databases_from_config(config_file: str) -> None:
     """
@@ -298,7 +300,7 @@ def process_entry(
     """
     print_header(f"Processing {entry['blast_title']}")
     start_time = datetime.now()
-    entry_name = entry['blast_title']
+    entry_name = entry["blast_title"]
 
     # Setup entry-specific logging
     date_to_add = datetime.now().strftime("%Y_%b_%d")
@@ -355,7 +357,10 @@ def process_entry(
             )
 
             # Unzip file if needed
-            if not Path(unzipped_fasta).exists() and Path(f"../data/{fasta_file}").exists():
+            if (
+                not Path(unzipped_fasta).exists()
+                and Path(f"../data/{fasta_file}").exists()
+            ):
                 logger.info(f"Unzipping {fasta_file}")
                 print_status(f"Unzipping {fasta_file}...", "info")
                 unzip_command = f"gunzip -v ../data/{fasta_file}"
@@ -389,11 +394,9 @@ def process_entry(
                 status = "requires" if needs_parse else "does not require"
                 print_status(
                     f"{entry_name}: {'[green]requires[/green]' if needs_parse else '[yellow]does not require[/yellow]'} -parse_seqids flag",
-                    "info"
+                    "info",
                 )
-                logger.info(
-                    f"Parse seqids check: {entry_name} {status} -parse_seqids"
-                )
+                logger.info(f"Parse seqids check: {entry_name} {status} -parse_seqids")
 
         # Clean up files
         try:
@@ -435,6 +438,7 @@ def process_entry(
             }
         )
         return False
+
 
 def process_json_entries(
     json_file: str,
@@ -514,9 +518,13 @@ def process_json_entries(
             for entry in entries:
                 if "genome_browser" in entry:
                     if update_genome_browser_map(entry, mod_code, environment, LOGGER):
-                        print_status(f"Updated mapping for {entry['blast_title']}", "success")
+                        print_status(
+                            f"Updated mapping for {entry['blast_title']}", "success"
+                        )
                     else:
-                        log_error(f"Failed to update mapping for {entry['blast_title']}")
+                        log_error(
+                            f"Failed to update mapping for {entry['blast_title']}"
+                        )
 
         # Clean up all FASTA files after processing if cleanup is enabled
         if cleanup and not check_only:
@@ -551,12 +559,14 @@ def process_json_entries(
             f"• *Duration:* {duration}"
         )
 
-        SLACK_MESSAGES.append({
-            "color": "#36a64f" if successful == total_entries else "#ff9900",
-            "title": "Processing Summary",
-            "text": summary_text,
-            "mrkdwn_in": ["text"]
-        })
+        SLACK_MESSAGES.append(
+            {
+                "color": "#36a64f" if successful == total_entries else "#ff9900",
+                "title": "Processing Summary",
+                "text": summary_text,
+                "mrkdwn_in": ["text"],
+            }
+        )
 
         return successful > 0
 
