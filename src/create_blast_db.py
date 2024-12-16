@@ -11,332 +11,568 @@ Date: Started July 2023, Refactored [Current Date]
 
 import json
 import re
-import subprocess
 import sys
-import time
 from datetime import datetime
 from pathlib import Path
-from shutil import copyfile, rmtree
+from shutil import rmtree
+from subprocess import PIPE, Popen
 from typing import Dict, List, Optional, Tuple
 
 import click
-import wget
 import yaml
-from dotenv import load_dotenv
-from rich.console import Console
-from rich.panel import Panel
-from rich.progress import (BarColumn, Progress, SpinnerColumn, TaskID,
-                           TextColumn)
-from rich.style import Style
-from rich.table import Table
 
-from utils import (check_md5sum, check_output, edit_fasta, get_ftp_file_size,
-                   get_mod_from_json, needs_parse_id, run_command, s3_sync,
-                   setup_logger, slack_message)
-
-# Load environment variables
-load_dotenv()
-
-console = Console()
+from terminal import (create_progress, log_error, print_header, print_status,
+                      show_summary)
+from utils import (cleanup_fasta_files, copy_config_file,
+                   extendable_logger, get_files_ftp, get_files_http,
+                   get_mod_from_json, needs_parse_seqids, s3_sync,
+                   setup_detailed_logger, slack_message,
+                   update_genome_browser_map)
 
 # Global variables
 SLACK_MESSAGES: List[Dict[str, str]] = []
-LOGGER = setup_logger("create_blast_db", "blast_db_creation.log")
-
-
-def store_fasta_files(fasta_file: Path) -> None:
-    """
-    Store the downloaded FASTA files in a specific directory.
-
-    Args:
-        fasta_file (Path): The path to the FASTA file that needs to be stored.
-    """
-    date_to_add = datetime.now().strftime("%Y_%b_%d")
-    original_files_store = Path(f"../data/database_{date_to_add}")
-    original_files_store.mkdir(parents=True, exist_ok=True)
-
-    console.log(
-        Panel(
-            f"Storing [bold]{fasta_file}[/bold] in [cyan]{original_files_store}[/cyan]",
-            title="File Storage",
-            border_style="green",
-        )
-    )
-    copyfile(fasta_file, original_files_store / fasta_file.name)
-    LOGGER.info(f"Stored {fasta_file} in {original_files_store}")
-
-
-def bar_custom(current, total, width=80):
-    if current % (total / 100) == 0:
-        LOGGER.info(f"Downloading: {current/total*100:.1f}% complete")
+LOGGER = setup_detailed_logger("create_blast_db", "blast_db_creation.log")
 
 
 def create_db_structure(
-    environment: str, mod: str, config_entry: Dict[str, str]
-) -> Tuple[Path, Path]:
+    environment: str, mod: str, config_entry: Dict, logger
+) -> Tuple[str, str]:
     """
-    Create the database and folder structure for storing the downloaded FASTA files.
+    Creates the database and folder structure for storing the BLAST databases.
 
     Args:
-        environment (str): The current environment (like dev, prod, etc.).
-        mod (str): The model organism.
-        config_entry (Dict[str, str]): A dictionary containing the configuration details.
+        environment: The deployment environment (dev, stage, prod)
+        mod: The model organism database identifier
+        config_entry: Configuration dictionary containing database details
+        logger: Logger instance for tracking operations
 
     Returns:
-        Tuple[Path, Path]: Paths to the database and config directories.
+        Tuple containing paths to database and config directories
     """
-    LOGGER.info("Creating database structure")
+    start_time = datetime.now()
+    logger.info(
+        f"Starting database structure creation for {config_entry['blast_title']}"
+    )
 
     blast_title = config_entry["blast_title"]
     sanitized_blast_title = re.sub(r"\W+", "_", blast_title)
 
+    # Determine the path based on config
     if "seqcol" in config_entry:
-        LOGGER.info("seqcol found in config file")
-        db_path = Path(
-            f"../data/blast/{mod}/{environment}/databases/{config_entry['seqcol']}/{sanitized_blast_title}/"
-        )
+        db_path = f"../data/blast/{mod}/{environment}/databases/{config_entry['seqcol']}/{sanitized_blast_title}/"
+        logger.info(f"Using seqcol path structure: {db_path}")
     else:
-        LOGGER.info("seqcol not found in config file")
-        db_path = Path(
-            f"../data/blast/{mod}/{environment}/databases/{config_entry['genus']}/{config_entry['species']}/{sanitized_blast_title}/"
+        db_path = (
+            f"../data/blast/{mod}/{environment}/databases/{config_entry['genus']}/{config_entry['species']}/"
+            f"{sanitized_blast_title.replace(' ', '_')}/"
         )
+        logger.info(f"Using species path structure: {db_path}")
 
-    config_path = Path(f"../data/config/{mod}/{environment}")
+    config_path = f"../data/config/{mod}/{environment}"
 
-    db_path.mkdir(parents=True, exist_ok=True)
-    config_path.mkdir(parents=True, exist_ok=True)
-
-    console.log(
-        Panel(
-            f"Created directory: [cyan]{db_path}[/cyan]",
-            title="Database Structure",
-            border_style="blue",
+    # Create directories
+    try:
+        Path(db_path).mkdir(parents=True, exist_ok=True)
+        Path(config_path).mkdir(parents=True, exist_ok=True)
+        logger.info(
+            f"Created directory structure - DB: {db_path}, Config: {config_path}"
         )
-    )
-    LOGGER.info(f"Directory {db_path} created")
+    except Exception as e:
+        logger.error(f"Failed to create directory structure: {str(e)}")
+        raise
+
+    duration = datetime.now() - start_time
+    logger.info(f"Database structure creation completed in {duration}")
 
     return db_path, config_path
 
 
-def get_files_ftp(fasta_uri: str, md5sum: str) -> bool:
-    LOGGER.info(f"Downloading {fasta_uri}")
-
-    today_date = datetime.now().strftime("%Y_%b_%d")
-    fasta_file = Path(f"../data/{Path(fasta_uri).name}")
-
-    if (Path(f"../data/database_{today_date}") / fasta_file.name).exists():
-        LOGGER.info(f"{fasta_file} already processed")
-        return False
-
-    try:
-        file_size = get_ftp_file_size(fasta_uri)
-        if file_size == 0:
-            LOGGER.error(f"Failed to get file size for {fasta_uri}")
-
-        # Use a custom progress bar (or no progress bar)
-        wget.download(fasta_uri, str(fasta_file), bar=bar_custom)
-        LOGGER.info(f"Downloaded {fasta_uri}")
-
-        store_fasta_files(fasta_file)
-
-        if check_md5sum(fasta_file, md5sum):
-            LOGGER.info(f"Successfully downloaded and verified {fasta_uri}")
-            return True
-        elif fasta_uri.find("zfin") != -1:
-            return True
-        else:
-            LOGGER.error("MD5sums do not match")
-            return False
-    except Exception as e:
-        LOGGER.error(f"Error downloading {fasta_uri}: {str(e)}")
-        return False
-
-
-def run_makeblastdb(config_entry: Dict[str, str], output_dir: Path) -> bool:
+def run_makeblastdb(config_entry: Dict, output_dir: str, logger) -> bool:
+    """
+    Runs the makeblastdb command to create a BLAST database.
+    """
+    start_time = datetime.now()
     fasta_file = Path(config_entry["uri"]).name
-    LOGGER.info(f"Running makeblastdb for {fasta_file}")
+    unzipped_fasta = f"../data/{fasta_file.replace('.gz', '')}"
 
-    SLACK_MESSAGES.append(
-        {"title": "Running makeblastdb", "text": f"Processing {fasta_file}"}
-    )
+    logger.info(f"Starting makeblastdb process for {fasta_file}")
+    logger.info(f"Configuration: {json.dumps(config_entry, indent=2)}")
 
-    gzipped_fasta = Path(f"../data/{fasta_file}")
-    unzipped_fasta = gzipped_fasta.with_suffix("")
-
-    if not unzipped_fasta.exists():
-        success, output = run_command(["gunzip", "-k", "-v", str(gzipped_fasta)])
-        if not success:
-            LOGGER.error(f"Error unzipping {fasta_file}: {output}")
+    try:
+        # Check if unzipped FASTA exists
+        if not Path(unzipped_fasta).exists():
+            logger.error(f"Unzipped FASTA file not found: {unzipped_fasta}")
             return False
-        LOGGER.info(f"Unzipping {fasta_file}: done")
 
-    parse_id_needed = needs_parse_id(gzipped_fasta)
+        # Check for parse_seqids requirement
+        parse_ids_flag = ""
+        if needs_parse_seqids(unzipped_fasta):
+            parse_ids_flag = "-parse_seqids"
+            logger.info("FASTA headers require -parse_seqids flag")
 
-    sanitized_blast_title = re.sub(r"\W+", "_", config_entry["blast_title"])
+        # Prepare makeblastdb command
+        blast_title = config_entry["blast_title"]
+        sanitized_blast_title = re.sub(r"\W+", "_", blast_title)
+        extensions = "".join(Path(fasta_file).suffixes)
 
-    makeblast_command = [
-        "makeblastdb",
-        "-in",
-        str(unzipped_fasta),
-        "-dbtype",
-        config_entry["seqtype"],
-        "-title",
-        sanitized_blast_title,
-        "-out",
-        str(output_dir / unzipped_fasta.name.replace(".fasta", ".db")),
-        "-taxid",
-        config_entry["taxon_id"].replace("NCBITaxon:", ""),
-    ]
+        makeblast_command = (
+            f"makeblastdb -in {unzipped_fasta} -dbtype {config_entry['seqtype']} "
+            f"-title '{sanitized_blast_title}' "
+            f"-out {output_dir}/{fasta_file.replace(extensions, 'db')} "
+            f"-taxid {config_entry['taxon_id'].replace('NCBITaxon:', '')} "
+            f"{parse_ids_flag}"
+        ).strip()
 
-    if parse_id_needed:
-        makeblast_command.extend(["-parse_seqids"])
-        LOGGER.info("Added -parse_seqids option to makeblastdb command")
+        logger.info(f"Executing makeblastdb command: {makeblast_command}")
 
-    LOGGER.info(f"Running makeblastdb: {' '.join(makeblast_command)}")
+        # Run makeblastdb
+        p = Popen(makeblast_command, shell=True, stdout=PIPE, stderr=PIPE)
+        stdout, stderr = p.communicate()
 
-    success, output = run_command(makeblast_command)
-    if success:
-        LOGGER.info("Makeblastdb: done")
-        SLACK_MESSAGES.append(
-            {
-                "title": "Makeblastdb completed",
-                "text": f"Successfully processed {fasta_file}",
-            }
-        )
+        # Log command output
+        if stdout:
+            stdout_str = stdout.decode("utf-8")
+            logger.info(f"makeblastdb stdout: {stdout_str}")
+        if stderr:
+            stderr_str = stderr.decode("utf-8")
+            logger.warning(f"makeblastdb stderr: {stderr_str}")
+
+        if p.returncode != 0:
+            logger.error(f"makeblastdb command failed with return code {p.returncode}")
+            logger.error(f"Command: {makeblast_command}")
+            logger.error(f"Error output: {stderr.decode('utf-8')}")
+            print_status(f"makeblastdb error: {stderr.decode('utf-8')}", "error")
+            if Path(output_dir).exists():
+                rmtree(output_dir)
+            return False
+
+        logger.info("makeblastdb completed successfully")
+        duration = datetime.now() - start_time
+        logger.info(f"Process completed in {duration}")
+
+        # Clean up unzipped file
+        if Path(unzipped_fasta).exists():
+            file_size = Path(unzipped_fasta).stat().st_size
+            logger.info(
+                f"Cleaning up unzipped file: {unzipped_fasta} (size: {file_size} bytes)"
+            )
+            Path(unzipped_fasta).unlink()
+
+        # Clean up original gzipped file
+        original_gzip = f"../data/{fasta_file}"
+        if Path(original_gzip).exists():
+            file_size = Path(original_gzip).stat().st_size
+            logger.info(
+                f"Cleaning up original gzipped file: {original_gzip} (size: {file_size} bytes)"
+            )
+            Path(original_gzip).unlink()
+
         return True
-    else:
-        LOGGER.error(f"Error running makeblastdb: {output}")
-        SLACK_MESSAGES.append(
-            {"title": "Makeblastdb Error", "text": f"Failed to process {fasta_file}"}
-        )
+
+    except Exception as e:
+        logger.error(f"Error in makeblastdb process: {str(e)}", exc_info=True)
+        print_status(f"makeblastdb error: {str(e)}", "error")
+        if Path(output_dir).exists():
+            rmtree(output_dir)
         return False
 
 
-def process_yaml(config_yaml: Path) -> bool:
+def list_databases_from_config(config_file: str) -> None:
     """
-    Process a YAML file containing configuration details for multiple data providers.
-
-    Args:
-        config_yaml (Path): The path to the YAML file that needs to be processed.
-
-    Returns:
-        bool: True if the YAML file was successfully processed, False otherwise.
+    Lists all database names from either a YAML or JSON configuration file.
     """
+    print_header("Available Databases")
+
     try:
-        with open(config_yaml, "r") as file:
-            config = yaml.safe_load(file)
-
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-        ) as progress:
-            main_task = progress.add_task(
-                "[green]Processing YAML config", total=len(config["data_providers"])
-            )
+        if config_file.endswith(".yaml") or config_file.endswith(".yml"):
+            with open(config_file) as f:
+                config = yaml.safe_load(f)
 
             for provider in config["data_providers"]:
-                provider_task = progress.add_task(
-                    f"Processing {provider['name']}",
-                    total=len(provider["environments"]),
-                )
-
+                print_header(provider["name"])  # Using header for provider names
                 for environment in provider["environments"]:
                     json_file = (
-                        config_yaml.parent
+                        Path(config_file).parent
                         / f"{provider['name']}/databases.{provider['name']}.{environment}.json"
                     )
-                    process_json(json_file, environment, provider["name"], progress)
-                    progress.update(provider_task, advance=1)
+                    if json_file.exists():
+                        with open(json_file, "r") as f:
+                            db_coordinates = json.load(f)
+                        for entry in db_coordinates["data"]:
+                            print_status(f"• {entry['blast_title']}", "info")
+                    else:
+                        print_status(f"JSON file not found - {json_file}", "warning")
 
-                progress.update(main_task, advance=1)
+        elif config_file.endswith(".json"):
+            with open(config_file, "r") as f:
+                db_coordinates = json.load(f)
+            for entry in db_coordinates["data"]:
+                print_status(f"• {entry['blast_title']}", "info")
+        else:
+            log_error("Config file must be either YAML or JSON")
 
-        return True
     except Exception as e:
-        LOGGER.error(f"Error processing YAML file: {e}")
-        console.print(
-            Panel(
-                f"[bold red]Error processing YAML file:[/bold red] {e}",
-                title="Error",
-                border_style="red",
+        log_error("Failed to list databases", e)
+
+
+def process_files(
+    config_yaml: Optional[str],
+    input_json: Optional[str],
+    environment: str,
+    db_list: Optional[List[str]] = None,
+    check_only: bool = False,
+    store_files: bool = False,
+    cleanup: bool = False,
+) -> None:
+    """
+    Process configuration files with enhanced logging.
+    """
+    LOGGER.info("Starting configuration file processing")
+    LOGGER.info(
+        f"Parameters: check_only={check_only}, store_files={store_files}, cleanup={cleanup}"
+    )
+
+    try:
+        if config_yaml:
+            LOGGER.info(f"Processing YAML config: {config_yaml}")
+            with open(config_yaml) as f:
+                config = yaml.safe_load(f)
+
+            for provider in config["data_providers"]:
+                provider_start = datetime.now()
+                LOGGER.info(f"Processing provider: {provider['name']}")
+
+                for env in provider["environments"]:
+                    json_file = (
+                        Path(config_yaml).parent
+                        / f"{provider['name']}/databases.{provider['name']}.{env}.json"
+                    )
+
+                    if json_file.exists():
+                        LOGGER.info(f"Found JSON file: {json_file}")
+                        process_json_entries(
+                            str(json_file),
+                            env,
+                            provider["name"],
+                            db_list,
+                            check_only,
+                            store_files,
+                            cleanup,
+                        )
+                    else:
+                        LOGGER.warning(f"JSON file not found: {json_file}")
+
+                duration = datetime.now() - provider_start
+                LOGGER.info(
+                    f"Completed processing provider {provider['name']} in {duration}"
+                )
+
+        elif input_json:
+            LOGGER.info(f"Processing single JSON file: {input_json}")
+            process_json_entries(
+                input_json, environment, None, db_list, check_only, store_files, cleanup
             )
+
+    except Exception as e:
+        LOGGER.error(f"Failed to process configuration files: {str(e)}", exc_info=True)
+        raise
+
+
+def process_entry(
+    entry: Dict,
+    mod_code: str,
+    environment: str,
+    check_only: bool = False,
+    store_files: bool = False,
+) -> bool:
+    """
+    Process a single database entry with comprehensive logging and progress display.
+
+    Args:
+        entry: Database entry configuration
+        mod_code: Model organism database identifier
+        environment: Deployment environment
+        check_only: Whether to only check parse_seqids
+        store_files: Whether to store original files
+
+    Returns:
+        bool: Success status
+    """
+    print_header(f"Processing {entry['blast_title']}")
+    start_time = datetime.now()
+    entry_name = entry["blast_title"]
+
+    # Setup entry-specific logging
+    date_to_add = datetime.now().strftime("%Y_%b_%d")
+    log_path = f"../logs/{entry['genus']}_{entry['species']}_{entry['seqtype']}_{date_to_add}.log"
+    logger = extendable_logger(entry_name, log_path)
+
+    logger.info(f"Starting processing of entry: {entry_name}")
+    logger.info(
+        f"Configuration details: {json.dumps({k: v for k, v in entry.items() if k != 'uri'}, indent=2)}"
+    )
+
+    try:
+        fasta_file = Path(entry["uri"]).name
+        unzipped_fasta = f"../data/{fasta_file.replace('.gz', '')}"
+
+        # Log processing parameters
+        print_status("Processing parameters:", "info")
+        print_status(f"  MOD code: {mod_code}", "info")
+        print_status(f"  Environment: {environment}", "info")
+        print_status(f"  Check only: {check_only}", "info")
+        print_status(f"  Store files: {store_files}", "info")
+
+        # Download file
+        print_status(f"Downloading {fasta_file}...", "info")
+        if entry["uri"].startswith("ftp://"):
+            success = get_files_ftp(
+                entry["uri"],
+                entry["md5sum"],
+                logger,
+                mod=mod_code,
+                store_files=store_files,
+            )
+        else:
+            success = get_files_http(
+                entry["uri"],
+                entry["md5sum"],
+                logger,
+                mod=mod_code,
+                store_files=store_files,
+            )
+
+        if not success:
+            log_error("File download failed")
+            return False
+
+        print_status("File download complete", "success")
+
+        # Create database if not check_only
+        if not check_only:
+            # Create database structure
+            print_status("Creating database structure", "info")
+            output_dir, config_dir = create_db_structure(
+                environment, mod_code, entry, logger
+            )
+
+            # Unzip file if needed
+            if (
+                not Path(unzipped_fasta).exists()
+                and Path(f"../data/{fasta_file}").exists()
+            ):
+                logger.info(f"Unzipping {fasta_file}")
+                print_status(f"Unzipping {fasta_file}...", "info")
+                unzip_command = f"gunzip -v ../data/{fasta_file}"
+                p = Popen(unzip_command, shell=True, stdout=PIPE, stderr=PIPE)
+                stdout, stderr = p.communicate()
+
+                if p.returncode != 0:
+                    log_error(f"Unzip failed: {stderr.decode('utf-8')}")
+                    return False
+
+            # Run makeblastdb
+            print_status("Running makeblastdb...", "info")
+            if not run_makeblastdb(entry, output_dir, logger):
+                log_error("Database creation failed")
+                return False
+
+            print_status("Database created successfully", "success")
+
+            SLACK_MESSAGES.append(
+                {
+                    "title": "Database Creation Success",
+                    "text": f"Successfully processed {entry_name}",
+                    "color": "#36a64f",
+                }
+            )
+
+        # Check parse_seqids requirement if in check_only mode
+        elif check_only:
+            if Path(unzipped_fasta).exists():
+                needs_parse = needs_parse_seqids(unzipped_fasta)
+                status = "requires" if needs_parse else "does not require"
+                print_status(
+                    f"{entry_name}: {'[green]requires[/green]' if needs_parse else '[yellow]does not require[/yellow]'} -parse_seqids flag",
+                    "info",
+                )
+                logger.info(f"Parse seqids check: {entry_name} {status} -parse_seqids")
+
+        # Clean up files
+        try:
+            if Path(unzipped_fasta).exists():
+                if check_only or not store_files:
+                    file_size = Path(unzipped_fasta).stat().st_size
+                    print_status(
+                        f"Cleaning up unzipped file: {unzipped_fasta} (size: {file_size:,} bytes)",
+                        "info",
+                    )
+                    Path(unzipped_fasta).unlink()
+
+            original_gzip = f"../data/{fasta_file}"
+            if Path(original_gzip).exists() and not store_files:
+                file_size = Path(original_gzip).stat().st_size
+                print_status(
+                    f"Cleaning up original gzipped file: {original_gzip} (size: {file_size:,} bytes)",
+                    "info",
+                )
+                Path(original_gzip).unlink()
+
+        except Exception as e:
+            log_error("Cleanup failed", e)
+            logger.error(f"Cleanup failed: {str(e)}", exc_info=True)
+
+        # Log completion
+        duration = datetime.now() - start_time
+        logger.info(f"Entry processing completed in {duration}")
+        return True
+
+    except Exception as e:
+        log_error("Entry processing failed", e)
+        logger.error(f"Entry processing failed: {str(e)}", exc_info=True)
+        SLACK_MESSAGES.append(
+            {
+                "title": "Processing Error",
+                "text": f"Failed to process {entry_name}: {str(e)}",
+                "color": "#8D2707",
+            }
         )
         return False
 
 
-def process_json(
-    json_file: Path,
+def process_json_entries(
+    json_file: str,
     environment: str,
     mod: Optional[str] = None,
-    db_info: Optional[dict] = None,
+    db_list: Optional[List[str]] = None,
+    check_only: bool = False,
+    store_files: bool = False,
+    cleanup: bool = True,
 ) -> bool:
-    LOGGER.info(f"Processing JSON file: {json_file}")
-
-    if mod is None:
-        mod = get_mod_from_json(json_file)
-
-    if not mod:
-        LOGGER.error("Unable to determine MOD")
-        return False
+    """
+    Process entries from a JSON configuration file with enhanced progress display.
+    """
+    print_header("Processing JSON Entries")
+    start_time = datetime.now()
+    LOGGER.info(f"Processing JSON entries from: {json_file}")
 
     try:
-        with open(json_file, "r") as file:
-            db_coordinates = json.load(file)
+        with open(json_file, "r") as f:
+            db_coordinates = json.load(f)
+            print_status("Successfully loaded JSON configuration", "success")
 
-        total_entries = len(db_coordinates["data"])
-        with Progress() as progress:
-            main_task = progress.add_task(
-                f"Processing {mod} - {environment}", total=total_entries
-            )
+        # Get MOD code
+        mod_code = mod if mod is not None else get_mod_from_json(json_file)
+        if not mod_code:
+            log_error("Invalid or missing MOD code")
+            return False
 
-            for entry in db_coordinates["data"]:
-                LOGGER.info(f"Processing {entry['uri']}")
-                if get_files_ftp(entry["uri"], entry["md5sum"]):
-                    output_dir, config_dir = create_db_structure(
-                        environment, mod, entry
+        print_status(f"Using MOD code: {mod_code}", "info")
+
+        # Create logs directory
+        Path("../logs").mkdir(parents=True, exist_ok=True)
+
+        # Process entries with progress tracking
+        entries = db_coordinates.get("data", [])
+        total_entries = len(entries)
+        processed = 0
+        successful = 0
+
+        print_status(f"Found {total_entries} entries to process", "info")
+
+        with create_progress() as progress:
+            task = progress.add_task("Processing entries...", total=total_entries)
+
+            for entry in entries:
+                processed += 1
+
+                if db_list and entry["blast_title"] not in db_list:
+                    print_status(
+                        f"Skipping {entry['blast_title']} (not in requested list)",
+                        "warning",
                     )
-                    copyfile(json_file, config_dir / "environment.json")
+                    progress.advance(task)
+                    continue
 
-                    if output_dir.exists():
-                        if run_makeblastdb(entry, output_dir):
-                            if db_info is not None:
-                                db_info["databases_created"].append(
-                                    {
-                                        "name": entry["blast_title"],
-                                        "type": entry["seqtype"],
-                                        "taxon_id": entry["taxon_id"],
-                                    }
-                                )
-                        else:
-                            LOGGER.error(
-                                f"Failed to create BLAST database for {entry['uri']}"
-                            )
-                            return False
-                progress.update(main_task, advance=1)
+                try:
+                    if process_entry(
+                        entry, mod_code, environment, check_only, store_files
+                    ):
+                        successful += 1
+                except Exception as e:
+                    log_error(f"Failed to process entry {entry['blast_title']}", e)
 
-        return True
+                progress.advance(task)
+
+        # After all entries are processed successfully, copy the configuration file
+        if successful > 0 and not check_only:
+            print_status("Copying configuration file", "info")
+            config_dir = Path(f"../data/config/{mod_code}/{environment}")
+            if copy_config_file(Path(json_file), config_dir, LOGGER):
+                print_status("Configuration file copied successfully", "success")
+            else:
+                log_error("Failed to copy configuration file")
+
+            # Update genome browser mappings after all entries are processed
+            print_status("Updating genome browser mappings", "info")
+            for entry in entries:
+                if "genome_browser" in entry:
+                    if update_genome_browser_map(entry, mod_code, environment, LOGGER):
+                        print_status(
+                            f"Updated mapping for {entry['blast_title']}", "success"
+                        )
+                    else:
+                        log_error(
+                            f"Failed to update mapping for {entry['blast_title']}"
+                        )
+
+        # Clean up all FASTA files after processing if cleanup is enabled
+        if cleanup and not check_only:
+            print_status("Starting post-processing cleanup", "info")
+            try:
+                cleanup_fasta_files(Path("../data"), LOGGER)
+                print_status("Cleanup completed successfully", "success")
+            except Exception as e:
+                log_error("Cleanup failed", e)
+
+        # Show final summary
+        duration = datetime.now() - start_time
+        show_summary(
+            "JSON Processing",
+            {
+                "Total Entries": total_entries,
+                "Processed": processed,
+                "Successful": successful,
+                "Failed": processed - successful,
+                "Cleanup Performed": str(cleanup and not check_only),
+            },
+            duration,
+        )
+
+        summary_text = (
+            "*JSON Processing Summary*\n"
+            f"• *Total Entries:* {total_entries}\n"
+            f"• *Processed:* {processed}\n"
+            f"• *Successful:* {successful}\n"
+            f"• *Failed:* {processed - successful}\n"
+            f"• *Cleanup Performed:* {cleanup and not check_only}\n"
+            f"• *Duration:* {duration}"
+        )
+
+        SLACK_MESSAGES.append(
+            {
+                "color": "#36a64f" if successful == total_entries else "#ff9900",
+                "title": "Processing Summary",
+                "text": summary_text,
+                "mrkdwn_in": ["text"],
+            }
+        )
+
+        return successful > 0
+
     except Exception as e:
-        LOGGER.error(f"Error processing JSON file: {str(e)}")
+        log_error(f"Failed to process JSON file {json_file}", e)
         return False
-
-
-def derive_mod_from_input(input_file):
-    """
-    Derive the MOD (Model Organism) from the input file name.
-
-    Args:
-        input_file (str): The path to the input file.
-
-    Returns:
-        str: The MOD (Model Organism) extracted from the input file name. If the input file name does not have the expected format or the MOD cannot be extracted, returns 'Unknown'.
-    """
-    file_name = Path(input_file).name
-    parts = file_name.split('.')
-    if len(parts) >= 3 and parts[0] == 'databases':
-        return parts[1]  # This should be the MOD
-    return 'Unknown'
-
 
 
 @click.command()
@@ -344,72 +580,127 @@ def derive_mod_from_input(input_file):
 @click.option("-j", "--input_json", help="JSON file input coordinates")
 @click.option("-e", "--environment", help="Environment", default="dev")
 @click.option("-m", "--mod", help="Model organism")
-@click.option("-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=False)
+@click.option(
+    "-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=False
+)
 @click.option("-u", "--update-slack", help="Update Slack", is_flag=True, default=False)
 @click.option("-s3", "--sync-s3", help="Sync to S3", is_flag=True, default=False)
-def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_slack, sync_s3):
+@click.option("--store-files", help="Store original files", is_flag=True, default=False)
+@click.option(
+    "-cl",
+    "--cleanup",
+    help="Clean up FASTA files after processing",
+    is_flag=True,
+    default=True,
+)
+@click.option(
+    "-d",
+    "--db_names",
+    help="Comma-separated list of database names to create",
+    default=None,
+)
+@click.option(
+    "-l",
+    "--list",
+    "list_dbs",
+    help="List available databases",
+    is_flag=True,
+    default=False,
+)
+@click.option(
+    "-c",
+    "--check-parse-seqids",
+    help="Only check if files need parse_seqids",
+    is_flag=True,
+    default=False,
+)
+def create_dbs(
+    config_yaml: str,
+    input_json: str,
+    environment: str,
+    mod: str,
+    skip_efs_sync: bool,
+    update_slack: bool,
+    sync_s3: bool,
+    store_files: bool,
+    cleanup: bool,
+    db_names: Optional[str],
+    list_dbs: bool,
+    check_parse_seqids: bool,
+) -> None:
     """
-    A command line interface function that creates BLAST databases based on the provided configuration.
-    
-    Parameters:
-    - config_yaml (str): YAML file with all MODs configuration.
-    - input_json (str): JSON file input coordinates.
-    - environment (str): Environment. Default is "dev".
-    - mod (str): Model organism.
-    - skip_efs_sync (bool): Skip EFS sync. Default is False.
-    - update_slack (bool): Update Slack. Default is False.
-    - sync_s3 (bool): Sync to S3. Default is False.
-    
-    Returns:
-    None
+    Main function that runs the pipeline for processing configuration files and creating BLAST databases.
     """
-    start_time = time.time()
-    LOGGER.info("Starting create_dbs function")
+    start_time = datetime.now()
+    LOGGER.info("Starting BLAST database creation process")
+    LOGGER.info(
+        f"Parameters: environment={environment}, mod={mod}, store_files={store_files}, cleanup={cleanup}"
+    )
 
     try:
-        # If mod is not provided, try to derive it from the input file
-        if mod is None:
-            mod = derive_mod_from_input(input_json or config_yaml)
+        if db_names:
+            db_list = [name.strip() for name in db_names.split(",")]
+            LOGGER.info(f"Processing specific databases: {db_list}")
+        else:
+            db_list = None
+            LOGGER.info("Processing all databases")
 
-        db_info = {
-            "mod": mod,
-            "environment": environment,
-            "databases_created": []
-        }
+        if list_dbs:
+            if config_yaml or input_json:
+                list_databases_from_config(config_yaml or input_json)
+            else:
+                msg = "Please provide either a YAML (-g) or JSON (-j) configuration file to list databases."
+                LOGGER.error(msg)
+                print_status(msg, "error")
+            return
+
+        if len(sys.argv) == 1:
+            LOGGER.info("No arguments provided, showing help")
+            click.echo(create_dbs.get_help(ctx=None))
+            return
 
         if config_yaml:
-            success = process_yaml(Path(config_yaml), db_info)
+            LOGGER.info(f"Processing YAML config: {config_yaml}")
+            process_files(
+                config_yaml,
+                None,
+                None,
+                db_list,
+                check_parse_seqids,
+                store_files,
+                cleanup,
+            )
         elif input_json:
-            success = process_json(Path(input_json), environment, db_info['mod'], db_info)
-        else:
-            LOGGER.error("Neither config_yaml nor input_json provided")
-            return
+            LOGGER.info(f"Processing JSON config: {input_json}")
+            process_files(
+                None,
+                input_json,
+                environment,
+                db_list,
+                check_parse_seqids,
+                store_files,
+                cleanup,
+            )
 
-        if not success:
-            LOGGER.error("Processing failed. Exiting.")
-            return
+        # Handle Slack updates with better error checking
+        if update_slack and not check_parse_seqids and SLACK_MESSAGES:
+            try:
+                LOGGER.info("Sending Slack update")
+                slack_message(SLACK_MESSAGES)
+            except Exception as e:
+                log_error("Failed to send Slack update - check SLACK token in .env", e)
 
-        if update_slack:
-            message = f"*MOD:* {db_info['mod']}\n"
-            message += f"*Environment:* {db_info['environment']}\n"
-            message += f"*Databases created:*\n"
-            for db in db_info['databases_created']:
-                message += f"• *{db['name']}* (Type: `{db['type']}`, Taxon ID: `{db['taxon_id']}`)\n"
+        if sync_s3 and not check_parse_seqids:
+            LOGGER.info("Starting S3 sync")
+            s3_sync(Path("../data"), skip_efs_sync)
 
-            slack_success = slack_message([{"text": message}], subject="BLAST Database Update")
-            LOGGER.info(f"Slack update {'successful' if slack_success else 'failed'}")
-
-        if sync_s3:
-            s3_success = s3_sync(Path("../data"), skip_efs_sync)
-            LOGGER.info(f"S3 sync {'successful' if s3_success else 'failed'}")
+        duration = datetime.now() - start_time
+        LOGGER.info(f"Process completed successfully in {duration}")
 
     except Exception as e:
-        LOGGER.error(f"Unhandled exception in create_dbs: {str(e)}", exc_info=True)
-    finally:
-        end_time = time.time()
-        duration = end_time - start_time
-        LOGGER.info(f"create_dbs function completed in {duration:.2f} seconds")
-
+        LOGGER.error(f"Process failed: {str(e)}", exc_info=True)
+        log_error(str(e))
+        sys.exit(1)
 
 
 if __name__ == "__main__":

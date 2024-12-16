@@ -9,46 +9,167 @@ Author: Paulo Nuin, Adam Wright
 Date: started September 2023
 """
 
-import gzip
 import hashlib
+import json
 import logging
+import re
+from datetime import datetime
 from ftplib import FTP
-from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from subprocess import PIPE, CalledProcessError, Popen, run
-from typing import Any, List, Tuple
+from shutil import copyfile
+from subprocess import PIPE, Popen
+from typing import Any, Optional
 
+import wget
 from dotenv import dotenv_values
+from rich import print as rprint
 from rich.console import Console
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
-from slack_sdk.webhook import WebhookClient
+
+from terminal import create_progress, log_error, print_status
 
 console = Console()
-
-# Define LOGGER at the top of utils.py
-LOGGER = logging.getLogger(__name__)
 
 # TODO: move to ENV
 MODS = ["FB", "SGD", "WB", "XB", "ZFIN"]
 
 
+def copy_config_file(json_file: Path, config_dir: Path, logger) -> bool:
+    """
+    Copies the configuration file to the config directory.
+    """
+    try:
+        # Ensure config directory exists
+        config_dir.mkdir(parents=True, exist_ok=True)
+
+        # Copy the JSON configuration file
+        target_file = config_dir / "environment.json"
+        target_file.write_text(json_file.read_text())
+        logger.info(f"Copied configuration file to {target_file}")
+
+        return True
+    except Exception as e:
+        logger.error(f"Failed to copy configuration file: {str(e)}")
+        return False
+
+
+def setup_detailed_logger(
+    log_name: str, file_name: str, level=logging.INFO
+) -> logging.Logger:
+    """
+    Creates a detailed logger with comprehensive formatting.
+    """
+    formatter = logging.Formatter(
+        "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    logger = logging.getLogger(log_name)
+    logger.setLevel(level)
+
+    # Prevent duplicate handlers
+    if logger.handlers:
+        return logger
+
+    # File handler
+    handler = logging.FileHandler(file_name)
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+    return logger
+
+
+def store_fasta_files(fasta_file: str, logger, store_files: bool = False) -> None:
+    """
+    Stores FASTA files in a dated directory if storage is enabled.
+
+    Args:
+        fasta_file (str): Path to the FASTA file
+        logger (logging.Logger): Logger instance
+        store_files (bool): Whether to store the file
+    """
+    if not store_files:
+        logger.info(f"File storage disabled, skipping storage of {fasta_file}")
+        return
+
+    date_to_add = datetime.now().strftime("%Y_%b_%d")
+    original_files_store = Path(f"../data/database_{date_to_add}")
+
+    try:
+        if not original_files_store.exists():
+            logger.info(f"Creating storage directory: {original_files_store}")
+            original_files_store.mkdir(parents=True, exist_ok=True)
+
+        file_size = Path(fasta_file).stat().st_size
+        dest_path = original_files_store / Path(fasta_file).name
+
+        logger.info(
+            f"Storing file {fasta_file} (size: {file_size} bytes) to {dest_path}"
+        )
+        copyfile(fasta_file, dest_path)
+        logger.info("File stored successfully")
+
+    except Exception as e:
+        logger.error(f"Failed to store file {fasta_file}: {str(e)}", exc_info=True)
+        # Don't raise the exception - make storage truly optional
+        logger.warning("Continuing process despite storage failure")
+
+
+def cleanup_fasta_files(data_dir: Path, logger) -> None:
+    """
+    Cleans up all FASTA files in the specified directory after database generation.
+    """
+    logger.info(f"Starting cleanup of FASTA files in {data_dir}")
+    print_status("Starting final cleanup...", "info")
+
+    try:
+        # Find all FASTA files (both gzipped and uncompressed)
+        fasta_patterns = ["*.fa*", "*.fasta*", "*.fna*", "*.gz"]
+        fasta_files = []
+        for pattern in fasta_patterns:
+            fasta_files.extend(list(data_dir.glob(pattern)))
+
+        if not fasta_files:
+            logger.info("No FASTA files found for cleanup")
+            print_status("No files to clean up", "info")
+            return
+
+        logger.info(f"Found {len(fasta_files)} files to clean up")
+        print_status(f"Found {len(fasta_files)} files to clean up", "info")
+
+        with create_progress() as progress:
+            cleanup_task = progress.add_task(
+                "Cleaning up files...", total=len(fasta_files)
+            )
+
+            for fasta_file in fasta_files:
+                try:
+                    file_size = fasta_file.stat().st_size
+                    logger.info(
+                        f"Removing {fasta_file.name} (size: {file_size:,} bytes)"
+                    )
+                    fasta_file.unlink()
+                    logger.info(f"Successfully removed {fasta_file.name}")
+                except Exception as e:
+                    logger.error(f"Failed to remove {fasta_file.name}: {str(e)}")
+                    print_status(f"Failed to remove {fasta_file.name}", "warning")
+
+                progress.advance(cleanup_task)
+
+        print_status("Cleanup completed successfully", "success")
+        logger.info("FASTA file cleanup completed")
+
+    except Exception as e:
+        error_msg = f"Error during FASTA cleanup: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        print_status(error_msg, "error")
+
+
 def extendable_logger(log_name, file_name, level=logging.INFO) -> Any:
     """
     Creates a logger that can be extended with additional handlers and configurations.
-
-    This function sets up a logger with a specified name, log file, and logging level. The logger uses a file handler to write log messages to a file. The log messages are formatted to include the timestamp, log level, and the log message.
-
-    :param log_name: The name of the logger.
-    :type log_name: str
-    :param file_name: The name of the file where the log messages will be written.
-    :type file_name: str
-    :param level: The logging level. By default, it's set to logging.INFO.
-    :type level: int, optional
-    :return: The configured logger.
-    :rtype: logging.Logger
     """
-
     formatter = logging.Formatter("[%(asctime)s] %(levelname)s %(message)s")
     handler = logging.FileHandler(file_name)
     handler.setFormatter(formatter)
@@ -59,85 +180,48 @@ def extendable_logger(log_name, file_name, level=logging.INFO) -> Any:
     return specified_logger
 
 
-def check_md5sum(fasta_file, md5sum) -> bool:
+def check_md5sum(fasta_file: str, expected_md5: str, logger) -> bool:
     """
-    Checks the MD5 checksum of a downloaded file.
+    Checks MD5 checksum of a file with detailed logging.
 
-    This function calculates the MD5 checksum of the downloaded file and compares it with the expected checksum. If the checksums match, the function returns True. Otherwise, it returns False.
+    Args:
+        fasta_file (str): Path to the file
+        expected_md5 (str): Expected MD5 checksum
+        logger (logging.Logger): Logger instance
 
-    :param fasta_file: The path to the downloaded file.
-    :type fasta_file: str
-    :param md5sum: The expected MD5 checksum.
-    :type md5sum: str
-    :return: True if the checksums match, False otherwise.
-    :rtype: bool
+    Returns:
+        bool: True if checksums match, False otherwise
     """
+    logger.info(f"Calculating MD5 checksum for {fasta_file}")
+    try:
+        with open(fasta_file, "rb") as f:
+            file_size = Path(fasta_file).stat().st_size
+            logger.info(f"File size: {file_size} bytes")
 
-    downloaded_md5sum = hashlib.md5(open(fasta_file, "rb").read()).hexdigest()
-    if downloaded_md5sum != md5sum:
-        console.log(f"MD5sums do not match: {md5sum} != {downloaded_md5sum}")
+            # Calculate MD5
+            start_time = datetime.now()
+            calculated_md5 = hashlib.md5(f.read()).hexdigest()
+            duration = datetime.now() - start_time
+
+            logger.info(f"MD5 calculation completed in {duration}")
+            logger.info(f"Expected MD5: {expected_md5}")
+            logger.info(f"Calculated MD5: {calculated_md5}")
+
+            if calculated_md5 != expected_md5:
+                logger.error("MD5 checksums do not match")
+                return False
+
+            logger.info("MD5 checksums match")
+            return True
+
+    except Exception as e:
+        logger.error(f"MD5 checksum verification failed: {str(e)}", exc_info=True)
         return False
-
-    console.log(f"MD5sums match: {md5sum} {downloaded_md5sum}")
-
-    return True
-
-
-def get_ftp_file_size(fasta_uri, file_logger) -> int:
-    """
-    Function to get the size of a file on an FTP server.
-
-    This function connects to an FTP server, navigates to the directory containing the file, and retrieves the size of the file.
-
-    :param fasta_uri: The URI of the FASTA file on the FTP server.
-    :type fasta_uri: str
-    :param file_logger: The logger object used for logging the process of getting the file size.
-    :type file_logger: logging.Logger
-    :return: The size of the file in bytes.
-    :rtype: int
-    """
-
-    # Initialize the size to 0
-    size = 0
-
-    # Connect to the FTP server
-    ftp = FTP(Path(fasta_uri).parts[1])
-    ftp.login()
-
-    # Navigate to the directory containing the file
-    ftp.cwd("/".join(Path(fasta_uri).parts[2:-1]))
-
-    # Get the name of the file
-    filename = Path(fasta_uri).name
-
-    if filename is not None:
-        # Get the size of the file
-        size = ftp.size(filename)
-        if size is not None:
-            # Log the size of the file
-            console.log(f"File size is {size} bytes")
-            file_logger.info(f"File size is {size} bytes")
-        else:
-            # Handle the case where size is None
-            console.log("Error: File size is not available.")
-            return 0
-    else:
-        console.log("Error: Filename is None.")
-        return 0
-
-    return size
 
 
 def get_mod_from_json(input_json) -> str:
     """
     Retrieves the model organism (mod) from the input JSON file.
-
-    This function extracts the mod from the filename of the input JSON file. The mod is the second element when the filename is split by the "." character. If the mod is not found in the predefined list of mods, the function returns False. Otherwise, it returns the mod.
-
-    :param input_json: The path to the input JSON file.
-    :type input_json: str
-    :return: The model organism (mod) if found, False otherwise.
-    :rtype: str or bool
     """
     filename = Path(input_json).name
     mod = filename.split(".")[1]
@@ -147,85 +231,73 @@ def get_mod_from_json(input_json) -> str:
         return False
 
     console.log(f"Mod found: {mod}")
-
     return mod
 
 
 def edit_fasta(fasta_file: str, config_entry: dict) -> bool:
     """
     Edits the FASTA file based on the configuration entry.
-
-    This function opens the FASTA file, reads the lines, and modifies the header lines to include additional information from the configuration entry. The modified lines are then written back to the FASTA file.
-
-    :param fasta_file: The path to the FASTA file to be edited.
-    :type fasta_file: str
-    :param config_entry: The configuration entry containing the additional information to be added to the FASTA file.
-    :type config_entry: dict
-    :return: True if the FASTA file was successfully edited, False otherwise.
-    :rtype: bool
     """
-
-    # Initialize a list to store the original file lines
     original_file = []
 
-    # Open the FASTA file and read the lines
     with open(fasta_file, "r") as fh:
         lines = fh.readlines()
 
-        # Iterate over the lines
         for line in lines:
-            # Check if the line is a header line
             if line.startswith(">"):
-                # Strip the newline character from the line
                 line = line.strip()
-
-                # Check if 'seqcol' is in the configuration entry
                 if "seqcol" in config_entry.keys():
-                    # If so, append the 'seqcol', 'genus', and 'species' values to the line
                     line += f" {config_entry['seqcol']} {config_entry['genus']} {config_entry['species']}\n"
                 else:
-                    # If not, append the 'genus', 'species', and 'version' values to the line
                     line += f" {config_entry['genus']} {config_entry['species']} {config_entry['version']}\n"
-
-                # Add the modified line to the original file list
                 original_file.append(line)
             else:
-                # If the line is not a header line, add it to the original file list as is
                 original_file.append(line)
 
-    # Open the FASTA file in write mode
     edited_file = open(fasta_file, "w")
-
-    # Write the lines from the original file list to the FASTA file
     edited_file.writelines(original_file)
-
-    # Close the FASTA file
     edited_file.close()
 
     return True
 
 
+def validate_fasta(filename: str) -> bool:
+    """
+    Validates if a file is in FASTA format without using Biopython.
+    """
+    try:
+        with open(filename, "r") as f:
+            first_line = f.readline().strip()
+            if not first_line:
+                return False
+
+            if not first_line.startswith(">"):
+                return False
+
+            has_sequence = False
+            for line in f:
+                line = line.strip()
+                if line.startswith(">"):
+                    if not has_sequence:
+                        return False
+                    has_sequence = False
+                elif line:  # sequence line
+                    has_sequence = True
+
+            return has_sequence
+
+    except Exception as e:
+        console.log(f"[red]Error validating FASTA file: {e}[/red]")
+        return False
+
+
 def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
     """
     Syncs files from a local directory to an S3 bucket.
-
-    This function uses the AWS CLI to sync files from a local directory to an S3 bucket. It excludes any temporary files during the sync process. If the `skip_efs_sync` flag is not set, it also syncs the files to an EFS volume.
-
-    :param path_to_copy: The path to the local directory to be synced to the S3 bucket.
-    :type path_to_copy: Path
-    :param skip_efs_sync: A flag indicating whether to skip syncing to the EFS volume.
-    :type skip_efs_sync: bool
-    :return: True if the sync operation was successful, False otherwise.
-    :rtype: bool
     """
-
-    # Load environment variables from .env file
     env = dotenv_values(f"{Path.cwd()}/.env")
-
-    # Log the start of the S3 sync process
     console.log(f"Syncing {path_to_copy} to S3")
 
-    # Construct the AWS CLI command to sync files to the S3 bucket
     proc = Popen(
         [
             "aws",
@@ -242,7 +314,6 @@ def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
         stderr=PIPE,
     )
 
-    # Process the output of the AWS CLI command
     while True:
         output = proc.stderr.readline().strip()
         if output == b"":
@@ -250,13 +321,9 @@ def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
         else:
             console.log(output.decode("utf-8"))
 
-    # Wait for the AWS CLI command to complete
     proc.wait()
-
-    # Log the completion of the S3 sync process
     console.log(f"Syncing {path_to_copy} to S3: done")
 
-    # If the skip_efs_sync flag is not set, sync the files to the EFS volume
     if not skip_efs_sync:
         sync_to_efs()
 
@@ -266,207 +333,430 @@ def s3_sync(path_to_copy: Path, skip_efs_sync: bool) -> bool:
 def sync_to_efs() -> bool:
     """
     Syncs files from an S3 bucket to an EFS volume.
-
-    This function uses the AWS CLI to sync files from an S3 bucket to an EFS volume. It excludes any temporary files during the sync process.
-
-    :return: True if the sync operation was successful, False otherwise.
-    :rtype: bool
     """
-
-    # Load environment variables from .env file
     env = dotenv_values(f"{Path.cwd()}/.env")
-
-    # Log the start of the EFS sync process
     console.log(f"Syncing {env['S3']} to {env['EFS']}")
 
-    # Get the S3 and EFS paths from the environment variables
     s3_path = env.get("S3")
     efs_path = env.get("EFS")
 
-    # Check if the S3 and EFS paths are not None
     if s3_path is not None and efs_path is not None:
-        # If so, construct the AWS CLI command to sync files to the EFS volume
         proc = Popen(
             ["aws", "s3", "sync", s3_path, efs_path, "--exclude", "*.tmp"],
             stdout=PIPE,
             stderr=PIPE,
         )
     else:
-        # If not, log that the S3 or EFS path is not defined in the environment variables
         console.log("S3 or EFS path is not defined in the environment variables")
+        return False
 
-    # Process the output of the AWS CLI command
     while True:
-        # Read a line from stderr and decode it to utf-8
         if proc.stderr is not None:
             output = proc.stderr.readline().decode("utf-8").strip()
-            # Process output further if needed
-        else:
-            # Handle the case when proc.stderr is None
-            output = "No output available"
+            if not output:
+                break
             console.log(output)
+        else:
+            break
 
-    # Wait for the AWS CLI command to complete
     proc.wait()
-
-    # Log the completion of the EFS sync process
     console.log(f"Syncing {env['S3']} to {env['EFS']}: done")
-
     return True
 
 
 def check_output(stdout: bytes, stderr: bytes) -> bool:
     """
-    Check the output of a subprocess for errors.
-
-    Args:
-        stdout (bytes): Standard output from the subprocess.
-        stderr (bytes): Standard error from the subprocess.
-
-    Returns:
-        bool: True if no errors were found, False otherwise.
+    Checks the output of a command for errors.
     """
-    stderr_str = stderr.decode("utf-8")
-    if stderr_str and "Error" in stderr_str:
-        console.log(
-            f"Error in subprocess output: {stderr_str}", style="blink bold white on red"
-        )
-        return False
+    stderr = stderr.decode("utf-8")
+    if len(stderr) > 1:
+        if stderr.find("Error") >= 1:
+            console.log(stderr, style="blink bold white on red")
+            return False
     return True
-
-
-def run_command(command: List[str]) -> Tuple[bool, str]:
-    """
-    Run a shell command and return its output.
-
-    Args:
-        command (List[str]): The command to run as a list of strings.
-
-    Returns:
-        Tuple[bool, str]: A tuple containing a boolean indicating success and the command output.
-    """
-    try:
-        result = run(command, check=True, capture_output=True, text=True)
-        return True, result.stdout
-    except CalledProcessError as e:
-        return False, f"Command failed with error: {e.stderr}"
-
-
-def needs_parse_id(fasta_file: Path) -> bool:
-    """
-    Determine if the FASTA file needs parse_id option for makeblastdb.
-
-    Args:
-        fasta_file (Path): Path to the gzipped FASTA file
-
-    Returns:
-        bool: True if parse_id is needed, False otherwise
-    """
-    open_func = gzip.open if fasta_file.suffix == ".gz" else open
-    mode = "rt" if fasta_file.suffix == ".gz" else "r"
-
-    with open_func(fasta_file, mode) as f:
-        headers = [next(f).strip() for _ in range(100) if next(f).startswith(">")]
-
-    # Analyze headers here
-    complex_headers = any("|" in header for header in headers)
-    consistent_format = len(set(header.count("|") for header in headers)) == 1
-
-    return complex_headers and consistent_format
-
-
-def setup_logger(name, log_file, level=logging.INFO):
-    """Function to set up a logger with file and console handlers."""
-    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
-
-    # File Handler
-    file_handler = RotatingFileHandler(
-        log_file, maxBytes=10 * 1024 * 1024, backupCount=5
-    )
-    file_handler.setFormatter(formatter)
-
-    # Console Handler
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
-
-    return logger
 
 
 def slack_message(messages: list, subject="BLAST Database Update") -> bool:
     """
     Sends a message to a Slack channel using the Slack API.
-
-    :param messages: The list of messages to be posted to the Slack channel.
-    :type messages: list
-    :param subject: The subject of the message. By default, it's set to "BLAST Database Update".
-    :type subject: str, optional
-    :return: True if the message was successfully posted, False otherwise.
-    :rtype: bool
+    If no Slack configuration is found, skips silently.
     """
-    # Load environment variables from .env file
     env = dotenv_values(f"{Path.cwd()}/.env")
 
-    # Create a WebClient object with the Slack API token
-    client = WebClient(token=env["SLACK"])
+    # Check if Slack token is configured
+    if "SLACK" not in env:
+        print_status("Skipping Slack update - no Slack token configured", "warning")
+        return True
 
     try:
-        for msg in messages:
-            blocks = [
-                {
-                    "type": "header",
-                    "text": {"type": "plain_text", "text": subject, "emoji": True},
-                },
-                {"type": "section", "text": {"type": "mrkdwn", "text": msg["text"]}},
-                {"type": "divider"},
-            ]
-
-            # Call the chat.postMessage method using the WebClient
-            response = client.chat_postMessage(
-                channel="#blast-status",  # Channel to send message to
-                blocks=blocks,
-                text=subject,  # Fallback text for notifications
-            )
-
-        LOGGER.info("Successfully sent message to Slack channel")
+        client = WebClient(token=env["SLACK"])
+        response = client.chat_postMessage(
+            channel="#blast-status",
+            text=subject,
+            attachments=messages,
+        )
+        print_status("Slack message sent successfully", "success")
         return True
+
     except SlackApiError as e:
-        LOGGER.error(f"Error sending message to Slack: {e.response['error']}")
+        log_error(f"Failed to send Slack message: {e.response['error']}")
+        return False
+    except Exception as e:
+        log_error("Unexpected error sending Slack message", e)
         return False
 
 
-def get_ftp_file_size(fasta_uri: str) -> int:
+def needs_parse_seqids(fasta_file: str) -> bool:
     """
-    Get the size of a file on an FTP server.
+    Determines if a FASTA file needs the -parse_seqids flag by examining its headers.
+    """
+    id_patterns = [
+        r"^>.*\|.*\|",
+        r"^>lcl\|",
+        r"^>ref\|",
+        r"^>gb\|",
+        r"^>emb\|",
+        r"^>dbj\|",
+        r"^>pir\|",
+        r"^>prf\|",
+        r"^>sp\|",
+        r"^>pdb\|",
+        r"^>pat\|",
+        r"^>bbs\|",
+        r"^>gnl\|",
+        r"^>gi\|",
+    ]
+
+    patterns = [re.compile(pattern) for pattern in id_patterns]
+
+    try:
+        with open(fasta_file, "r") as f:
+            for line in f:
+                if line.startswith(">"):
+                    if any(pattern.match(line) for pattern in patterns):
+                        return True
+    except Exception as e:
+        console.log(f"Warning: Error checking FASTA headers: {e}")
+        return True
+
+    return False
+
+
+def get_files_http(
+    file_uri: str,
+    md5sum: str,
+    logger,
+    mod: Optional[str] = None,
+    store_files: bool = False,
+) -> bool:
+    """
+    Downloads files from HTTP/HTTPS sites with controlled output.
+    """
+    start_time = datetime.now()
+    logger.info(f"Starting HTTP download from: {file_uri}")
+
+    try:
+        file_name = f"../data/{Path(file_uri).name}"
+        logger.info(f"Download target: {file_name}")
+
+        # Download file with quiet output
+        download_start = datetime.now()
+        wget.download(file_uri, file_name, bar=None)  # Suppress wget progress bar
+        print()  # Add newline after download
+        download_duration = datetime.now() - download_start
+
+        # Rest of the function remains the same
+        file_size = Path(file_name).stat().st_size
+        logger.info(
+            f"Download completed | Size: {file_size:,} bytes | "
+            f"Duration: {download_duration} | "
+            f"Speed: {file_size / download_duration.total_seconds() / 1024:.2f} KB/s"
+        )
+
+        if store_files:
+            logger.info("Storing original file (store_files=True)")
+            store_fasta_files(file_name, logger)
+
+        if mod != "ZFIN":
+            logger.info(f"Verifying MD5 checksum: expected={md5sum}")
+            if not check_md5sum(file_name, md5sum, logger):
+                logger.error("MD5 checksum verification failed")
+                return False
+            logger.info("MD5 checksum verified successfully")
+        else:
+            logger.info("Skipping MD5 check for ZFIN")
+
+        return True
+
+    except Exception as e:
+        logger.error(f"Download failed: {str(e)}", exc_info=True)
+        return False
+
+
+def get_files_ftp(
+    fasta_uri: str,
+    md5sum: str,
+    logger,
+    mod: Optional[str] = None,
+    store_files: bool = False,
+) -> bool:
+    """
+    Downloads files from FTP sites with controlled output.
+    """
+    start_time = datetime.now()
+    logger.info(f"Starting FTP download from: {fasta_uri}")
+
+    try:
+        ftp_host = Path(fasta_uri).parts[1]
+        ftp_path = "/".join(Path(fasta_uri).parts[2:-1])
+        fasta_file = f"../data/{Path(fasta_uri).name}"
+        fasta_name = Path(fasta_uri).name
+
+        logger.info("FTP Details:")
+        logger.info(f"  Host: {ftp_host}")
+        logger.info(f"  Path: {ftp_path}")
+        logger.info(f"  File: {fasta_name}")
+        logger.info(f"Local target: {fasta_file}")
+
+        if store_files:
+            date_to_add = datetime.now().strftime("%Y_%b_%d")
+            stored_path = Path(f"../data/database_{date_to_add}/{fasta_name}")
+            if stored_path.exists():
+                logger.info(f"File already exists in storage: {stored_path}")
+                return False
+
+        # Get remote file size
+        try:
+            remote_size = get_ftp_file_size(fasta_uri, logger)
+            logger.info(f"Remote file size: {remote_size:,} bytes")
+        except Exception as e:
+            logger.warning(f"Could not get remote file size: {str(e)}")
+            remote_size = None
+
+        # Download file with quiet output
+        download_start = datetime.now()
+        logger.info("Starting file download")
+
+        try:
+            wget.download(fasta_uri, fasta_file, bar=None)  # Suppress wget progress bar
+            print()  # Add newline after download
+            download_duration = datetime.now() - download_start
+
+            # Rest of the verification code...
+            if Path(fasta_file).exists():
+                local_size = Path(fasta_file).stat().st_size
+                logger.info(
+                    f"Download completed:\n"
+                    f"  Duration: {download_duration}\n"
+                    f"  Local size: {local_size:,} bytes\n"
+                    f"  Speed: {local_size / download_duration.total_seconds() / 1024:.2f} KB/s"
+                )
+
+                if remote_size and remote_size != local_size:
+                    logger.error(
+                        f"Size mismatch - Remote: {remote_size:,} bytes, Local: {local_size:,} bytes"
+                    )
+                    return False
+            else:
+                logger.error("Downloaded file not found")
+                return False
+
+        except Exception as e:
+            logger.error(f"Download failed: {str(e)}", exc_info=True)
+            return False
+
+        # Rest of the function remains the same...
+        if store_files:
+            logger.info("Storing original file (store_files=True)")
+            try:
+                store_fasta_files(fasta_file, logger, store_files)
+                logger.info("File stored successfully")
+            except Exception as e:
+                logger.error(f"File storage failed: {str(e)}", exc_info=True)
+                return False
+
+        if mod == "ZFIN":
+            logger.info("Skipping MD5 check for ZFIN")
+            return True
+
+        logger.info(f"Verifying MD5 checksum: expected={md5sum}")
+        if check_md5sum(fasta_file, md5sum, logger):
+            logger.info("MD5 checksum verification successful")
+            duration = datetime.now() - start_time
+            logger.info(
+                f"FTP download and verification completed successfully in {duration}"
+            )
+            return True
+        else:
+            logger.error(
+                f"MD5 checksum verification failed:\n"
+                f"  File: {fasta_file}\n"
+                f"  Expected: {md5sum}"
+            )
+            return False
+
+    except Exception as e:
+        logger.error(
+            f"FTP download process failed:\n"
+            f"  URI: {fasta_uri}\n"
+            f"  Error: {str(e)}",
+            exc_info=True,
+        )
+        return False
+
+
+def get_ftp_file_size(fasta_uri: str, logger) -> int:
+    """
+    Gets the size of a file on an FTP server with enhanced logging.
 
     Args:
-        fasta_uri (str): The URI of the FASTA file on the FTP server.
+        fasta_uri (str): FTP URI of the file
+        logger (logging.Logger): Logger instance
 
     Returns:
-        int: The size of the file in bytes, or 0 if size couldn't be determined.
+        int: Size of the file in bytes
     """
-    try:
-        ftp_parts = fasta_uri.split("/")
-        ftp_server = ftp_parts[2]
-        ftp_path = "/".join(ftp_parts[3:-1])
-        filename = ftp_parts[-1]
+    logger.info(f"Getting file size from FTP: {fasta_uri}")
 
-        with FTP(ftp_server) as ftp:
-            ftp.login()
-            ftp.cwd(ftp_path)
-            size = ftp.size(filename)
+    try:
+        # Parse FTP URI
+        ftp_host = Path(fasta_uri).parts[1]
+        ftp_path = "/".join(Path(fasta_uri).parts[2:-1])
+        filename = Path(fasta_uri).name
+
+        logger.info(f"Connecting to FTP server: {ftp_host}")
+
+        # Connect to FTP server
+        ftp = FTP(ftp_host)
+        ftp.login()
+
+        logger.info(f"Navigating to directory: {ftp_path}")
+        ftp.cwd(ftp_path)
+
+        # Get file size
+        size = ftp.size(filename)
 
         if size is not None:
-            console.log(f"File size for {filename} is {size} bytes")
+            logger.info(f"File size retrieved: {size:,} bytes")
+            ftp.quit()
             return size
         else:
-            console.log(f"Couldn't determine size for {filename}")
+            logger.error("File size not available")
+            ftp.quit()
             return 0
 
     except Exception as e:
-        console.log(f"Error getting FTP file size: {e}")
+        logger.error(f"Failed to get FTP file size: {str(e)}", exc_info=True)
         return 0
+
+
+def update_genome_browser_map(
+    config_entry: dict, mod: str, environment: str, logger
+) -> bool:
+    """
+    Updates genome browser mappings for both Ruby and JSON formats.
+    """
+
+    def log_and_print(message: str, level: str = "info"):
+        """Helper to both log and print messages"""
+        if level == "error":
+            logger.error(message)
+            rprint(f"[red]ERROR: {message}[/red]")
+        elif level == "warning":
+            logger.warning(message)
+            rprint(f"[yellow]WARNING: {message}[/yellow]")
+        else:
+            logger.info(message)
+            rprint(f"[blue]INFO: {message}[/blue]")
+
+    try:
+        # Debug current directory
+        current_dir = Path.cwd()
+        log_and_print(f"Current working directory: {current_dir}")
+
+        # Skip if no genome browser info
+        if "genome_browser" not in config_entry:
+            log_and_print("No genome browser info found in entry, skipping", "warning")
+            return True
+
+        # Get filename and browser URL for current entry
+        filename = Path(config_entry["uri"]).name
+        browser_url = config_entry["genome_browser"]["url"]
+        log_and_print(f"Processing: {filename} -> {browser_url}")
+
+        # Define target directory with correct path and create if needed
+        target_dir = Path("../data/config") / mod / environment
+        target_dir.mkdir(parents=True, exist_ok=True)
+        log_and_print(
+            f"Target directory: {target_dir.absolute()} (exists: {target_dir.exists()})"
+        )
+
+        # Define file paths
+        json_file = target_dir / "genome_browser_map.json"
+        ruby_file = target_dir / "genome_browser_map.rb"
+        log_and_print(
+            f"Will write to:\n  JSON: {json_file.absolute()}\n  Ruby: {ruby_file.absolute()}"
+        )
+
+        # Load existing mappings from JSON if it exists
+        mapping = {}
+        if json_file.exists():
+            try:
+                with open(json_file, "r") as f:
+                    content = f.read()
+                    log_and_print(f"Existing JSON content: {content[:100]}...")
+                    if content.strip():
+                        mapping = json.loads(content)
+                log_and_print(f"Loaded {len(mapping)} existing mappings")
+            except Exception as e:
+                log_and_print(
+                    f"Starting fresh due to error reading JSON: {e}", "warning"
+                )
+
+        # Add new mapping
+        mapping[filename] = browser_url
+        log_and_print(f"Added new mapping. Total mappings now: {len(mapping)}")
+
+        # Write JSON file
+        try:
+            json_content = json.dumps(mapping, indent=2, sort_keys=True)
+            log_and_print(f"Writing JSON content: {json_content[:100]}...")
+            with open(json_file, "w") as f:
+                f.write(json_content)
+            log_and_print(
+                f"Wrote JSON file: {json_file} (size: {json_file.stat().st_size} bytes)"
+            )
+        except Exception as e:
+            log_and_print(f"Failed to write JSON file: {e}", "error")
+            return False
+
+        # Write Ruby file
+        try:
+            ruby_content = "GENOME_BROWSER_MAP = {\n"
+            for fname, url in sorted(mapping.items()):
+                ruby_content += f"  '{fname}' => '{url}',\n"
+            ruby_content += "}.freeze\n"
+
+            log_and_print(f"Writing Ruby content: {ruby_content[:100]}...")
+            with open(ruby_file, "w") as f:
+                f.write(ruby_content)
+            log_and_print(
+                f"Wrote Ruby file: {ruby_file} (size: {ruby_file.stat().st_size} bytes)"
+            )
+        except Exception as e:
+            log_and_print(f"Failed to write Ruby file: {e}", "error")
+            return False
+
+        # Final verification
+        if not json_file.exists() or not ruby_file.exists():
+            log_and_print("One or both files missing after writing!", "error")
+            log_and_print(f"JSON exists: {json_file.exists()}", "error")
+            log_and_print(f"Ruby exists: {ruby_file.exists()}", "error")
+            return False
+
+        log_and_print("✓ Successfully updated both mapping files")
+        return True
+
+    except Exception as e:
+        log_and_print(f"Failed to update mapping: {str(e)}", "error")
+        return False
