@@ -575,6 +575,22 @@ def process_json_entries(
         return False
 
 
+def send_slack_messages_in_batches(messages: List[Dict[str, str]], batch_size: int = 20) -> None:
+    """
+    Sends Slack messages in smaller batches to avoid the too_many_attachments error.
+
+    Args:
+        messages: List of message dictionaries to send
+        batch_size: Maximum number of messages to send in each batch
+    """
+    for i in range(0, len(messages), batch_size):
+        batch = messages[i:i + batch_size]
+        try:
+            slack_message(batch)
+        except Exception as e:
+            LOGGER.error(f"Failed to send Slack batch {i//batch_size + 1}: {str(e)}")
+
+
 @click.command()
 @click.option("-g", "--config_yaml", help="YAML file with all MODs configuration")
 @click.option("-j", "--input_json", help="JSON file input coordinates")
@@ -682,13 +698,13 @@ def create_dbs(
                 cleanup,
             )
 
-        # Handle Slack updates with better error checking
+        # Handle Slack updates with better error checking and batching
         if update_slack and not check_parse_seqids and SLACK_MESSAGES:
             try:
-                LOGGER.info("Sending Slack update")
-                slack_message(SLACK_MESSAGES)
+                LOGGER.info("Sending Slack updates in batches")
+                send_slack_messages_in_batches(SLACK_MESSAGES)
             except Exception as e:
-                log_error("Failed to send Slack update - check SLACK token in .env", e)
+                log_error("Failed to send Slack updates - check SLACK token in .env", e)
 
         if sync_s3 and not check_parse_seqids:
             LOGGER.info("Starting S3 sync")
