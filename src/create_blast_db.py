@@ -355,7 +355,7 @@ def process_entry(
             )
 
         if not success:
-            error_msg = "File download failed"
+            error_msg = f"File download failed from {entry['uri']}"
             log_error(error_msg)
             FAILURE_DETAILS.append({
                 "entry": entry_name,
