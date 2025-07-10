@@ -22,7 +22,7 @@ import click
 import yaml
 
 from terminal import (create_progress, log_error, print_header, print_status,
-                      show_summary)
+                      show_summary, log_success, log_warning, print_error_details)
 from utils import (cleanup_fasta_files, copy_config_file,
                    extendable_logger, get_files_ftp, get_files_http,
                    get_mod_from_json, needs_parse_seqids, s3_sync,
@@ -31,6 +31,7 @@ from utils import (cleanup_fasta_files, copy_config_file,
 
 # Global variables
 SLACK_MESSAGES: List[Dict[str, str]] = []
+FAILURE_DETAILS: List[Dict[str, str]] = []  # Track detailed failure information
 LOGGER = setup_detailed_logger("create_blast_db", "blast_db_creation.log")
 
 
@@ -138,10 +139,20 @@ def run_makeblastdb(config_entry: Dict, output_dir: str, logger) -> bool:
             logger.warning(f"makeblastdb stderr: {stderr_str}")
 
         if p.returncode != 0:
+            error_msg = stderr.decode('utf-8')
             logger.error(f"makeblastdb command failed with return code {p.returncode}")
             logger.error(f"Command: {makeblast_command}")
-            logger.error(f"Error output: {stderr.decode('utf-8')}")
-            print_status(f"makeblastdb error: {stderr.decode('utf-8')}", "error")
+            logger.error(f"Error output: {error_msg}")
+            
+            # Display detailed error information
+            print_error_details("BLAST Database Creation Error", {
+                "Return Code": p.returncode,
+                "Command": makeblast_command,
+                "Error Output": error_msg,
+                "Output Directory": output_dir,
+                "FASTA File": unzipped_fasta
+            })
+            
             if Path(output_dir).exists():
                 rmtree(output_dir)
             return False
@@ -149,6 +160,7 @@ def run_makeblastdb(config_entry: Dict, output_dir: str, logger) -> bool:
         logger.info("makeblastdb completed successfully")
         duration = datetime.now() - start_time
         logger.info(f"Process completed in {duration}")
+        log_success(f"BLAST database created successfully in {duration}")
 
         # Clean up unzipped file
         if Path(unzipped_fasta).exists():
@@ -343,10 +355,17 @@ def process_entry(
             )
 
         if not success:
-            log_error("File download failed")
+            error_msg = "File download failed"
+            log_error(error_msg)
+            FAILURE_DETAILS.append({
+                "entry": entry_name,
+                "error": error_msg,
+                "stage": "download",
+                "uri": entry.get("uri", "unknown")
+            })
             return False
 
-        print_status("File download complete", "success")
+        log_success("File download complete")
 
         # Create database if not check_only
         if not check_only:
@@ -368,16 +387,35 @@ def process_entry(
                 stdout, stderr = p.communicate()
 
                 if p.returncode != 0:
-                    log_error(f"Unzip failed: {stderr.decode('utf-8')}")
+                    error_msg = f"Unzip failed: {stderr.decode('utf-8')}"
+                    print_error_details("Unzip Error", {
+                        "Command": unzip_command,
+                        "Error": stderr.decode('utf-8'),
+                        "File": fasta_file
+                    })
+                    log_error(error_msg)
+                    FAILURE_DETAILS.append({
+                        "entry": entry_name,
+                        "error": error_msg,
+                        "stage": "unzip",
+                        "uri": entry.get("uri", "unknown")
+                    })
                     return False
 
             # Run makeblastdb
             print_status("Running makeblastdb...", "info")
             if not run_makeblastdb(entry, output_dir, logger):
-                log_error("Database creation failed")
+                error_msg = "Database creation failed"
+                log_error(error_msg)
+                FAILURE_DETAILS.append({
+                    "entry": entry_name,
+                    "error": error_msg,
+                    "stage": "makeblastdb",
+                    "uri": entry.get("uri", "unknown")
+                })
                 return False
 
-            print_status("Database created successfully", "success")
+            log_success("Database created successfully")
 
             SLACK_MESSAGES.append(
                 {
@@ -428,8 +466,15 @@ def process_entry(
         return True
 
     except Exception as e:
+        error_msg = f"Entry processing failed: {str(e)}"
         log_error("Entry processing failed", e)
         logger.error(f"Entry processing failed: {str(e)}", exc_info=True)
+        FAILURE_DETAILS.append({
+            "entry": entry_name,
+            "error": error_msg,
+            "stage": "processing",
+            "uri": entry.get("uri", "unknown")
+        })
         SLACK_MESSAGES.append(
             {
                 "title": "Processing Error",
@@ -485,12 +530,13 @@ def process_json_entries(
 
             for entry in entries:
                 processed += 1
+                entry_name = entry.get("blast_title", "Unknown")
+                
+                # Update progress display
+                progress.update(task, description=f"Processing {entry_name}...")
 
-                if db_list and entry["blast_title"] not in db_list:
-                    print_status(
-                        f"Skipping {entry['blast_title']} (not in requested list)",
-                        "warning",
-                    )
+                if db_list and entry_name not in db_list:
+                    log_warning(f"Skipping {entry_name} (not in requested list)")
                     progress.advance(task)
                     continue
 
@@ -499,8 +545,12 @@ def process_json_entries(
                         entry, mod_code, environment, check_only, store_files
                     ):
                         successful += 1
+                        print_status(f"[{processed}/{total_entries}] ✓ {entry_name}", "success")
+                    else:
+                        print_status(f"[{processed}/{total_entries}] ✗ {entry_name}", "error")
                 except Exception as e:
-                    log_error(f"Failed to process entry {entry['blast_title']}", e)
+                    log_error(f"Failed to process entry {entry_name}", e)
+                    print_status(f"[{processed}/{total_entries}] ✗ {entry_name}", "error")
 
                 progress.advance(task)
 
@@ -537,26 +587,47 @@ def process_json_entries(
 
         # Show final summary
         duration = datetime.now() - start_time
+        failed_count = processed - successful
+        
         show_summary(
             "JSON Processing",
             {
                 "Total Entries": total_entries,
                 "Processed": processed,
                 "Successful": successful,
-                "Failed": processed - successful,
+                "Failed": failed_count,
+                "Success Rate": f"{(successful/total_entries*100):.1f}%" if total_entries > 0 else "0%",
                 "Cleanup Performed": str(cleanup and not check_only),
             },
             duration,
         )
+        
+        # Show detailed failure summary if there were failures
+        if failed_count > 0:
+            show_failure_summary()
 
+        # Create failure summary for Slack if there were failures
+        failure_summary = ""
+        if failed_count > 0:
+            stage_counts = {}
+            for failure in FAILURE_DETAILS:
+                stage = failure.get("stage", "unknown")
+                stage_counts[stage] = stage_counts.get(stage, 0) + 1
+            
+            failure_summary = "\n\n*Failure Breakdown:*\n"
+            for stage, count in sorted(stage_counts.items()):
+                failure_summary += f"• {stage.title()}: {count}\n"
+        
         summary_text = (
             "*JSON Processing Summary*\n"
             f"• *Total Entries:* {total_entries}\n"
             f"• *Processed:* {processed}\n"
             f"• *Successful:* {successful}\n"
-            f"• *Failed:* {processed - successful}\n"
+            f"• *Failed:* {failed_count}\n"
+            f"• *Success Rate:* {(successful/total_entries*100):.1f}%\n"
             f"• *Cleanup Performed:* {cleanup and not check_only}\n"
             f"• *Duration:* {duration}"
+            f"{failure_summary}"
         )
 
         SLACK_MESSAGES.append(
@@ -573,6 +644,58 @@ def process_json_entries(
     except Exception as e:
         log_error(f"Failed to process JSON file {json_file}", e)
         return False
+
+
+def show_failure_summary() -> None:
+    """
+    Display a detailed summary of all failures that occurred during processing.
+    """
+    if not FAILURE_DETAILS:
+        return
+    
+    print_header("Failure Summary")
+    print_status(f"Total failures: {len(FAILURE_DETAILS)}", "error")
+    
+    # Group failures by stage
+    stage_failures = {}
+    for failure in FAILURE_DETAILS:
+        stage = failure.get("stage", "unknown")
+        if stage not in stage_failures:
+            stage_failures[stage] = []
+        stage_failures[stage].append(failure)
+    
+    # Display failures by stage
+    for stage, failures in stage_failures.items():
+        print_status(f"\n{stage.upper()} failures ({len(failures)}):", "warning")
+        for failure in failures:
+            print_status(f"  ✗ {failure['entry']}", "error")
+            print_status(f"    Error: {failure['error']}", "error")
+            if failure.get('uri'):
+                print_status(f"    URI: {failure['uri']}", "info")
+    
+    # Show common failure patterns
+    error_patterns = {}
+    for failure in FAILURE_DETAILS:
+        error = failure.get("error", "")
+        # Extract common error patterns
+        if "makeblastdb" in error.lower():
+            key = "BLAST database creation"
+        elif "download" in error.lower():
+            key = "File download"
+        elif "unzip" in error.lower():
+            key = "File extraction"
+        elif "md5" in error.lower():
+            key = "Checksum validation"
+        else:
+            key = "Other"
+        
+        if key not in error_patterns:
+            error_patterns[key] = 0
+        error_patterns[key] += 1
+    
+    print_status("\nFailure patterns:", "warning")
+    for pattern, count in sorted(error_patterns.items(), key=lambda x: x[1], reverse=True):
+        print_status(f"  {pattern}: {count} failures", "info")
 
 
 def send_slack_messages_in_batches(messages: List[Dict[str, str]], batch_size: int = 20) -> None:

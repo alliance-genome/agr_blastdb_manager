@@ -459,11 +459,38 @@ def get_files_http(
         file_name = f"../data/{Path(file_uri).name}"
         logger.info(f"Download target: {file_name}")
 
-        # Download file with quiet output
+        # Download file with system wget for better handling
         download_start = datetime.now()
-        wget.download(file_uri, file_name, bar=None)  # Suppress wget progress bar
-        print()  # Add newline after download
-        download_duration = datetime.now() - download_start
+        try:
+            # Use system wget with timeout and progress options
+            wget_command = [
+                "wget",
+                "--timeout=30",
+                "--tries=3",
+                "--no-verbose",
+                "--show-progress",
+                "-O", file_name,
+                file_uri
+            ]
+            
+            logger.info(f"Running command: {' '.join(wget_command)}")
+            p = Popen(wget_command, stdout=PIPE, stderr=PIPE)
+            stdout, stderr = p.communicate()
+            
+            download_duration = datetime.now() - download_start
+            
+            if p.returncode != 0:
+                error_msg = stderr.decode('utf-8')
+                logger.error(f"wget failed with return code {p.returncode}")
+                logger.error(f"Error: {error_msg}")
+                return False
+            
+            logger.info(f"wget stdout: {stdout.decode('utf-8')}")
+            if stderr:
+                logger.info(f"wget stderr: {stderr.decode('utf-8')}")
+        except Exception as e:
+            logger.error(f"Download command failed: {str(e)}", exc_info=True)
+            return False
 
         # Rest of the function remains the same
         file_size = Path(file_name).stat().st_size
@@ -533,14 +560,37 @@ def get_files_ftp(
             logger.warning(f"Could not get remote file size: {str(e)}")
             remote_size = None
 
-        # Download file with quiet output
+        # Download file with system wget for better FTP handling
         download_start = datetime.now()
         logger.info("Starting file download")
 
         try:
-            wget.download(fasta_uri, fasta_file, bar=None)  # Suppress wget progress bar
-            print()  # Add newline after download
+            # Use system wget with timeout and progress options
+            wget_command = [
+                "wget",
+                "--timeout=30",
+                "--tries=3",
+                "--no-verbose",
+                "--show-progress",
+                "-O", fasta_file,
+                fasta_uri
+            ]
+            
+            logger.info(f"Running command: {' '.join(wget_command)}")
+            p = Popen(wget_command, stdout=PIPE, stderr=PIPE)
+            stdout, stderr = p.communicate()
+            
             download_duration = datetime.now() - download_start
+            
+            if p.returncode != 0:
+                error_msg = stderr.decode('utf-8')
+                logger.error(f"wget failed with return code {p.returncode}")
+                logger.error(f"Error: {error_msg}")
+                return False
+            
+            logger.info(f"wget stdout: {stdout.decode('utf-8')}")
+            if stderr:
+                logger.info(f"wget stderr: {stderr.decode('utf-8')}")
 
             # Rest of the verification code...
             if Path(fasta_file).exists():

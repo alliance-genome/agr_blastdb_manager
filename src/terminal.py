@@ -88,9 +88,23 @@ def log_error(error_message: str, error: Optional[Exception] = None) -> None:
     """
     Displays an error message with optional exception details.
     """
-    console.print(f"[red]Error:[/red] {error_message}")
+    console.print(f"[red]✗ Error:[/red] {error_message}")
     if error:
         console.print(f"[dim red]Details: {str(error)}[/dim red]")
+
+
+def log_success(message: str) -> None:
+    """
+    Displays a success message.
+    """
+    console.print(f"[green]✓ {message}[/green]")
+
+
+def log_warning(message: str) -> None:
+    """
+    Displays a warning message.
+    """
+    console.print(f"[yellow]⚠ {message}[/yellow]")
 
 
 def print_header(text: str) -> None:
@@ -99,3 +113,33 @@ def print_header(text: str) -> None:
     """
     console.print(f"\n[bold blue]{text}[/bold blue]")
     console.print("[blue]" + "─" * len(text) + "[/blue]")
+
+
+def print_error_details(title: str, details: Dict[str, Any]) -> None:
+    """
+    Prints error details in a formatted box.
+    """
+    table = Table(box=box.ROUNDED, border_style="red")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", style="white")
+    
+    for key, value in details.items():
+        table.add_row(key, str(value))
+    
+    panel = Panel(table, title=f"[bold red]{title}[/bold red]", border_style="red")
+    console.print(panel)
+
+
+def print_processing_status(current: int, total: int, item_name: str, status: str = "processing") -> None:
+    """
+    Prints current processing status with progress indicator.
+    """
+    percentage = (current / total) * 100 if total > 0 else 0
+    status_color = {
+        "processing": "blue",
+        "success": "green",
+        "error": "red",
+        "warning": "yellow"
+    }.get(status, "blue")
+    
+    console.print(f"[{status_color}][{current}/{total}] ({percentage:.1f}%) {item_name}[/{status_color}]")
