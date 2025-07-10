@@ -36,7 +36,7 @@ from terminal import (
 console = Console()
 
 # TODO: move to ENV
-MODS = ["FB", "SGD", "WB", "XB", "ZFIN"]
+MODS = ["FB", "SGD", "WB", "XB", "ZFIN", "RGD"]
 
 
 def copy_config_file(json_file: Path, config_dir: Path, logger) -> bool:
