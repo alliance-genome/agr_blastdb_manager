@@ -10,6 +10,7 @@ Date: started September 2023
 """
 
 import hashlib
+import json
 import logging
 import re
 from datetime import datetime
@@ -17,21 +18,16 @@ from ftplib import FTP
 from pathlib import Path
 from shutil import copyfile
 from subprocess import PIPE, Popen
-from typing import Any, Dict, Optional
-import json
-from rich import print as rprint
+from typing import Any, Optional
+
 import wget
 from dotenv import dotenv_values
+from rich import print as rprint
 from rich.console import Console
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
-from terminal import (
-    create_progress,
-    log_error,
-    print_status,
-    show_summary,
-)
+from terminal import create_progress, log_error, print_status
 
 console = Console()
 
@@ -143,12 +139,16 @@ def cleanup_fasta_files(data_dir: Path, logger) -> None:
         print_status(f"Found {len(fasta_files)} files to clean up", "info")
 
         with create_progress() as progress:
-            cleanup_task = progress.add_task("Cleaning up files...", total=len(fasta_files))
+            cleanup_task = progress.add_task(
+                "Cleaning up files...", total=len(fasta_files)
+            )
 
             for fasta_file in fasta_files:
                 try:
                     file_size = fasta_file.stat().st_size
-                    logger.info(f"Removing {fasta_file.name} (size: {file_size:,} bytes)")
+                    logger.info(
+                        f"Removing {fasta_file.name} (size: {file_size:,} bytes)"
+                    )
                     fasta_file.unlink()
                     logger.info(f"Successfully removed {fasta_file.name}")
                 except Exception as e:
@@ -164,6 +164,7 @@ def cleanup_fasta_files(data_dir: Path, logger) -> None:
         error_msg = f"Error during FASTA cleanup: {str(e)}"
         logger.error(error_msg, exc_info=True)
         print_status(error_msg, "error")
+
 
 def extendable_logger(log_name, file_name, level=logging.INFO) -> Any:
     """
@@ -401,7 +402,7 @@ def slack_message(messages: list, subject="BLAST Database Update") -> bool:
         log_error(f"Failed to send Slack message: {e.response['error']}")
         return False
     except Exception as e:
-        log_error(f"Unexpected error sending Slack message", e)
+        log_error("Unexpected error sending Slack message", e)
         return False
 
 
@@ -442,11 +443,11 @@ def needs_parse_seqids(fasta_file: str) -> bool:
 
 
 def get_files_http(
-        file_uri: str,
-        md5sum: str,
-        logger,
-        mod: Optional[str] = None,
-        store_files: bool = False,
+    file_uri: str,
+    md5sum: str,
+    logger,
+    mod: Optional[str] = None,
+    store_files: bool = False,
 ) -> bool:
     """
     Downloads files from HTTP/HTTPS sites with controlled output.
@@ -493,11 +494,11 @@ def get_files_http(
 
 
 def get_files_ftp(
-        fasta_uri: str,
-        md5sum: str,
-        logger,
-        mod: Optional[str] = None,
-        store_files: bool = False,
+    fasta_uri: str,
+    md5sum: str,
+    logger,
+    mod: Optional[str] = None,
+    store_files: bool = False,
 ) -> bool:
     """
     Downloads files from FTP sites with controlled output.
@@ -649,7 +650,9 @@ def get_ftp_file_size(fasta_uri: str, logger) -> int:
         return 0
 
 
-def update_genome_browser_map(config_entry: dict, mod: str, environment: str, logger) -> bool:
+def update_genome_browser_map(
+    config_entry: dict, mod: str, environment: str, logger
+) -> bool:
     """
     Updates genome browser mappings for both Ruby and JSON formats.
     """
@@ -684,25 +687,31 @@ def update_genome_browser_map(config_entry: dict, mod: str, environment: str, lo
         # Define target directory with correct path and create if needed
         target_dir = Path("../data/config") / mod / environment
         target_dir.mkdir(parents=True, exist_ok=True)
-        log_and_print(f"Target directory: {target_dir.absolute()} (exists: {target_dir.exists()})")
+        log_and_print(
+            f"Target directory: {target_dir.absolute()} (exists: {target_dir.exists()})"
+        )
 
         # Define file paths
         json_file = target_dir / "genome_browser_map.json"
         ruby_file = target_dir / "genome_browser_map.rb"
-        log_and_print(f"Will write to:\n  JSON: {json_file.absolute()}\n  Ruby: {ruby_file.absolute()}")
+        log_and_print(
+            f"Will write to:\n  JSON: {json_file.absolute()}\n  Ruby: {ruby_file.absolute()}"
+        )
 
         # Load existing mappings from JSON if it exists
         mapping = {}
         if json_file.exists():
             try:
-                with open(json_file, 'r') as f:
+                with open(json_file, "r") as f:
                     content = f.read()
                     log_and_print(f"Existing JSON content: {content[:100]}...")
                     if content.strip():
                         mapping = json.loads(content)
                 log_and_print(f"Loaded {len(mapping)} existing mappings")
             except Exception as e:
-                log_and_print(f"Starting fresh due to error reading JSON: {e}", "warning")
+                log_and_print(
+                    f"Starting fresh due to error reading JSON: {e}", "warning"
+                )
 
         # Add new mapping
         mapping[filename] = browser_url
@@ -712,9 +721,11 @@ def update_genome_browser_map(config_entry: dict, mod: str, environment: str, lo
         try:
             json_content = json.dumps(mapping, indent=2, sort_keys=True)
             log_and_print(f"Writing JSON content: {json_content[:100]}...")
-            with open(json_file, 'w') as f:
+            with open(json_file, "w") as f:
                 f.write(json_content)
-            log_and_print(f"Wrote JSON file: {json_file} (size: {json_file.stat().st_size} bytes)")
+            log_and_print(
+                f"Wrote JSON file: {json_file} (size: {json_file.stat().st_size} bytes)"
+            )
         except Exception as e:
             log_and_print(f"Failed to write JSON file: {e}", "error")
             return False
@@ -727,9 +738,11 @@ def update_genome_browser_map(config_entry: dict, mod: str, environment: str, lo
             ruby_content += "}.freeze\n"
 
             log_and_print(f"Writing Ruby content: {ruby_content[:100]}...")
-            with open(ruby_file, 'w') as f:
+            with open(ruby_file, "w") as f:
                 f.write(ruby_content)
-            log_and_print(f"Wrote Ruby file: {ruby_file} (size: {ruby_file.stat().st_size} bytes)")
+            log_and_print(
+                f"Wrote Ruby file: {ruby_file} (size: {ruby_file.stat().st_size} bytes)"
+            )
         except Exception as e:
             log_and_print(f"Failed to write Ruby file: {e}", "error")
             return False
