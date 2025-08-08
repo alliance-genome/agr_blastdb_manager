@@ -107,7 +107,7 @@ def run_makeblastdb(config_entry: Dict, output_dir: str, logger) -> bool:
 
         # Check for parse_seqids requirement
         parse_ids_flag = ""
-        if needs_parse_seqids(unzipped_fasta):
+        if needs_parse_seqids(unzipped_fasta, mod):
             parse_ids_flag = "-parse_seqids"
             logger.info("FASTA headers require -parse_seqids flag")
 
@@ -428,7 +428,7 @@ def process_entry(
         # Check parse_seqids requirement if in check_only mode
         elif check_only:
             if Path(unzipped_fasta).exists():
-                needs_parse = needs_parse_seqids(unzipped_fasta)
+                needs_parse = needs_parse_seqids(unzipped_fasta, mod)
                 status = "requires" if needs_parse else "does not require"
                 print_status(
                     f"{entry_name}: {'[green]requires[/green]' if needs_parse else '[yellow]does not require[/yellow]'} -parse_seqids flag",

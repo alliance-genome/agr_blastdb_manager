@@ -406,10 +406,14 @@ def slack_message(messages: list, subject="BLAST Database Update") -> bool:
         return False
 
 
-def needs_parse_seqids(fasta_file: str) -> bool:
+def needs_parse_seqids(fasta_file: str, mod: str = None) -> bool:
     """
     Determines if a FASTA file needs the -parse_seqids flag by examining its headers.
+    ZFIN files should NOT use parse_seqids, all others should check headers.
     """
+    # ZFIN files should NOT use parse_seqids
+    if mod == "ZFIN":
+        return False
     id_patterns = [
         r"^>.*\|.*\|",
         r"^>lcl\|",
