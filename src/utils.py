@@ -54,9 +54,10 @@ def copy_config_file(json_file: Path, config_dir: Path, logger) -> bool:
         return False
 
 
-def copy_to_production(source_databases_path: str, mod: str, environment: str, logger) -> bool:
+def copy_to_production(source_databases_path: str, mod: str, environment: str, logger, dry_run: bool = False) -> bool:
     """
     Copies BLAST databases from data directory to production location (/var/sequenceserver-data).
+    If dry_run is True, only shows what would be copied without actually copying.
     """
     try:
         source_path = Path(source_databases_path)
@@ -65,6 +66,35 @@ def copy_to_production(source_databases_path: str, mod: str, environment: str, l
         if not source_path.exists():
             logger.error(f"Source databases path does not exist: {source_path}")
             return False
+        
+        if dry_run:
+            # Show what would be copied
+            from terminal import console
+            console.print(f"[yellow]DRY RUN[/yellow] - Would copy databases:")
+            console.print(f"  Source: {source_path}")
+            console.print(f"  Destination: {dest_path}")
+            
+            # Show directory contents to be copied
+            try:
+                db_dirs = [d for d in source_path.iterdir() if d.is_dir()]
+                if db_dirs:
+                    console.print(f"  Database directories to copy ({len(db_dirs)}):")
+                    for db_dir in sorted(db_dirs):
+                        db_files = list(db_dir.glob("*"))
+                        file_count = len(db_files)
+                        total_size = sum(f.stat().st_size for f in db_files if f.is_file())
+                        size_mb = total_size / (1024 * 1024)
+                        console.print(f"    - {db_dir.name}/ ({file_count} files, {size_mb:.1f} MB)")
+                
+                if dest_path.exists():
+                    console.print(f"  [red]Will replace existing directory:[/red] {dest_path}")
+                else:
+                    console.print(f"  [green]Will create new directory:[/green] {dest_path}")
+                    
+            except Exception as e:
+                console.print(f"  [red]Error analyzing source directory: {e}[/red]")
+            
+            return True
             
         # Create production directory structure
         dest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -84,6 +114,67 @@ def copy_to_production(source_databases_path: str, mod: str, environment: str, l
         return True
     except Exception as e:
         logger.error(f"Failed to copy databases to production: {str(e)}")
+        return False
+
+
+def copy_config_to_production(source_config_path: str, mod: str, environment: str, logger, dry_run: bool = False) -> bool:
+    """
+    Copies config files from data directory to production location (/var/sequenceserver-data).
+    If dry_run is True, only shows what would be copied without actually copying.
+    """
+    try:
+        source_path = Path(source_config_path)
+        dest_path = Path(f"/var/sequenceserver-data/config/{mod}/{environment}")
+        
+        if not source_path.exists():
+            logger.error(f"Source config path does not exist: {source_path}")
+            return False
+        
+        if dry_run:
+            # Show what would be copied
+            from terminal import console
+            console.print(f"[yellow]DRY RUN[/yellow] - Would copy config:")
+            console.print(f"  Source: {source_path}")
+            console.print(f"  Destination: {dest_path}")
+            
+            # Show config files to be copied
+            try:
+                config_files = [f for f in source_path.iterdir() if f.is_file()]
+                if config_files:
+                    console.print(f"  Config files to copy ({len(config_files)}):")
+                    for config_file in sorted(config_files):
+                        file_size = config_file.stat().st_size
+                        size_kb = file_size / 1024
+                        console.print(f"    - {config_file.name} ({size_kb:.1f} KB)")
+                
+                if dest_path.exists():
+                    console.print(f"  [red]Will replace existing directory:[/red] {dest_path}")
+                else:
+                    console.print(f"  [green]Will create new directory:[/green] {dest_path}")
+                    
+            except Exception as e:
+                console.print(f"  [red]Error analyzing config directory: {e}[/red]")
+            
+            return True
+            
+        # Create production directory structure
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Copy config directory structure
+        import shutil
+        
+        # Remove existing config directory if it exists
+        if dest_path.exists():
+            shutil.rmtree(dest_path)
+            logger.info(f"Removed existing config directory: {dest_path}")
+            
+        # Copy the entire config directory
+        shutil.copytree(source_path, dest_path)
+        logger.info(f"Copied config from {source_path} to {dest_path}")
+        
+        return True
+    except Exception as e:
+        logger.error(f"Failed to copy config to production: {str(e)}")
         return False
 
 

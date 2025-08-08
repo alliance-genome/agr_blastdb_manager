@@ -23,7 +23,7 @@ import yaml
 
 from terminal import (create_progress, log_error, print_header, print_status,
                       show_summary, log_success, log_warning, print_error_details)
-from utils import (cleanup_fasta_files, copy_config_file, copy_to_production,
+from utils import (cleanup_fasta_files, copy_config_file, copy_to_production, copy_config_to_production,
                    extendable_logger, get_files_ftp, get_files_http,
                    get_mod_from_json, needs_parse_seqids, s3_sync,
                    setup_detailed_logger, slack_message,
@@ -831,9 +831,14 @@ def create_dbs(
 
         # Copy databases and config to production location
         if not check_parse_seqids:
-            LOGGER.info("Starting copy to production location")
+            LOGGER.info("Preparing to copy to production location")
+            from terminal import console
+            
             try:
-                # Copy databases
+                # Collect all directories to copy
+                copy_operations = []
+                
+                # Find databases to copy
                 data_blast_dir = Path("../data/blast")
                 if data_blast_dir.exists():
                     for mod_dir in data_blast_dir.iterdir():
@@ -844,31 +849,53 @@ def create_dbs(
                                     env_name = env_dir.name
                                     databases_dir = env_dir / "databases"
                                     if databases_dir.exists():
-                                        if copy_to_production(str(databases_dir), mod_name, env_name, LOGGER):
-                                            print_status(f"Copied {mod_name}/{env_name} databases to production", "success")
-                                        else:
-                                            log_error(f"Failed to copy {mod_name}/{env_name} databases to production")
+                                        copy_operations.append(("databases", str(databases_dir), mod_name, env_name))
                 
-                # Copy config files
+                # Find config files to copy
                 data_config_dir = Path("../data/config")
                 if data_config_dir.exists():
-                    import shutil
                     for mod_dir in data_config_dir.iterdir():
                         if mod_dir.is_dir():
                             mod_name = mod_dir.name
                             for env_dir in mod_dir.iterdir():
                                 if env_dir.is_dir():
                                     env_name = env_dir.name
-                                    prod_config_dir = Path(f"/var/sequenceserver-data/config/{mod_name}/{env_name}")
-                                    try:
-                                        prod_config_dir.parent.mkdir(parents=True, exist_ok=True)
-                                        if prod_config_dir.exists():
-                                            shutil.rmtree(prod_config_dir)
-                                        shutil.copytree(env_dir, prod_config_dir)
-                                        print_status(f"Copied {mod_name}/{env_name} config to production", "success")
-                                    except Exception as e:
-                                        log_error(f"Failed to copy {mod_name}/{env_name} config to production", e)
-                                        
+                                    copy_operations.append(("config", str(env_dir), mod_name, env_name))
+                
+                if not copy_operations:
+                    print_status("No data to copy to production", "info")
+                else:
+                    # Show dry run
+                    console.print("\n[bold yellow]═══ PRODUCTION COPY PREVIEW ═══[/bold yellow]")
+                    for copy_type, source_path, mod_name, env_name in copy_operations:
+                        if copy_type == "databases":
+                            copy_to_production(source_path, mod_name, env_name, LOGGER, dry_run=True)
+                        else:
+                            copy_config_to_production(source_path, mod_name, env_name, LOGGER, dry_run=True)
+                        console.print()
+                    
+                    # Ask for confirmation
+                    console.print("[bold]Do you want to proceed with copying to production? [y/N]:[/bold]", end=" ")
+                    response = input().strip().lower()
+                    
+                    if response == 'y' or response == 'yes':
+                        console.print("[green]Proceeding with production copy...[/green]\n")
+                        
+                        # Perform actual copy
+                        for copy_type, source_path, mod_name, env_name in copy_operations:
+                            if copy_type == "databases":
+                                if copy_to_production(source_path, mod_name, env_name, LOGGER):
+                                    print_status(f"Copied {mod_name}/{env_name} databases to production", "success")
+                                else:
+                                    log_error(f"Failed to copy {mod_name}/{env_name} databases to production")
+                            else:
+                                if copy_config_to_production(source_path, mod_name, env_name, LOGGER):
+                                    print_status(f"Copied {mod_name}/{env_name} config to production", "success")
+                                else:
+                                    log_error(f"Failed to copy {mod_name}/{env_name} config to production")
+                    else:
+                        console.print("[yellow]Skipped copying to production location[/yellow]")
+                        
             except Exception as e:
                 log_error("Failed to copy to production", e)
 
