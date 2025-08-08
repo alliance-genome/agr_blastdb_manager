@@ -38,7 +38,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Entry point for BLAST database creation
 - Handles configuration parsing (YAML/JSON)
 - Orchestrates download, validation, and database creation
-- Supports multiple model organisms (MODs): FB, SGD, WB, XB, ZFIN
+- Supports multiple model organisms (MODs): FB, SGD, WB, XB, ZFIN, RGD
 
 **Utility Functions** (`src/utils.py`)
 - File download handlers (FTP/HTTP)
@@ -96,6 +96,8 @@ tests/                          # Test files
 - **Slack Integration**: Optional notifications for pipeline status
 - **Docker Support**: Containerized execution for consistent environments
 - **Parse SeqIDs Detection**: Automatically detects if FASTA headers need -parse_seqids flag
+- **Production Deployment**: Automatic copy to production location with dry-run preview
+- **ZFIN Special Handling**: ZFIN databases skip MD5 validation and don't use -parse_seqids flag
 
 ### Testing
 
@@ -110,3 +112,50 @@ Required for full functionality:
 - `SLACK`: Slack API token for notifications
 - `S3`: S3 bucket path for file storage
 - `EFS`: EFS mount path for sync operations
+
+## Operational Notes
+
+### CLI Usage Patterns
+
+**Run for specific MOD and environment:**
+```bash
+poetry run python src/create_blast_db.py --conf conf/global.yaml --mod WB --env WS285
+```
+
+**Check parse_seqids requirements without creating databases:**
+```bash
+poetry run python src/create_blast_db.py --conf conf/global.yaml --mod WB --env WS285 --check-only
+```
+
+**Run with production copy (requires confirmation):**
+```bash
+poetry run python src/create_blast_db.py --conf conf/global.yaml --mod WB --env WS285 --production-copy
+```
+
+### Configuration Structure
+
+Configuration follows a hierarchical pattern:
+- `conf/global.yaml` defines providers and references MOD-specific configs
+- `conf/{mod}/databases.{mod}.{env}.json` contains database specifications
+- Each database entry includes: URI, MD5, blast_title, taxonomy, seqtype
+
+### Error Handling Patterns
+
+The system provides comprehensive error reporting:
+- Entry-level failures are logged with context (download, unzip, makeblastdb stages)
+- Failed entries are summarized at completion
+- Common error patterns are detected (network issues, makeblastdb failures)
+- Individual logs per entry stored in `../logs/` directory
+
+### File Management
+
+- Downloaded FASTA files are temporary and cleaned up after processing
+- BLAST databases are created in `../data/blast/{mod}/{env}/databases/`
+- Configuration files are copied to `../data/config/{mod}/{env}/`
+- Use `--store-files` flag to preserve original files for archival
+
+### Special MOD Considerations
+
+- **ZFIN**: Skips MD5 validation and never uses -parse_seqids flag
+- **All others**: Automatically detect if -parse_seqids needed based on FASTA headers
+- Headers with pipe-delimited IDs (e.g., `>gi|123|ref|XP_456|`) trigger -parse_seqids
