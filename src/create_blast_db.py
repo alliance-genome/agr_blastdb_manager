@@ -22,7 +22,8 @@ import click
 import yaml
 
 from terminal import (create_progress, log_error, print_header, print_status,
-                      show_summary, log_success, log_warning, print_error_details)
+                      show_summary, log_success, log_warning, print_error_details,
+                      print_progress_line, print_minimal_header)
 from utils import (cleanup_fasta_files, copy_config_file, copy_to_production, copy_config_to_production,
                    extendable_logger, get_files_ftp, get_files_http,
                    get_mod_from_json, needs_parse_seqids, s3_sync,
@@ -310,7 +311,7 @@ def process_entry(
     Returns:
         bool: Success status
     """
-    print_header(f"Processing {entry['blast_title']}")
+    print_minimal_header(f"Processing {entry['blast_title']}")
     start_time = datetime.now()
     entry_name = entry["blast_title"]
 
@@ -327,13 +328,6 @@ def process_entry(
     try:
         fasta_file = Path(entry["uri"]).name
         unzipped_fasta = f"../data/{fasta_file.replace('.gz', '')}"
-
-        # Log processing parameters
-        print_status("Processing parameters:", "info")
-        print_status(f"  MOD code: {mod_code}", "info")
-        print_status(f"  Environment: {environment}", "info")
-        print_status(f"  Check only: {check_only}", "info")
-        print_status(f"  Store files: {store_files}", "info")
 
         # Download file
         print_status(f"Downloading {fasta_file}...", "info")
@@ -370,7 +364,7 @@ def process_entry(
         # Create database if not check_only
         if not check_only:
             # Create database structure
-            print_status("Creating database structure", "info")
+            print_status("Creating database...", "info")
             output_dir, config_dir = create_db_structure(
                 environment, mod_code, entry, logger
             )
@@ -381,18 +375,12 @@ def process_entry(
                 and Path(f"../data/{fasta_file}").exists()
             ):
                 logger.info(f"Unzipping {fasta_file}")
-                print_status(f"Unzipping {fasta_file}...", "info")
                 unzip_command = f"gunzip -v ../data/{fasta_file}"
                 p = Popen(unzip_command, shell=True, stdout=PIPE, stderr=PIPE)
                 stdout, stderr = p.communicate()
 
                 if p.returncode != 0:
                     error_msg = f"Unzip failed: {stderr.decode('utf-8')}"
-                    print_error_details("Unzip Error", {
-                        "Command": unzip_command,
-                        "Error": stderr.decode('utf-8'),
-                        "File": fasta_file
-                    })
                     log_error(error_msg)
                     FAILURE_DETAILS.append({
                         "entry": entry_name,
@@ -403,7 +391,6 @@ def process_entry(
                     return False
 
             # Run makeblastdb
-            print_status("Running makeblastdb...", "info")
             if not run_makeblastdb(entry, output_dir, logger):
                 error_msg = "Database creation failed"
                 log_error(error_msg)
@@ -441,19 +428,13 @@ def process_entry(
             if Path(unzipped_fasta).exists():
                 if check_only or not store_files:
                     file_size = Path(unzipped_fasta).stat().st_size
-                    print_status(
-                        f"Cleaning up unzipped file: {unzipped_fasta} (size: {file_size:,} bytes)",
-                        "info",
-                    )
+                    logger.info(f"Cleaning up unzipped file: {unzipped_fasta} (size: {file_size:,} bytes)")
                     Path(unzipped_fasta).unlink()
 
             original_gzip = f"../data/{fasta_file}"
             if Path(original_gzip).exists() and not store_files:
                 file_size = Path(original_gzip).stat().st_size
-                print_status(
-                    f"Cleaning up original gzipped file: {original_gzip} (size: {file_size:,} bytes)",
-                    "info",
-                )
+                logger.info(f"Cleaning up original gzipped file: {original_gzip} (size: {file_size:,} bytes)")
                 Path(original_gzip).unlink()
 
         except Exception as e:
@@ -525,63 +506,48 @@ def process_json_entries(
 
         print_status(f"Found {total_entries} entries to process", "info")
 
-        with create_progress() as progress:
-            task = progress.add_task("Processing entries...", total=total_entries)
+        # Process entries without progress bars for cleaner output
+        for entry in entries:
+            processed += 1
+            entry_name = entry.get("blast_title", "Unknown")
+            
+            if db_list and entry_name not in db_list:
+                log_warning(f"Skipping {entry_name} (not in requested list)")
+                continue
 
-            for entry in entries:
-                processed += 1
-                entry_name = entry.get("blast_title", "Unknown")
-                
-                # Update progress display
-                progress.update(task, description=f"Processing {entry_name}...")
-
-                if db_list and entry_name not in db_list:
-                    log_warning(f"Skipping {entry_name} (not in requested list)")
-                    progress.advance(task)
-                    continue
-
-                try:
-                    if process_entry(
-                        entry, mod_code, environment, check_only, store_files
-                    ):
-                        successful += 1
-                        print_status(f"[{processed}/{total_entries}] ✓ {entry_name}", "success")
-                    else:
-                        print_status(f"[{processed}/{total_entries}] ✗ {entry_name}", "error")
-                except Exception as e:
-                    log_error(f"Failed to process entry {entry_name}", e)
-                    print_status(f"[{processed}/{total_entries}] ✗ {entry_name}", "error")
-
-                progress.advance(task)
+            try:
+                if process_entry(
+                    entry, mod_code, environment, check_only, store_files
+                ):
+                    successful += 1
+                    print_progress_line(processed, total_entries, entry_name, "success")
+                else:
+                    print_progress_line(processed, total_entries, entry_name, "error")
+            except Exception as e:
+                log_error(f"Failed to process entry {entry_name}", e)
+                print_progress_line(processed, total_entries, entry_name, "error")
 
         # After all entries are processed successfully, copy the configuration file
         if successful > 0 and not check_only:
-            print_status("Copying configuration file", "info")
             config_dir = Path(f"../data/config/{mod_code}/{environment}")
             if copy_config_file(Path(json_file), config_dir, LOGGER):
-                print_status("Configuration file copied successfully", "success")
+                LOGGER.info("Configuration file copied successfully")
             else:
                 log_error("Failed to copy configuration file")
 
             # Update genome browser mappings after all entries are processed
-            print_status("Updating genome browser mappings", "info")
             for entry in entries:
                 if "genome_browser" in entry:
                     if update_genome_browser_map(entry, mod_code, environment, LOGGER):
-                        print_status(
-                            f"Updated mapping for {entry['blast_title']}", "success"
-                        )
+                        LOGGER.info(f"Updated mapping for {entry['blast_title']}")
                     else:
-                        log_error(
-                            f"Failed to update mapping for {entry['blast_title']}"
-                        )
+                        log_error(f"Failed to update mapping for {entry['blast_title']}")
 
         # Clean up all FASTA files after processing if cleanup is enabled
         if cleanup and not check_only:
-            print_status("Starting post-processing cleanup", "info")
             try:
                 cleanup_fasta_files(Path("../data"), LOGGER)
-                print_status("Cleanup completed successfully", "success")
+                LOGGER.info("Cleanup completed successfully")
             except Exception as e:
                 log_error("Cleanup failed", e)
 

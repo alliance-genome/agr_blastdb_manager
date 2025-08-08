@@ -20,21 +20,21 @@ console = Console()
 
 def print_status(message: str, status: str = "info") -> None:
     """
-    Prints a status message with an appropriate style.
+    Prints a clean status message.
     Status can be: info, success, error, warning
     """
     styles = {
-        "info": "blue",
+        "info": "white",
         "success": "green",
         "error": "red",
         "warning": "yellow",
     }
 
     icons = {
-        "info": "ℹ",
+        "info": "→",
         "success": "✓",
         "error": "✗",
-        "warning": "⚠",
+        "warning": "!",
     }
 
     style = styles.get(status, "default")
@@ -109,10 +109,9 @@ def log_warning(message: str) -> None:
 
 def print_header(text: str) -> None:
     """
-    Prints a section header.
+    Prints a clean section header.
     """
-    console.print(f"\n[bold blue]{text}[/bold blue]")
-    console.print("[blue]" + "─" * len(text) + "[/blue]")
+    console.print(f"\n[bold cyan]{text}[/bold cyan]")
 
 
 def print_error_details(title: str, details: Dict[str, Any]) -> None:
@@ -143,3 +142,29 @@ def print_processing_status(current: int, total: int, item_name: str, status: st
     }.get(status, "blue")
     
     console.print(f"[{status_color}][{current}/{total}] ({percentage:.1f}%) {item_name}[/{status_color}]")
+
+
+def print_simple(message: str) -> None:
+    """
+    Prints a simple message without styling.
+    """
+    console.print(message)
+
+
+def print_progress_line(current: int, total: int, name: str, status: str) -> None:
+    """
+    Prints a single line progress update.
+    """
+    if status == "success":
+        console.print(f"[green]✓[/green] [{current}/{total}] {name}")
+    elif status == "error":
+        console.print(f"[red]✗[/red] [{current}/{total}] {name}")
+    else:
+        console.print(f"[blue]→[/blue] [{current}/{total}] {name}")
+
+
+def print_minimal_header(text: str) -> None:
+    """
+    Prints a minimal header for cleaner output.
+    """
+    console.print(f"\n[bold]{text}[/bold]")
