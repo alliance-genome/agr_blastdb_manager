@@ -121,15 +121,17 @@ def print_error_details(title: str, details: Dict[str, Any]) -> None:
     table = Table(box=box.ROUNDED, border_style="red")
     table.add_column("Field", style="cyan")
     table.add_column("Value", style="white")
-    
+
     for key, value in details.items():
         table.add_row(key, str(value))
-    
+
     panel = Panel(table, title=f"[bold red]{title}[/bold red]", border_style="red")
     console.print(panel)
 
 
-def print_processing_status(current: int, total: int, item_name: str, status: str = "processing") -> None:
+def print_processing_status(
+    current: int, total: int, item_name: str, status: str = "processing"
+) -> None:
     """
     Prints current processing status with progress indicator.
     """
@@ -138,10 +140,12 @@ def print_processing_status(current: int, total: int, item_name: str, status: st
         "processing": "blue",
         "success": "green",
         "error": "red",
-        "warning": "yellow"
+        "warning": "yellow",
     }.get(status, "blue")
-    
-    console.print(f"[{status_color}][{current}/{total}] ({percentage:.1f}%) {item_name}[/{status_color}]")
+
+    console.print(
+        f"[{status_color}][{current}/{total}] ({percentage:.1f}%) {item_name}[/{status_color}]"
+    )
 
 
 def print_simple(message: str) -> None:

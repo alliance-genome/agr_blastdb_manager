@@ -21,10 +21,11 @@ from typing import Dict, List, Optional, Tuple
 import click
 import yaml
 
-from terminal import (create_progress, log_error, print_header, print_status,
-                      show_summary, log_success, log_warning, print_error_details,
-                      print_progress_line, print_minimal_header)
-from utils import (cleanup_fasta_files, copy_config_file, copy_to_production, copy_config_to_production,
+from terminal import (create_progress, log_error, log_success, log_warning,
+                      print_error_details, print_header, print_minimal_header,
+                      print_progress_line, print_status, show_summary)
+from utils import (cleanup_fasta_files, copy_config_file,
+                   copy_config_to_production, copy_to_production,
                    extendable_logger, get_files_ftp, get_files_http,
                    get_mod_from_json, needs_parse_seqids, s3_sync,
                    setup_detailed_logger, slack_message,
@@ -140,20 +141,23 @@ def run_makeblastdb(config_entry: Dict, output_dir: str, logger) -> bool:
             logger.warning(f"makeblastdb stderr: {stderr_str}")
 
         if p.returncode != 0:
-            error_msg = stderr.decode('utf-8')
+            error_msg = stderr.decode("utf-8")
             logger.error(f"makeblastdb command failed with return code {p.returncode}")
             logger.error(f"Command: {makeblast_command}")
             logger.error(f"Error output: {error_msg}")
-            
+
             # Display detailed error information
-            print_error_details("BLAST Database Creation Error", {
-                "Return Code": p.returncode,
-                "Command": makeblast_command,
-                "Error Output": error_msg,
-                "Output Directory": output_dir,
-                "FASTA File": unzipped_fasta
-            })
-            
+            print_error_details(
+                "BLAST Database Creation Error",
+                {
+                    "Return Code": p.returncode,
+                    "Command": makeblast_command,
+                    "Error Output": error_msg,
+                    "Output Directory": output_dir,
+                    "FASTA File": unzipped_fasta,
+                },
+            )
+
             if Path(output_dir).exists():
                 rmtree(output_dir)
             return False
@@ -351,12 +355,14 @@ def process_entry(
         if not success:
             error_msg = f"File download failed from {entry['uri']}"
             log_error(error_msg)
-            FAILURE_DETAILS.append({
-                "entry": entry_name,
-                "error": error_msg,
-                "stage": "download",
-                "uri": entry.get("uri", "unknown")
-            })
+            FAILURE_DETAILS.append(
+                {
+                    "entry": entry_name,
+                    "error": error_msg,
+                    "stage": "download",
+                    "uri": entry.get("uri", "unknown"),
+                }
+            )
             return False
 
         log_success("File download complete")
@@ -382,24 +388,28 @@ def process_entry(
                 if p.returncode != 0:
                     error_msg = f"Unzip failed: {stderr.decode('utf-8')}"
                     log_error(error_msg)
-                    FAILURE_DETAILS.append({
-                        "entry": entry_name,
-                        "error": error_msg,
-                        "stage": "unzip",
-                        "uri": entry.get("uri", "unknown")
-                    })
+                    FAILURE_DETAILS.append(
+                        {
+                            "entry": entry_name,
+                            "error": error_msg,
+                            "stage": "unzip",
+                            "uri": entry.get("uri", "unknown"),
+                        }
+                    )
                     return False
 
             # Run makeblastdb
             if not run_makeblastdb(entry, output_dir, logger):
                 error_msg = "Database creation failed"
                 log_error(error_msg)
-                FAILURE_DETAILS.append({
-                    "entry": entry_name,
-                    "error": error_msg,
-                    "stage": "makeblastdb",
-                    "uri": entry.get("uri", "unknown")
-                })
+                FAILURE_DETAILS.append(
+                    {
+                        "entry": entry_name,
+                        "error": error_msg,
+                        "stage": "makeblastdb",
+                        "uri": entry.get("uri", "unknown"),
+                    }
+                )
                 return False
 
             log_success("Database created successfully")
@@ -428,13 +438,17 @@ def process_entry(
             if Path(unzipped_fasta).exists():
                 if check_only or not store_files:
                     file_size = Path(unzipped_fasta).stat().st_size
-                    logger.info(f"Cleaning up unzipped file: {unzipped_fasta} (size: {file_size:,} bytes)")
+                    logger.info(
+                        f"Cleaning up unzipped file: {unzipped_fasta} (size: {file_size:,} bytes)"
+                    )
                     Path(unzipped_fasta).unlink()
 
             original_gzip = f"../data/{fasta_file}"
             if Path(original_gzip).exists() and not store_files:
                 file_size = Path(original_gzip).stat().st_size
-                logger.info(f"Cleaning up original gzipped file: {original_gzip} (size: {file_size:,} bytes)")
+                logger.info(
+                    f"Cleaning up original gzipped file: {original_gzip} (size: {file_size:,} bytes)"
+                )
                 Path(original_gzip).unlink()
 
         except Exception as e:
@@ -450,12 +464,14 @@ def process_entry(
         error_msg = f"Entry processing failed: {str(e)}"
         log_error("Entry processing failed", e)
         logger.error(f"Entry processing failed: {str(e)}", exc_info=True)
-        FAILURE_DETAILS.append({
-            "entry": entry_name,
-            "error": error_msg,
-            "stage": "processing",
-            "uri": entry.get("uri", "unknown")
-        })
+        FAILURE_DETAILS.append(
+            {
+                "entry": entry_name,
+                "error": error_msg,
+                "stage": "processing",
+                "uri": entry.get("uri", "unknown"),
+            }
+        )
         SLACK_MESSAGES.append(
             {
                 "title": "Processing Error",
@@ -510,15 +526,13 @@ def process_json_entries(
         for entry in entries:
             processed += 1
             entry_name = entry.get("blast_title", "Unknown")
-            
+
             if db_list and entry_name not in db_list:
                 log_warning(f"Skipping {entry_name} (not in requested list)")
                 continue
 
             try:
-                if process_entry(
-                    entry, mod_code, environment, check_only, store_files
-                ):
+                if process_entry(entry, mod_code, environment, check_only, store_files):
                     successful += 1
                     print_progress_line(processed, total_entries, entry_name, "success")
                 else:
@@ -541,7 +555,9 @@ def process_json_entries(
                     if update_genome_browser_map(entry, mod_code, environment, LOGGER):
                         LOGGER.info(f"Updated mapping for {entry['blast_title']}")
                     else:
-                        log_error(f"Failed to update mapping for {entry['blast_title']}")
+                        log_error(
+                            f"Failed to update mapping for {entry['blast_title']}"
+                        )
 
         # Clean up all FASTA files after processing if cleanup is enabled
         if cleanup and not check_only:
@@ -554,7 +570,7 @@ def process_json_entries(
         # Show final summary
         duration = datetime.now() - start_time
         failed_count = processed - successful
-        
+
         show_summary(
             "JSON Processing",
             {
@@ -562,12 +578,14 @@ def process_json_entries(
                 "Processed": processed,
                 "Successful": successful,
                 "Failed": failed_count,
-                "Success Rate": f"{(successful/total_entries*100):.1f}%" if total_entries > 0 else "0%",
+                "Success Rate": f"{(successful/total_entries*100):.1f}%"
+                if total_entries > 0
+                else "0%",
                 "Cleanup Performed": str(cleanup and not check_only),
             },
             duration,
         )
-        
+
         # Show detailed failure summary if there were failures
         if failed_count > 0:
             show_failure_summary()
@@ -579,11 +597,11 @@ def process_json_entries(
             for failure in FAILURE_DETAILS:
                 stage = failure.get("stage", "unknown")
                 stage_counts[stage] = stage_counts.get(stage, 0) + 1
-            
+
             failure_summary = "\n\n*Failure Breakdown:*\n"
             for stage, count in sorted(stage_counts.items()):
                 failure_summary += f"• {stage.title()}: {count}\n"
-        
+
         summary_text = (
             "*JSON Processing Summary*\n"
             f"• *Total Entries:* {total_entries}\n"
@@ -618,10 +636,10 @@ def show_failure_summary() -> None:
     """
     if not FAILURE_DETAILS:
         return
-    
+
     print_header("Failure Summary")
     print_status(f"Total failures: {len(FAILURE_DETAILS)}", "error")
-    
+
     # Group failures by stage
     stage_failures = {}
     for failure in FAILURE_DETAILS:
@@ -629,16 +647,16 @@ def show_failure_summary() -> None:
         if stage not in stage_failures:
             stage_failures[stage] = []
         stage_failures[stage].append(failure)
-    
+
     # Display failures by stage
     for stage, failures in stage_failures.items():
         print_status(f"\n{stage.upper()} failures ({len(failures)}):", "warning")
         for failure in failures:
             print_status(f"  ✗ {failure['entry']}", "error")
             print_status(f"    Error: {failure['error']}", "error")
-            if failure.get('uri'):
+            if failure.get("uri"):
                 print_status(f"    URI: {failure['uri']}", "info")
-    
+
     # Show common failure patterns
     error_patterns = {}
     for failure in FAILURE_DETAILS:
@@ -654,17 +672,21 @@ def show_failure_summary() -> None:
             key = "Checksum validation"
         else:
             key = "Other"
-        
+
         if key not in error_patterns:
             error_patterns[key] = 0
         error_patterns[key] += 1
-    
+
     print_status("\nFailure patterns:", "warning")
-    for pattern, count in sorted(error_patterns.items(), key=lambda x: x[1], reverse=True):
+    for pattern, count in sorted(
+        error_patterns.items(), key=lambda x: x[1], reverse=True
+    ):
         print_status(f"  {pattern}: {count} failures", "info")
 
 
-def send_slack_messages_in_batches(messages: List[Dict[str, str]], batch_size: int = 20) -> None:
+def send_slack_messages_in_batches(
+    messages: List[Dict[str, str]], batch_size: int = 20
+) -> None:
     """
     Sends Slack messages in smaller batches to avoid the too_many_attachments error.
 
@@ -673,7 +695,7 @@ def send_slack_messages_in_batches(messages: List[Dict[str, str]], batch_size: i
         batch_size: Maximum number of messages to send in each batch
     """
     for i in range(0, len(messages), batch_size):
-        batch = messages[i:i + batch_size]
+        batch = messages[i : i + batch_size]
         try:
             slack_message(batch)
         except Exception as e:
@@ -799,11 +821,11 @@ def create_dbs(
         if not check_parse_seqids:
             LOGGER.info("Preparing to copy to production location")
             from terminal import console
-            
+
             try:
                 # Collect all directories to copy
                 copy_operations = []
-                
+
                 # Find databases to copy
                 data_blast_dir = Path("../data/blast")
                 if data_blast_dir.exists():
@@ -815,8 +837,15 @@ def create_dbs(
                                     env_name = env_dir.name
                                     databases_dir = env_dir / "databases"
                                     if databases_dir.exists():
-                                        copy_operations.append(("databases", str(databases_dir), mod_name, env_name))
-                
+                                        copy_operations.append(
+                                            (
+                                                "databases",
+                                                str(databases_dir),
+                                                mod_name,
+                                                env_name,
+                                            )
+                                        )
+
                 # Find config files to copy
                 data_config_dir = Path("../data/config")
                 if data_config_dir.exists():
@@ -826,42 +855,76 @@ def create_dbs(
                             for env_dir in mod_dir.iterdir():
                                 if env_dir.is_dir():
                                     env_name = env_dir.name
-                                    copy_operations.append(("config", str(env_dir), mod_name, env_name))
-                
+                                    copy_operations.append(
+                                        ("config", str(env_dir), mod_name, env_name)
+                                    )
+
                 if not copy_operations:
                     print_status("No data to copy to production", "info")
                 else:
                     # Show dry run
-                    console.print("\n[bold yellow]═══ PRODUCTION COPY PREVIEW ═══[/bold yellow]")
+                    console.print(
+                        "\n[bold yellow]═══ PRODUCTION COPY PREVIEW ═══[/bold yellow]"
+                    )
                     for copy_type, source_path, mod_name, env_name in copy_operations:
                         if copy_type == "databases":
-                            copy_to_production(source_path, mod_name, env_name, LOGGER, dry_run=True)
+                            copy_to_production(
+                                source_path, mod_name, env_name, LOGGER, dry_run=True
+                            )
                         else:
-                            copy_config_to_production(source_path, mod_name, env_name, LOGGER, dry_run=True)
+                            copy_config_to_production(
+                                source_path, mod_name, env_name, LOGGER, dry_run=True
+                            )
                         console.print()
-                    
+
                     # Ask for confirmation
-                    console.print("[bold]Do you want to proceed with copying to production? [y/N]:[/bold]", end=" ")
+                    console.print(
+                        "[bold]Do you want to proceed with copying to production? [y/N]:[/bold]",
+                        end=" ",
+                    )
                     response = input().strip().lower()
-                    
-                    if response == 'y' or response == 'yes':
-                        console.print("[green]Proceeding with production copy...[/green]\n")
-                        
+
+                    if response == "y" or response == "yes":
+                        console.print(
+                            "[green]Proceeding with production copy...[/green]\n"
+                        )
+
                         # Perform actual copy
-                        for copy_type, source_path, mod_name, env_name in copy_operations:
+                        for (
+                            copy_type,
+                            source_path,
+                            mod_name,
+                            env_name,
+                        ) in copy_operations:
                             if copy_type == "databases":
-                                if copy_to_production(source_path, mod_name, env_name, LOGGER):
-                                    print_status(f"Copied {mod_name}/{env_name} databases to production", "success")
+                                if copy_to_production(
+                                    source_path, mod_name, env_name, LOGGER
+                                ):
+                                    print_status(
+                                        f"Copied {mod_name}/{env_name} databases to production",
+                                        "success",
+                                    )
                                 else:
-                                    log_error(f"Failed to copy {mod_name}/{env_name} databases to production")
+                                    log_error(
+                                        f"Failed to copy {mod_name}/{env_name} databases to production"
+                                    )
                             else:
-                                if copy_config_to_production(source_path, mod_name, env_name, LOGGER):
-                                    print_status(f"Copied {mod_name}/{env_name} config to production", "success")
+                                if copy_config_to_production(
+                                    source_path, mod_name, env_name, LOGGER
+                                ):
+                                    print_status(
+                                        f"Copied {mod_name}/{env_name} config to production",
+                                        "success",
+                                    )
                                 else:
-                                    log_error(f"Failed to copy {mod_name}/{env_name} config to production")
+                                    log_error(
+                                        f"Failed to copy {mod_name}/{env_name} config to production"
+                                    )
                     else:
-                        console.print("[yellow]Skipped copying to production location[/yellow]")
-                        
+                        console.print(
+                            "[yellow]Skipped copying to production location[/yellow]"
+                        )
+
             except Exception as e:
                 log_error("Failed to copy to production", e)
 
