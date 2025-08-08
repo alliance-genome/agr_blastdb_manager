@@ -90,7 +90,7 @@ def create_db_structure(
     return db_path, config_path
 
 
-def run_makeblastdb(config_entry: Dict, output_dir: str, logger) -> bool:
+def run_makeblastdb(config_entry: Dict, output_dir: str, logger, mod_code: str) -> bool:
     """
     Runs the makeblastdb command to create a BLAST database.
     """
@@ -109,7 +109,7 @@ def run_makeblastdb(config_entry: Dict, output_dir: str, logger) -> bool:
 
         # Check for parse_seqids requirement
         parse_ids_flag = ""
-        if needs_parse_seqids(unzipped_fasta, mod):
+        if needs_parse_seqids(unzipped_fasta, mod_code):
             parse_ids_flag = "-parse_seqids"
             logger.info("FASTA headers require -parse_seqids flag")
 
@@ -399,7 +399,7 @@ def process_entry(
                     return False
 
             # Run makeblastdb
-            if not run_makeblastdb(entry, output_dir, logger):
+            if not run_makeblastdb(entry, output_dir, logger, mod_code):
                 error_msg = "Database creation failed"
                 log_error(error_msg)
                 FAILURE_DETAILS.append(
@@ -425,7 +425,7 @@ def process_entry(
         # Check parse_seqids requirement if in check_only mode
         elif check_only:
             if Path(unzipped_fasta).exists():
-                needs_parse = needs_parse_seqids(unzipped_fasta, mod)
+                needs_parse = needs_parse_seqids(unzipped_fasta, mod_code)
                 status = "requires" if needs_parse else "does not require"
                 print_status(
                     f"{entry_name}: {'[green]requires[/green]' if needs_parse else '[yellow]does not require[/yellow]'} -parse_seqids flag",
