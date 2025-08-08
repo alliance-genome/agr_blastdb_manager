@@ -28,6 +28,7 @@ black = "^24.3.0"
 mypy = "^1.8.0"
 types-pyyaml = "^6.0.12.12"
 types-boto3 = "^1.0.2"
+ruff = "^0.12.8"
 
 [build-system]
 requires = ["poetry-core"]

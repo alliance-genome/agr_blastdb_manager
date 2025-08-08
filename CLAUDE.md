@@ -21,6 +21,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Code Quality Commands
 - `poetry run black src/ tests/` - Format code with Black
+- `poetry run ruff check src/ tests/` - Lint code with Ruff
+- `poetry run ruff check --fix src/ tests/` - Lint and auto-fix with Ruff
 - `poetry run mypy src/` - Type check with mypy
 - `poetry run isort src/ tests/` - Sort imports
 
