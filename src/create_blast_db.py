@@ -21,15 +21,32 @@ from typing import Dict, List, Optional, Tuple
 import click
 import yaml
 
-from terminal import (create_progress, log_error, log_success, log_warning,
-                      print_error_details, print_header, print_minimal_header,
-                      print_progress_line, print_status, show_summary)
-from utils import (cleanup_fasta_files, copy_config_file,
-                   copy_config_to_production, copy_to_production,
-                   extendable_logger, get_files_ftp, get_files_http,
-                   get_mod_from_json, needs_parse_seqids, s3_sync,
-                   setup_detailed_logger, slack_message,
-                   update_genome_browser_map)
+from terminal import (
+    log_error,
+    log_success,
+    log_warning,
+    print_error_details,
+    print_header,
+    print_minimal_header,
+    print_progress_line,
+    print_status,
+    show_summary,
+)
+from utils import (
+    cleanup_fasta_files,
+    copy_config_file,
+    copy_config_to_production,
+    copy_to_production,
+    extendable_logger,
+    get_files_ftp,
+    get_files_http,
+    get_mod_from_json,
+    needs_parse_seqids,
+    s3_sync,
+    setup_detailed_logger,
+    slack_message,
+    update_genome_browser_map,
+)
 
 # Global variables
 SLACK_MESSAGES: List[Dict[str, str]] = []
@@ -578,7 +595,7 @@ def process_json_entries(
                 "Processed": processed,
                 "Successful": successful,
                 "Failed": failed_count,
-                "Success Rate": f"{(successful/total_entries*100):.1f}%"
+                "Success Rate": f"{(successful / total_entries * 100):.1f}%"
                 if total_entries > 0
                 else "0%",
                 "Cleanup Performed": str(cleanup and not check_only),
@@ -608,7 +625,7 @@ def process_json_entries(
             f"• *Processed:* {processed}\n"
             f"• *Successful:* {successful}\n"
             f"• *Failed:* {failed_count}\n"
-            f"• *Success Rate:* {(successful/total_entries*100):.1f}%\n"
+            f"• *Success Rate:* {(successful / total_entries * 100):.1f}%\n"
             f"• *Cleanup Performed:* {cleanup and not check_only}\n"
             f"• *Duration:* {duration}"
             f"{failure_summary}"
@@ -699,7 +716,7 @@ def send_slack_messages_in_batches(
         try:
             slack_message(batch)
         except Exception as e:
-            LOGGER.error(f"Failed to send Slack batch {i//batch_size + 1}: {str(e)}")
+            LOGGER.error(f"Failed to send Slack batch {i // batch_size + 1}: {str(e)}")
 
 
 @click.command()

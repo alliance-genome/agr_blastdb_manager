@@ -11,18 +11,20 @@ Date: July 2025
 """
 
 import json
-import logging
 import sys
 from datetime import datetime
 from pathlib import Path
 from subprocess import PIPE, Popen
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import click
-import yaml
 
-from terminal import (create_progress, log_error, log_success, log_warning,
-                      print_header, print_status, show_summary)
+from terminal import (
+    create_progress,
+    print_header,
+    print_status,
+    show_summary,
+)
 from utils import setup_detailed_logger
 
 # Test sequences for different MODs
@@ -252,7 +254,7 @@ def test_database(database_path: Path, mod_code: str, test_sequences: Dict) -> D
         try:
             if temp_dir.exists() and not any(temp_dir.iterdir()):
                 temp_dir.rmdir()
-        except:
+        except OSError:
             pass
 
     return result
@@ -333,7 +335,7 @@ def generate_test_report(results: List[Dict], output_file: Path = None) -> None:
     report_lines.append("## Summary")
     report_lines.append(f"- **Successful**: {successful}")
     report_lines.append(f"- **Failed**: {failed}")
-    report_lines.append(f"- **Success Rate**: {(successful/len(results)*100):.1f}%")
+    report_lines.append(f"- **Success Rate**: {(successful / len(results) * 100):.1f}%")
     report_lines.append("")
 
     # Results by MOD
@@ -490,7 +492,9 @@ def test_databases(
         "Total Databases": len(results),
         "Successful": successful,
         "Failed": failed,
-        "Success Rate": f"{(successful/len(results)*100):.1f}%" if results else "0%",
+        "Success Rate": f"{(successful / len(results) * 100):.1f}%"
+        if results
+        else "0%",
     }
 
     show_summary("Database Testing", summary_data, duration)

@@ -20,7 +20,6 @@ from shutil import copyfile
 from subprocess import PIPE, Popen
 from typing import Any, Optional
 
-import wget
 from dotenv import dotenv_values
 from rich import print as rprint
 from rich.console import Console
@@ -79,7 +78,7 @@ def copy_to_production(
             # Show what would be copied
             from terminal import console
 
-            console.print(f"[yellow]DRY RUN[/yellow] - Would copy databases:")
+            console.print("[yellow]DRY RUN[/yellow] - Would copy databases:")
             console.print(f"  Source: {source_path}")
             console.print(f"  Destination: {dest_path}")
 
@@ -153,7 +152,7 @@ def copy_config_to_production(
             # Show what would be copied
             from terminal import console
 
-            console.print(f"[yellow]DRY RUN[/yellow] - Would copy config:")
+            console.print("[yellow]DRY RUN[/yellow] - Would copy config:")
             console.print(f"  Source: {source_path}")
             console.print(f"  Destination: {dest_path}")
 
@@ -538,7 +537,7 @@ def slack_message(messages: list, subject="BLAST Database Update") -> bool:
 
     try:
         client = WebClient(token=env["SLACK"])
-        response = client.chat_postMessage(
+        client.chat_postMessage(
             channel="#blast-status",
             text=subject,
             attachments=messages,
@@ -604,7 +603,6 @@ def get_files_http(
     """
     Downloads files from HTTP/HTTPS sites with controlled output.
     """
-    start_time = datetime.now()
     logger.info(f"Starting HTTP download from: {file_uri}")
 
     try:
@@ -801,9 +799,7 @@ def get_files_ftp(
 
     except Exception as e:
         logger.error(
-            f"FTP download process failed:\n"
-            f"  URI: {fasta_uri}\n"
-            f"  Error: {str(e)}",
+            f"FTP download process failed:\n  URI: {fasta_uri}\n  Error: {str(e)}",
             exc_info=True,
         )
         return False
