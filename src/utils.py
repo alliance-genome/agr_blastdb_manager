@@ -54,6 +54,39 @@ def copy_config_file(json_file: Path, config_dir: Path, logger) -> bool:
         return False
 
 
+def copy_to_production(source_databases_path: str, mod: str, environment: str, logger) -> bool:
+    """
+    Copies BLAST databases from data directory to production location (/var/sequenceserver-data).
+    """
+    try:
+        source_path = Path(source_databases_path)
+        dest_path = Path(f"/var/sequenceserver-data/blast/{mod}/{environment}/databases")
+        
+        if not source_path.exists():
+            logger.error(f"Source databases path does not exist: {source_path}")
+            return False
+            
+        # Create production directory structure
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Copy database directory structure
+        import shutil
+        
+        # Remove existing databases directory if it exists
+        if dest_path.exists():
+            shutil.rmtree(dest_path)
+            logger.info(f"Removed existing databases directory: {dest_path}")
+            
+        # Copy the entire databases directory
+        shutil.copytree(source_path, dest_path)
+        logger.info(f"Copied databases from {source_path} to {dest_path}")
+        
+        return True
+    except Exception as e:
+        logger.error(f"Failed to copy databases to production: {str(e)}")
+        return False
+
+
 def setup_detailed_logger(
     log_name: str, file_name: str, level=logging.INFO
 ) -> logging.Logger:
