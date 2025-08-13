@@ -13,6 +13,7 @@ import re
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
+import warnings
 
 import requests
 from bs4 import BeautifulSoup
@@ -23,6 +24,17 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import TimeoutException, WebDriverException
+from urllib3.exceptions import InsecureRequestWarning
+
+# Try to import cloudscraper if available
+try:
+    import cloudscraper
+    HAS_CLOUDSCRAPER = True
+except ImportError:
+    HAS_CLOUDSCRAPER = False
+
+# Suppress SSL warnings
+warnings.filterwarnings('ignore', category=InsecureRequestWarning)
 
 console = Console()
 
@@ -43,6 +55,11 @@ class UIConfigGenerator:
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-gpu')
         options.add_argument('--window-size=1920,1080')
+        options.add_argument('--disable-web-security')
+        options.add_argument('--ignore-certificate-errors')
+        options.add_argument('--allow-insecure-localhost')
+        options.add_argument('--ignore-ssl-errors=yes')
+        options.add_argument('--ignore-certificate-errors-spki-list')
         
         try:
             self.browser = webdriver.Chrome(options=options)
@@ -118,6 +135,68 @@ class UIConfigGenerator:
         
         return releases
     
+    def get_database_anchors_requests(self, mod: str, release: str) -> List[str]:
+        """Get database anchor elements using requests library (fallback)."""
+        url = f"{self.base_url}/{mod}/{release}"
+        anchors = []
+        
+        # Try cloudscraper first if available
+        if HAS_CLOUDSCRAPER:
+            console.log(f"[yellow]Fetching with cloudscraper: {url}[/yellow]")
+            try:
+                scraper = cloudscraper.create_scraper()
+                response = scraper.get(url, timeout=30)
+                response.raise_for_status()
+                
+                # Parse HTML
+                soup = BeautifulSoup(response.text, 'html.parser')
+                
+                # Find ALL elements with id containing '_anchor' (including subdivisions)
+                for element in soup.find_all(id=re.compile(r'.*_anchor')):
+                    anchor_id = element.get('id')
+                    if anchor_id:
+                        anchors.append(anchor_id)
+                
+                console.log(f"[green]Found {len(anchors)} anchors via cloudscraper[/green]")
+                return anchors
+            except Exception as e:
+                console.log(f"[yellow]Cloudscraper failed, trying requests session: {e}[/yellow]")
+        
+        # Fallback to regular requests with session
+        console.log(f"[yellow]Fetching with requests session: {url}[/yellow]")
+        try:
+            # Create a session with browser headers
+            session = requests.Session()
+            session.verify = False
+            session.headers.update({
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
+            })
+            
+            # Make request with session
+            response = session.get(url, timeout=30)
+            response.raise_for_status()
+            
+            # Parse HTML
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Find ALL elements with id containing '_anchor'
+            for element in soup.find_all(id=re.compile(r'.*_anchor')):
+                anchor_id = element.get('id')
+                if anchor_id:
+                    anchors.append(anchor_id)
+            
+            console.log(f"[green]Found {len(anchors)} anchors via requests[/green]")
+            
+        except Exception as e:
+            console.log(f"[red]Requests error: {str(e)}[/red]")
+        
+        return anchors
+    
     def get_database_anchors(self, mod: str, release: str) -> List[str]:
         """Get database anchor elements from the actual UI."""
         url = f"{self.base_url}/{mod}/{release}"
@@ -133,53 +212,65 @@ class UIConfigGenerator:
                 EC.presence_of_element_located((By.TAG_NAME, "body"))
             )
             
-            # Look for database checkboxes/inputs
-            # Common patterns: input[type="checkbox"], input[id*="anchor"], etc.
-            checkbox_selectors = [
-                "input[type='checkbox'][id*='anchor']",
-                "input[type='checkbox'][id*='_anchor']", 
-                "input[type='checkbox']",
-                "input[id*='anchor']",
-                ".database-checkbox",
-                "[data-database]"
+            # Give time for JavaScript to render
+            time.sleep(3)
+            
+            # Look for ALL elements with id containing 'anchor' (main and subdivisions)
+            # This should capture both Genus_anchor and Genus_species_anchor patterns
+            elements_with_anchor = self.browser.find_elements(By.XPATH, "//*[contains(@id, '_anchor')]")
+            console.log(f"[yellow]Found {len(elements_with_anchor)} elements with '_anchor' in id[/yellow]")
+            
+            for element in elements_with_anchor:
+                element_id = element.get_attribute('id')
+                if element_id:
+                    anchors.append(element_id)
+                    # Only log first few to avoid clutter
+                    if len(anchors) <= 10:
+                        console.log(f"  Anchor: {element_id}")
+            
+            if len(anchors) > 10:
+                console.log(f"  ... and {len(anchors) - 10} more anchors")
+            
+            # Also try to find nested/subdivision anchors by looking for patterns
+            # Some sites might use different patterns for subdivisions
+            subdivision_patterns = [
+                "//*[contains(@id, '_') and contains(@id, '_anchor')]",  # Genus_species_anchor
+                "//div[contains(@class, 'species')]//a",  # Species within divs
+                "//li[contains(@class, 'database')]//a"   # Database list items
             ]
             
-            for selector in checkbox_selectors:
+            for pattern in subdivision_patterns:
                 try:
-                    elements = self.browser.find_elements(By.CSS_SELECTOR, selector)
-                    for element in elements:
-                        element_id = element.get_attribute('id')
-                        if element_id and 'anchor' in element_id.lower():
-                            anchors.append(element_id)
-                    
-                    if anchors:
-                        console.log(f"Found {len(anchors)} anchors with selector: {selector}")
-                        break
-                        
-                except Exception as e:
-                    continue
-            
-            # If no anchors found with checkboxes, try other elements
-            if not anchors:
-                # Look for any elements with 'anchor' in the id
-                try:
-                    elements = self.browser.find_elements(By.XPATH, "//*[contains(@id, 'anchor')]")
-                    for element in elements:
-                        element_id = element.get_attribute('id')
-                        if element_id:
-                            anchors.append(element_id)
+                    sub_elements = self.browser.find_elements(By.XPATH, pattern)
+                    if sub_elements:
+                        console.log(f"[cyan]Found {len(sub_elements)} elements with pattern: {pattern}[/cyan]")
+                        for elem in sub_elements[:3]:  # Show first 3 examples
+                            elem_id = elem.get_attribute('id') or elem.get_attribute('name')
+                            if elem_id and elem_id not in anchors:
+                                anchors.append(elem_id)
+                                console.log(f"    Subdivision: {elem_id}")
                 except Exception:
                     pass
             
             # Remove duplicates while preserving order
             anchors = list(dict.fromkeys(anchors))
             
-            console.log(f"[green]Found {len(anchors)} database anchors for {mod}/{release}[/green]")
+            console.log(f"[green]Found {len(anchors)} unique database anchors for {mod}/{release}[/green]")
+            
+            # Log examples of found anchors for debugging
+            if anchors:
+                examples = anchors[:5]
+                console.log(f"  Examples: {', '.join(examples)}")
+                if len(anchors) > 5:
+                    console.log(f"  ... and {len(anchors) - 5} more")
             
         except TimeoutException:
             console.log(f"[red]Timeout loading {url}[/red]")
         except WebDriverException as e:
             console.log(f"[red]Browser error for {url}: {str(e)}[/red]")
+            # Try fallback method with requests
+            console.log(f"[yellow]Falling back to requests method...[/yellow]")
+            anchors = self.get_database_anchors_requests(mod, release)
         except Exception as e:
             console.log(f"[red]Error inspecting {url}: {str(e)}[/red]")
         
@@ -192,19 +283,31 @@ class UIConfigGenerator:
             "prot": "MKLLIVDDSSGKVRAEIKQLLKQGVNPEMKLLIVDDSSGKVRAEIKQLLKQGVNPE"
         }
     
-    def generate_config(self) -> Dict:
+    def generate_config(self, use_selenium: bool = True) -> Dict:
         """Generate complete UI test configuration."""
         console.log("[bold blue]Generating UI test configuration...[/bold blue]")
         
         config = {}
-        releases = self.get_latest_releases()
+        # Use hardcoded releases from current config
+        releases = {
+            "FB": "FB2025_03",
+            "RGD": "production",
+            "SGD": "main",
+            "WB": "WS297",
+            "ZFIN": "prod"
+        }
         test_sequences = self.get_test_sequences()
         
-        if not releases:
-            console.log("[red]No releases found![/red]")
-            return config
+        console.log(f"[green]Using existing releases: {releases}[/green]")
         
-        self.setup_browser()
+        # Try to set up browser if using Selenium
+        if use_selenium:
+            try:
+                self.setup_browser()
+            except Exception as e:
+                console.log(f"[yellow]Browser setup failed: {e}[/yellow]")
+                console.log("[yellow]Falling back to requests-only mode[/yellow]")
+                use_selenium = False
         
         try:
             with Progress(
@@ -217,7 +320,11 @@ class UIConfigGenerator:
                     task_desc = f"Processing {mod}/{release}"
                     progress.add_task(task_desc, total=None)
                     
-                    anchors = self.get_database_anchors(mod, release)
+                    # Use requests method directly if Selenium is disabled
+                    if not use_selenium:
+                        anchors = self.get_database_anchors_requests(mod, release)
+                    else:
+                        anchors = self.get_database_anchors(mod, release)
                     
                     if anchors:
                         config[mod] = {
@@ -287,11 +394,18 @@ class UIConfigGenerator:
 
 def main():
     """Main function to generate UI configuration."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Generate UI test configuration')
+    parser.add_argument('--no-selenium', action='store_true', 
+                       help='Skip Selenium and use requests only (for server environments)')
+    args = parser.parse_args()
+    
     generator = UIConfigGenerator()
     
     try:
         # Generate configuration from live data
-        config = generator.generate_config()
+        config = generator.generate_config(use_selenium=not args.no_selenium)
         
         if config:
             # Save configuration

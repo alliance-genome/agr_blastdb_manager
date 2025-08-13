@@ -40,42 +40,5 @@
       "prot": "MKLLIVDDSSGKVRAEIKQLLKQGVNPEMKLLIVDDSSGKVRAEIKQLLKQGVNPE",
       "url": "https://blast.alliancegenome.org/blast/RGD/production"
     }
-  },
-  "SGD": {
-    "main": {
-      "items": [
-        "Saccharomyces_anchor"
-      ],
-      "nucl": "ATGCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATC",
-      "prot": "MKLLIVDDSSGKVRAEIKQLLKQGVNPEMKLLIVDDSSGKVRAEIKQLLKQGVNPE",
-      "url": "https://blast.alliancegenome.org/blast/SGD/main"
-    }
-  },
-  "WB": {
-    "WS297": {
-      "items": [
-        "Brugia_anchor",
-        "Caenorhabditis_anchor",
-        "Onchocerca_anchor",
-        "Oscheius_anchor",
-        "Panagrellus_anchor",
-        "Pristionchus_anchor",
-        "Strongyloides_anchor",
-        "Trichuris_anchor"
-      ],
-      "nucl": "ATGCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATC",
-      "prot": "MKLLIVDDSSGKVRAEIKQLLKQGVNPEMKLLIVDDSSGKVRAEIKQLLKQGVNPE",
-      "url": "https://blast.alliancegenome.org/blast/WB/WS297"
-    }
-  },
-  "ZFIN": {
-    "prod": {
-      "items": [
-        "Danio_anchor"
-      ],
-      "nucl": "ATGCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATC",
-      "prot": "MKLLIVDDSSGKVRAEIKQLLKQGVNPEMKLLIVDDSSGKVRAEIKQLLKQGVNPE",
-      "url": "https://blast.alliancegenome.org/blast/ZFIN/prod"
-    }
   }
 }

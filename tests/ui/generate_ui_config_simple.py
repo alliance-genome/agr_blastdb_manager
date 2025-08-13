@@ -91,11 +91,19 @@ def get_database_names_from_filesystem(mod: str, release: str) -> List[str]:
     for genus_dir in blast_path.iterdir():
         if genus_dir.is_dir():
             genus_name = genus_dir.name
-            # Convert to anchor format: Genus_anchor
+            # Add main genus anchor
             anchor_name = f"{genus_name}_anchor"
             database_names.append(anchor_name)
+            
+            # Get species/strain subdirectories (second level)
+            for species_dir in genus_dir.iterdir():
+                if species_dir.is_dir():
+                    species_name = species_dir.name
+                    # Convert to anchor format: Genus_species_anchor
+                    species_anchor = f"{genus_name}_{species_name}_anchor"
+                    database_names.append(species_anchor)
     
-    console.log(f"Found {len(database_names)} databases in {mod}/{release}")
+    console.log(f"Found {len(database_names)} databases (including subdivisions) in {mod}/{release}")
     
     return sorted(database_names)
 
