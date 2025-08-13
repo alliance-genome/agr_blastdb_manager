@@ -299,10 +299,10 @@ GCTAGCTAGCTA
         assert skip_md5_validation is True
         assert use_parse_seqids is False
         
-        # Test other MODs
+        # Test other MODs (mandatory parse_seqids)
         for mod in ["WB", "SGD", "FB", "RGD", "XB"]:
             skip_md5_validation = (mod == "ZFIN")
             use_parse_seqids = (mod != "ZFIN")
             
             assert skip_md5_validation is False
-            assert use_parse_seqids is True
+            assert use_parse_seqids is True  # Mandatory for all non-ZFIN MODs

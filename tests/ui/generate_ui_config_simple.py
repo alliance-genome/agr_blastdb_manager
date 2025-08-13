@@ -133,7 +133,7 @@ def generate_config() -> Dict:
         if database_anchors:
             config[mod] = {
                 release: {
-                    "url": f"https://blast.alliancegenome.org/blast/{mod}/{release}",
+                    "url": f"http://127.0.0.1:4569/blast/{mod}/{release}",
                     "nucl": test_sequences["nucl"],
                     "prot": test_sequences["prot"],
                     "items": database_anchors

@@ -334,7 +334,7 @@ class TestSpecialMODHandling:
         skip_md5_validation = (mod_code == "ZFIN")
         assert skip_md5_validation is True
         
-        # ZFIN databases don't use -parse_seqids
+        # ZFIN databases don't use -parse_seqids (only exception to mandatory rule)
         use_parse_seqids = (mod_code != "ZFIN")
         assert use_parse_seqids is False
 
@@ -345,7 +345,7 @@ class TestSpecialMODHandling:
             skip_md5_validation = (mod_code == "ZFIN")
             assert skip_md5_validation is False
             
-            # Standard MODs may use -parse_seqids based on content
+            # Standard MODs use mandatory -parse_seqids
             use_parse_seqids = (mod_code != "ZFIN")
             assert use_parse_seqids is True
 

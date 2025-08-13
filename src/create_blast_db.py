@@ -41,7 +41,6 @@ from utils import (
     get_files_ftp,
     get_files_http,
     get_mod_from_json,
-    needs_parse_seqids,
     s3_sync,
     setup_detailed_logger,
     slack_message,
@@ -124,11 +123,13 @@ def run_makeblastdb(config_entry: Dict, output_dir: str, logger, mod_code: str) 
             logger.error(f"Unzipped FASTA file not found: {unzipped_fasta}")
             return False
 
-        # Check for parse_seqids requirement
-        parse_ids_flag = ""
-        if needs_parse_seqids(unzipped_fasta, mod_code):
+        # Apply parse_seqids flag (mandatory for all except ZFIN)
+        if mod_code == "ZFIN":
+            parse_ids_flag = ""
+            logger.info("ZFIN database - skipping -parse_seqids flag")
+        else:
             parse_ids_flag = "-parse_seqids"
-            logger.info("FASTA headers require -parse_seqids flag")
+            logger.info("Using mandatory -parse_seqids flag")
 
         # Prepare makeblastdb command
         blast_title = config_entry["blast_title"]
@@ -439,16 +440,20 @@ def process_entry(
                 }
             )
 
-        # Check parse_seqids requirement if in check_only mode
+        # Show parse_seqids policy if in check_only mode
         elif check_only:
-            if Path(unzipped_fasta).exists():
-                needs_parse = needs_parse_seqids(unzipped_fasta, mod_code)
-                status = "requires" if needs_parse else "does not require"
+            if mod_code == "ZFIN":
                 print_status(
-                    f"{entry_name}: {'[green]requires[/green]' if needs_parse else '[yellow]does not require[/yellow]'} -parse_seqids flag",
+                    f"{entry_name}: [yellow]ZFIN - does not use[/yellow] -parse_seqids flag",
                     "info",
                 )
-                logger.info(f"Parse seqids check: {entry_name} {status} -parse_seqids")
+                logger.info(f"Parse seqids check: {entry_name} - ZFIN exclusion (no -parse_seqids)")
+            else:
+                print_status(
+                    f"{entry_name}: [green]uses mandatory[/green] -parse_seqids flag", 
+                    "info",
+                )
+                logger.info(f"Parse seqids check: {entry_name} - mandatory -parse_seqids")
 
         # Clean up files
         try:
@@ -754,7 +759,7 @@ def send_slack_messages_in_batches(
 @click.option(
     "-c",
     "--check-parse-seqids",
-    help="Only check if files need parse_seqids",
+    help="Only check parse_seqids policy (mandatory except ZFIN)",
     is_flag=True,
     default=False,
 )

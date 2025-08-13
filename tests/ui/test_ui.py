@@ -29,6 +29,7 @@ from selenium.common.exceptions import TimeoutException, WebDriverException, NoS
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
+from webdriver_manager.chrome import ChromeDriverManager
 
 console = Console()
 
@@ -48,7 +49,7 @@ class BlastUITester:
         """Initialize the Chrome WebDriver with optimized settings."""
         options = webdriver.ChromeOptions()
         if headless:
-            options.add_argument('--headless')
+            options.add_argument('--headless=new')  # Use new headless mode
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-gpu')
@@ -56,16 +57,56 @@ class BlastUITester:
         options.add_argument('--disable-extensions')
         options.add_argument('--disable-plugins')
         options.add_argument('--disable-images')  # Faster loading
+        options.add_argument('--disable-web-security')
+        options.add_argument('--disable-features=VizDisplayCompositor')
+        options.add_argument('--remote-debugging-port=9222')
+        options.add_argument('--disable-background-networking')
+        options.add_argument('--disable-default-apps')
+        options.add_argument('--disable-sync')
+        options.add_argument('--metrics-recording-only')
+        options.add_argument('--no-first-run')
+        options.add_argument('--safebrowsing-disable-auto-update')
+        options.add_argument('--disable-background-timer-throttling')
+        options.add_argument('--disable-renderer-backgrounding')
+        options.add_argument('--disable-backgrounding-occluded-windows')
         options.add_experimental_option('excludeSwitches', ['enable-logging'])
         options.add_experimental_option('useAutomationExtension', False)
         
-        # Set up Chrome service
+        # Try different Chrome binary locations
+        chrome_binaries = [
+            '/usr/bin/google-chrome',
+            '/usr/bin/google-chrome-stable', 
+            '/usr/bin/chromium-browser',
+            '/usr/bin/chromium',
+            '/snap/bin/chromium'
+        ]
+        
+        chrome_binary = None
+        for binary in chrome_binaries:
+            try:
+                if Path(binary).exists():
+                    chrome_binary = binary
+                    break
+            except:
+                continue
+        
+        if chrome_binary:
+            options.binary_location = chrome_binary
+            console.log(f"[blue]Using Chrome binary: {chrome_binary}[/blue]")
+        else:
+            console.log("[yellow]No Chrome binary found, trying default...[/yellow]")
+        
+        # Set up Chrome service with automatic ChromeDriver management
         try:
-            self.browser = webdriver.Chrome(options=options)
+            service = Service(ChromeDriverManager().install())
+            self.browser = webdriver.Chrome(service=service, options=options)
             self.browser.set_page_load_timeout(self.wait_timeout)
             self.browser.implicitly_wait(10)
+            console.log("[green]✓ Browser initialized successfully[/green]")
         except Exception as e:
             console.log(f"[red]Failed to initialize browser: {str(e)}[/red]")
+            console.log("[yellow]UI tests require Chrome/Chromium to be installed.[/yellow]")
+            console.log("[yellow]Consider running: sudo yum install -y google-chrome-stable[/yellow]")
             raise
 
     def cleanup(self) -> None:

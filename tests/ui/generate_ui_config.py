@@ -42,7 +42,7 @@ console = Console()
 class UIConfigGenerator:
     """Generate UI test configuration from actual data."""
     
-    def __init__(self, base_url: str = "https://blast.alliancegenome.org/blast"):
+    def __init__(self, base_url: str = "http://127.0.0.1:4569/blast"):
         self.base_url = base_url
         self.data_path = Path("/var/sequenceserver-data")
         self.browser = None

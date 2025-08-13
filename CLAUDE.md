@@ -103,7 +103,7 @@ tests/                          # Test files
 - **Comprehensive Logging**: Detailed logs for debugging and monitoring
 - **Slack Integration**: Optional notifications for pipeline status
 - **Docker Support**: Containerized execution for consistent environments
-- **Parse SeqIDs Detection**: Automatically detects if FASTA headers need -parse_seqids flag
+- **Parse SeqIDs Policy**: Mandatory -parse_seqids flag for all MODs except ZFIN
 - **Production Deployment**: Automatic copy to production location with dry-run preview
 - **ZFIN Special Handling**: ZFIN databases skip MD5 validation and don't use -parse_seqids flag
 
@@ -162,9 +162,9 @@ Required for full functionality:
 poetry run python src/create_blast_db.py --conf conf/global.yaml --mod WB --env WS285
 ```
 
-**Check parse_seqids requirements without creating databases:**
+**Check parse_seqids policy without creating databases:**
 ```bash
-poetry run python src/create_blast_db.py --conf conf/global.yaml --mod WB --env WS285 --check-only
+poetry run python src/create_blast_db.py --conf conf/global.yaml --mod WB --env WS285 --check-parse-seqids
 ```
 
 **Run with production copy (requires confirmation):**
@@ -197,5 +197,4 @@ The system provides comprehensive error reporting:
 ### Special MOD Considerations
 
 - **ZFIN**: Skips MD5 validation and never uses -parse_seqids flag
-- **All others**: Automatically detect if -parse_seqids needed based on FASTA headers
-- Headers with pipe-delimited IDs (e.g., `>gi|123|ref|XP_456|`) trigger -parse_seqids
+- **All others**: Mandatory -parse_seqids flag for consistent FASTA download functionality
