@@ -1,0 +1,81 @@
+{
+  "FB": {
+    "FB2025_03": {
+      "items": [
+        "Acromyrmex_anchor",
+        "Acyrthosiphon_anchor",
+        "Aedes_anchor",
+        "Anopheles_anchor",
+        "Apis_anchor",
+        "Atta_anchor",
+        "Bombus_anchor",
+        "Bombyx_anchor",
+        "Camponotus_anchor",
+        "Culex_anchor",
+        "Danaus_anchor",
+        "Drosophila_anchor",
+        "Harpegnathos_anchor",
+        "Ixodes_anchor",
+        "Linepithema_anchor",
+        "Megachile_anchor",
+        "Musca_anchor",
+        "Nasonia_anchor",
+        "Pediculus_anchor",
+        "Pogonomyrmex_anchor",
+        "Rhipicephalus_anchor",
+        "Solenopsis_anchor",
+        "Tribolium_anchor"
+      ],
+      "nucl": "ATGCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATC",
+      "prot": "MKLLIVDDSSGKVRAEIKQLLKQGVNPEMKLLIVDDSSGKVRAEIKQLLKQGVNPE",
+      "url": "https://blast.alliancegenome.org/blast/FB/FB2025_03"
+    }
+  },
+  "RGD": {
+    "production": {
+      "items": [
+        "Rattus_anchor"
+      ],
+      "nucl": "ATGCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATC",
+      "prot": "MKLLIVDDSSGKVRAEIKQLLKQGVNPEMKLLIVDDSSGKVRAEIKQLLKQGVNPE",
+      "url": "https://blast.alliancegenome.org/blast/RGD/production"
+    }
+  },
+  "SGD": {
+    "main": {
+      "items": [
+        "Saccharomyces_anchor"
+      ],
+      "nucl": "ATGCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATC",
+      "prot": "MKLLIVDDSSGKVRAEIKQLLKQGVNPEMKLLIVDDSSGKVRAEIKQLLKQGVNPE",
+      "url": "https://blast.alliancegenome.org/blast/SGD/main"
+    }
+  },
+  "WB": {
+    "WS297": {
+      "items": [
+        "Brugia_anchor",
+        "Caenorhabditis_anchor",
+        "Onchocerca_anchor",
+        "Oscheius_anchor",
+        "Panagrellus_anchor",
+        "Pristionchus_anchor",
+        "Strongyloides_anchor",
+        "Trichuris_anchor"
+      ],
+      "nucl": "ATGCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATC",
+      "prot": "MKLLIVDDSSGKVRAEIKQLLKQGVNPEMKLLIVDDSSGKVRAEIKQLLKQGVNPE",
+      "url": "https://blast.alliancegenome.org/blast/WB/WS297"
+    }
+  },
+  "ZFIN": {
+    "prod": {
+      "items": [
+        "Danio_anchor"
+      ],
+      "nucl": "ATGCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATC",
+      "prot": "MKLLIVDDSSGKVRAEIKQLLKQGVNPEMKLLIVDDSSGKVRAEIKQLLKQGVNPE",
+      "url": "https://blast.alliancegenome.org/blast/ZFIN/prod"
+    }
+  }
+}

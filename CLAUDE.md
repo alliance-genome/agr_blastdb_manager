@@ -18,6 +18,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Testing Commands
 - `poetry run pytest tests/` - Run all tests
 - `poetry run pytest tests/test_agr_blastdb_manager.py` - Run specific test file
+- `poetry run pytest tests/ --cov=src --cov-report=html` - Run tests with coverage report
+- `poetry run pytest tests/test_integration.py` - Run integration tests
+- `poetry run pytest tests/test_performance.py` - Run performance tests
+- `python tests/UI/test_ui.py -m WB -t nematode --comprehensive` - Run comprehensive UI tests
+- `python tests/UI/visual_regression.py -b baseline/ -c current/ -o results/` - Run visual regression tests
+- `locust -f tests/UI/locustfile.py --host=https://blast.alliancegenome.org -u 10 -r 2 -t 5m` - Run load tests
 
 ### Code Quality Commands
 - `poetry run black src/ tests/` - Format code with Black
@@ -103,10 +109,42 @@ tests/                          # Test files
 
 ### Testing
 
-- Basic version test in `tests/test_agr_blastdb_manager.py`
-- UI tests using Selenium in `tests/UI/`
-- CLI tests in `tests/CLI/`
-- Load testing with Locust framework
+The project includes comprehensive test coverage across multiple categories:
+
+**Unit Tests:**
+- `tests/test_utils.py` - Utility function tests (file operations, sequence analysis, configuration parsing)
+- `tests/test_terminal.py` - Terminal interface and logging function tests
+- `tests/test_create_blast_db.py` - Core BLAST database creation functionality tests
+
+**Integration Tests:**
+- `tests/test_integration.py` - Full pipeline integration tests from configuration to database creation
+- Tests error handling, multi-MOD workflows, and production deployment scenarios
+
+**Performance Tests:**
+- `tests/test_performance.py` - Performance, scalability, and resource utilization tests
+- Download speed, validation performance, memory usage, concurrent processing
+
+**UI/Visual Tests:**
+- `tests/UI/test_ui.py` - Enhanced Selenium-based web interface tests with screenshot capabilities
+- `tests/UI/visual_regression.py` - Visual regression testing comparing baseline and current screenshots
+- Comprehensive test modes with step-by-step screenshot capture and error documentation
+
+**Load Testing:**
+- `tests/UI/locustfile.py` - Enhanced Locust-based load testing with detailed reporting
+- Multiple task types, session tracking, and performance metrics export
+
+**Test Infrastructure:**
+- `tests/conftest.py` - Pytest configuration with comprehensive fixtures
+- `tests/fixtures/` - Test data, sample configurations, and mock sequences
+- Extensive mock data for all MODs (WB, SGD, FB, ZFIN, RGD, XB)
+
+**Test Features:**
+- Code coverage reporting with HTML output
+- Visual regression testing with image comparison
+- Performance benchmarking and resource monitoring  
+- Load testing with detailed metrics and JSON export
+- Comprehensive error scenario testing
+- Memory leak detection and cleanup verification
 
 ### Environment Variables
 
