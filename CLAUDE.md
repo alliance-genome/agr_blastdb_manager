@@ -5,9 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Common Commands
 
 ### Development Commands
-- `poetry install` - Install dependencies
-- `poetry shell` - Activate virtual environment
-- `poetry run python src/create_blast_db.py --help` - Show main script help
+- `uv sync` - Install dependencies
+- `uv run python src/create_blast_db.py --help` - Show main script help
 
 ### Docker Commands
 - `make docker-build` - Build Docker image (x86_64)
@@ -16,21 +15,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `make docker-run-help` - Show Docker help
 
 ### Testing Commands
-- `poetry run pytest tests/` - Run all tests
-- `poetry run pytest tests/test_agr_blastdb_manager.py` - Run specific test file
-- `poetry run pytest tests/ --cov=src --cov-report=html` - Run tests with coverage report
-- `poetry run pytest tests/test_integration.py` - Run integration tests
-- `poetry run pytest tests/test_performance.py` - Run performance tests
-- `python tests/UI/test_ui.py -m WB -t nematode --comprehensive` - Run comprehensive UI tests
-- `python tests/UI/visual_regression.py -b baseline/ -c current/ -o results/` - Run visual regression tests
-- `locust -f tests/UI/locustfile.py --host=https://blast.alliancegenome.org -u 10 -r 2 -t 5m` - Run load tests
+- `uv run pytest tests/` - Run all tests
+- `uv run pytest tests/test_agr_blastdb_manager.py` - Run specific test file
+- `uv run pytest tests/ --cov=src --cov-report=html` - Run tests with coverage report
+- `uv run pytest tests/test_integration.py` - Run integration tests
+- `uv run pytest tests/test_performance.py` - Run performance tests
+- `uv run python tests/ui/test_ui.py -m WB -t nematode --comprehensive` - Run comprehensive UI tests
+- `uv run python tests/ui/visual_regression.py -b baseline/ -c current/ -o results/` - Run visual regression tests
+- `uv run locust -f tests/ui/locustfile.py --host=https://blast.alliancegenome.org -u 10 -r 2 -t 5m` - Run load tests
 
 ### Code Quality Commands
-- `poetry run black src/ tests/` - Format code with Black
-- `poetry run ruff check src/ tests/` - Lint code with Ruff
-- `poetry run ruff check --fix src/ tests/` - Lint and auto-fix with Ruff
-- `poetry run mypy src/` - Type check with mypy
-- `poetry run isort src/ tests/` - Sort imports
+- `uv run black src/ tests/` - Format code with Black
+- `uv run ruff check src/ tests/` - Lint code with Ruff
+- `uv run ruff check --fix src/ tests/` - Lint and auto-fix with Ruff
+- `uv run mypy src/` - Type check with mypy
+- `uv run isort src/ tests/` - Sort imports
 
 ### Data Management Commands
 - `make clean-fasta` - Remove downloaded FASTA files
@@ -159,17 +158,17 @@ Required for full functionality:
 
 **Run for specific MOD and environment:**
 ```bash
-poetry run python src/create_blast_db.py --conf conf/global.yaml --mod WB --env WS285
+uv run python src/create_blast_db.py --conf conf/global.yaml --mod WB --env WS285
 ```
 
 **Check parse_seqids policy without creating databases:**
 ```bash
-poetry run python src/create_blast_db.py --conf conf/global.yaml --mod WB --env WS285 --check-parse-seqids
+uv run python src/create_blast_db.py --conf conf/global.yaml --mod WB --env WS285 --check-parse-seqids
 ```
 
 **Run with production copy (requires confirmation):**
 ```bash
-poetry run python src/create_blast_db.py --conf conf/global.yaml --mod WB --env WS285 --production-copy
+uv run python src/create_blast_db.py --conf conf/global.yaml --mod WB --env WS285 --production-copy
 ```
 
 ### Configuration Structure
