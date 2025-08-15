@@ -26,7 +26,7 @@ from rich.console import Console
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
-from terminal import create_progress, log_error, print_status
+from . import terminal
 
 console = Console()
 
@@ -268,7 +268,7 @@ def cleanup_fasta_files(data_dir: Path, logger) -> None:
     Cleans up all FASTA files in the specified directory after database generation.
     """
     logger.info(f"Starting cleanup of FASTA files in {data_dir}")
-    print_status("Starting final cleanup...", "info")
+    terminal.print_status("Starting final cleanup...", "info")
 
     try:
         # Find all FASTA files (both gzipped and uncompressed)
@@ -279,13 +279,13 @@ def cleanup_fasta_files(data_dir: Path, logger) -> None:
 
         if not fasta_files:
             logger.info("No FASTA files found for cleanup")
-            print_status("No files to clean up", "info")
+            terminal.print_status("No files to clean up", "info")
             return
 
         logger.info(f"Found {len(fasta_files)} files to clean up")
-        print_status(f"Found {len(fasta_files)} files to clean up", "info")
+        terminal.print_status(f"Found {len(fasta_files)} files to clean up", "info")
 
-        with create_progress() as progress:
+        with terminal.create_progress() as progress:
             cleanup_task = progress.add_task(
                 "Cleaning up files...", total=len(fasta_files)
             )
@@ -300,17 +300,17 @@ def cleanup_fasta_files(data_dir: Path, logger) -> None:
                     logger.info(f"Successfully removed {fasta_file.name}")
                 except Exception as e:
                     logger.error(f"Failed to remove {fasta_file.name}: {str(e)}")
-                    print_status(f"Failed to remove {fasta_file.name}", "warning")
+                    terminal.print_status(f"Failed to remove {fasta_file.name}", "warning")
 
                 progress.advance(cleanup_task)
 
-        print_status("Cleanup completed successfully", "success")
+        terminal.print_status("Cleanup completed successfully", "success")
         logger.info("FASTA file cleanup completed")
 
     except Exception as e:
         error_msg = f"Error during FASTA cleanup: {str(e)}"
         logger.error(error_msg, exc_info=True)
-        print_status(error_msg, "error")
+        terminal.print_status(error_msg, "error")
 
 
 def extendable_logger(log_name, file_name, level=logging.INFO) -> Any:
@@ -532,7 +532,7 @@ def slack_message(messages: list, subject="BLAST Database Update") -> bool:
 
     # Check if Slack token is configured
     if "SLACK" not in env:
-        print_status("Skipping Slack update - no Slack token configured", "warning")
+        terminal.print_status("Skipping Slack update - no Slack token configured", "warning")
         return True
 
     try:
@@ -542,14 +542,14 @@ def slack_message(messages: list, subject="BLAST Database Update") -> bool:
             text=subject,
             attachments=messages,
         )
-        print_status("Slack message sent successfully", "success")
+        terminal.print_status("Slack message sent successfully", "success")
         return True
 
     except SlackApiError as e:
-        log_error(f"Failed to send Slack message: {e.response['error']}")
+        terminal.log_error(f"Failed to send Slack message: {e.response['error']}")
         return False
     except Exception as e:
-        log_error("Unexpected error sending Slack message", e)
+        terminal.log_error("Unexpected error sending Slack message", e)
         return False
 
 

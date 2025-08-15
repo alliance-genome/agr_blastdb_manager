@@ -31,7 +31,7 @@ def setup_blast(datadir, mod, environment):
 
     p = pathlib.Path(f"{datadir}/{mod}/{environment}/databases/")
     dbs = data[mod][environment]["dbs"]
-    fasta = f">test\n{data[mod][environment]["nucl"]}"
+    fasta = f">test\n{data[mod][environment]['nucl']}"
 
     for db in dbs:
         full_dir = p / db

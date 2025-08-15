@@ -13,9 +13,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 try:
-    from .fixtures import PERFORMANCE_TEST_DATA, LARGE_SEQUENCE_FASTA
+    from ..fixtures import PERFORMANCE_TEST_DATA, LARGE_SEQUENCE_FASTA
 except ImportError:
-    from fixtures import PERFORMANCE_TEST_DATA, LARGE_SEQUENCE_FASTA
+    from tests.fixtures import PERFORMANCE_TEST_DATA, LARGE_SEQUENCE_FASTA
 
 
 class TestDownloadPerformance:

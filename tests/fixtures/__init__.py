@@ -4,8 +4,8 @@ fixtures package
 Test fixtures and sample data for the AGR BLAST DB Manager.
 """
 
-from .sample_configurations import *
-from .sample_sequences import *
+from .mock_data.sample_configurations import *
+from .mock_data.sample_sequences import *
 
 __all__ = [
     # Configuration fixtures

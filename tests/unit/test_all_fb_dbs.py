@@ -54,7 +54,7 @@ for version in ['FB2025_01', 'FB2025_03']:
                                     break
 
 print(f"\nTesting user sequence against {len(all_dbs)} FB genome databases")
-print(f"Sequence length: {len(open('test_user_sequence.fasta').readlines()[1].strip())}bp")
+print(f"Sequence length: {len(open('../../tests/fixtures/test_user_sequence.fasta').readlines()[1].strip())}bp")
 print("Using stringent e-value: 1e-3")
 print("=" * 80)
 
@@ -64,7 +64,7 @@ hit_species = []
 
 for species_name, db_path in sorted(all_dbs):
     total += 1
-    if test_sequence_stringent('test_user_sequence.fasta', db_path, species_name):
+    if test_sequence_stringent('../../tests/fixtures/test_user_sequence.fasta', db_path, species_name):
         hits += 1
         hit_species.append(species_name)
 

@@ -19,13 +19,13 @@ from typing import Dict, List, Tuple
 
 import click
 
-from terminal import (
+from src.terminal import (
     create_progress,
     print_header,
     print_status,
     show_summary,
 )
-from utils import setup_detailed_logger
+from src.utils import setup_detailed_logger
 
 # Test sequences for different MODs
 DEFAULT_TEST_SEQUENCES = {
