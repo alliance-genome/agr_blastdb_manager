@@ -1,0 +1,6 @@
+# Small, rat-specific test sequence for RGD databases
+>rat_actin_small Rattus norvegicus beta-actin partial sequence (short)
+ATGGATGATGACATCGCCGCGCTCGTCGTCGACAACGGCTCCGGCATGTGCAAGGCC
+
+>rat_gapdh_small Rattus norvegicus GAPDH partial sequence (short) 
+ATGGTGAAGGTCGGAGTCAACGGATTTGGTCGTATTGGGCGCCTGGTCACCAGGGC

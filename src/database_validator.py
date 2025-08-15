@@ -15,13 +15,27 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
-from . import terminal
+try:
+    from . import terminal
+except ImportError:
+    import terminal
 
 
 class DatabaseValidator:
     """Comprehensive BLAST database validator with detailed logging"""
     
     def __init__(self, log_dir: str = "../logs", test_sequences_dir: str = "../tests/fixtures"):
+        # Handle relative paths from different calling contexts
+        if not Path(log_dir).is_absolute():
+            # Try from current directory first, then from project root
+            if not Path(log_dir).exists():
+                log_dir = str(Path(__file__).parent.parent / log_dir.lstrip('../'))
+        
+        if not Path(test_sequences_dir).is_absolute():
+            # Try from current directory first, then from project root  
+            if not Path(test_sequences_dir).exists():
+                test_sequences_dir = str(Path(__file__).parent.parent / test_sequences_dir.lstrip('../'))
+        
         self.log_dir = Path(log_dir)
         self.test_sequences_dir = Path(test_sequences_dir)
         self.log_dir.mkdir(exist_ok=True, parents=True)
@@ -145,20 +159,23 @@ class DatabaseValidator:
         return db_info
     
     def test_database_functionality(self, db_path: str) -> Tuple[bool, str, Dict]:
-        """Test database functionality with universal conserved sequences"""
-        if not self.universal_sequences.exists():
-            self.logger.error(f"Universal test sequences not found: {self.universal_sequences}")
+        """Test database functionality with appropriate test sequences"""
+        # Determine optimal test sequences and timeout based on database type
+        test_sequences, timeout_seconds = self.get_optimal_test_params(db_path)
+        
+        if not test_sequences.exists():
+            self.logger.error(f"Test sequences not found: {test_sequences}")
             return False, "Test sequences missing", {}
             
         try:
-            self.logger.debug(f"Testing database functionality: {db_path}")
+            self.logger.debug(f"Testing database functionality: {db_path} (timeout: {timeout_seconds}s)")
             result = subprocess.run([
-                'blastn', '-query', str(self.universal_sequences), '-db', db_path,
+                'blastn', '-query', str(test_sequences), '-db', db_path,
                 '-outfmt', '6 qseqid sseqid pident length evalue bitscore',
                 '-evalue', '10',        # Very permissive
                 '-word_size', '7',      # Sensitive
-                '-max_target_seqs', '5' # Limited output
-            ], capture_output=True, text=True, timeout=60)
+                '-max_target_seqs', '3' # Limited output for speed
+            ], capture_output=True, text=True, timeout=timeout_seconds)
             
             if result.returncode != 0:
                 error_msg = f"BLAST search failed: {result.stderr[:200]}"
@@ -204,6 +221,38 @@ class DatabaseValidator:
             error_msg = f"BLAST search error: {str(e)[:100]}"
             self.logger.error(f"{error_msg}: {db_path}")
             return False, error_msg, {}
+    
+    def get_optimal_test_params(self, db_path: str) -> Tuple[Path, int]:
+        """Determine optimal test sequences and timeout based on database characteristics"""
+        # Extract MOD from database path
+        path_parts = db_path.split('/')
+        
+        # Default parameters
+        test_sequences = self.universal_sequences
+        timeout_seconds = 60
+        
+        # MOD-specific optimization
+        if 'RGD' in path_parts:
+            # RGD databases are massive genome assemblies - need longer timeout and specific sequences
+            rgd_sequences = self.test_sequences_dir / "rgd_specific_test.fasta"
+            if rgd_sequences.exists():
+                test_sequences = rgd_sequences
+            timeout_seconds = 180  # 3 minutes for large genomes
+            
+        elif 'SGD' in path_parts:
+            # SGD databases are smaller, can use shorter timeout
+            timeout_seconds = 30
+            
+        elif 'ZFIN' in path_parts:
+            # ZFIN databases vary in size
+            timeout_seconds = 90
+            
+        elif 'FB' in path_parts or 'WB' in path_parts:
+            # FB and WB databases are moderate size
+            timeout_seconds = 60
+        
+        self.logger.debug(f"Selected test params for {db_path}: {test_sequences.name}, {timeout_seconds}s timeout")
+        return test_sequences, timeout_seconds
     
     def count_sequences_in_fasta(self, fasta_file: str) -> int:
         """Count number of sequences in FASTA file"""
