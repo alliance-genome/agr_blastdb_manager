@@ -46,6 +46,7 @@ from utils import (
     slack_message,
     update_genome_browser_map,
 )
+from database_validator import DatabaseValidator
 
 # Global variables
 SLACK_MESSAGES: List[Dict[str, str]] = []
@@ -763,6 +764,18 @@ def send_slack_messages_in_batches(
     is_flag=True,
     default=False,
 )
+@click.option(
+    "--validate-databases",
+    help="Run comprehensive database validation after creation",
+    is_flag=True,
+    default=True,
+)
+@click.option(
+    "--skip-validation",
+    help="Skip database validation (not recommended for production)",
+    is_flag=True,
+    default=False,
+)
 def create_dbs(
     config_yaml: str,
     input_json: str,
@@ -776,6 +789,8 @@ def create_dbs(
     db_names: Optional[str],
     list_dbs: bool,
     check_parse_seqids: bool,
+    validate_databases: bool,
+    skip_validation: bool,
 ) -> None:
     """
     Main function that runs the pipeline for processing configuration files and creating BLAST databases.
@@ -953,6 +968,41 @@ def create_dbs(
         if sync_s3 and not check_parse_seqids:
             LOGGER.info("Starting S3 sync")
             s3_sync(Path("../data"), skip_efs_sync)
+
+        # Run comprehensive database validation after successful creation
+        if validate_databases and not skip_validation and not check_parse_seqids:
+            LOGGER.info("Starting comprehensive database validation")
+            print_status("Validating created databases...", "info")
+            
+            try:
+                validator = DatabaseValidator()
+                validation_results = validator.validate_release(mod, environment)
+                
+                # Log validation summary
+                summary = validation_results.get('summary', {})
+                passed = summary.get('passed', 0)
+                failed = summary.get('failed', 0)
+                total = passed + failed
+                
+                if failed > 0:
+                    log_warning(f"Database validation completed with {failed}/{total} failures")
+                    SLACK_MESSAGES.append({
+                        'level': 'warning',
+                        'message': f"{mod} {environment}: {failed}/{total} databases failed validation"
+                    })
+                else:
+                    log_success(f"All {total} databases passed validation")
+                    SLACK_MESSAGES.append({
+                        'level': 'success', 
+                        'message': f"{mod} {environment}: All {total} databases validated successfully"
+                    })
+                    
+            except Exception as e:
+                log_error("Database validation failed", e)
+                SLACK_MESSAGES.append({
+                    'level': 'error',
+                    'message': f"{mod} {environment}: Database validation failed - {str(e)}"
+                })
 
         duration = datetime.now() - start_time
         LOGGER.info(f"Process completed successfully in {duration}")
