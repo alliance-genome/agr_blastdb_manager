@@ -1,0 +1,17 @@
+# Drosophila conserved sequences - should hit multiple Drosophila species
+
+# Even-skipped homeodomain - conserved across Drosophila species (90bp)
+>eve_homeodomain Drosophila even-skipped homeodomain conserved
+CAGTTCAAACAGCAGCTGAACCGCCAGTGCGGCTGCATCAAGTACGGCAAGCTGATCTTCGATCAGAACATGAGCCGCACCATCAAGTGC
+
+# Alcohol dehydrogenase (Adh) - highly conserved metabolic gene (120bp)
+>adh_conserved Drosophila alcohol dehydrogenase conserved region
+ATGAGCCCCATCAAGATGGTGGTGAGCCAGGGCTACGACCGCACCGGCATGGTGCCCTGCAACCAGGTGCTGGACTTCACCAAGGAGGTGAAGGCCCTGGTCGACGGCGTGTGC
+
+# Hsp70 heat shock protein - conserved stress response gene (100bp)  
+>hsp70_conserved Drosophila heat shock protein 70 conserved region
+ATGGCCAAGGCCACCGCCAACATCGAGGAGGTGCTGGACCACATCAACATGACCGTGGGCTACGGCCGCAAGGACACCGGCGTGATCGGC
+
+# Rp49 ribosomal protein - housekeeping gene conserved across Drosophila (80bp)
+>rp49_conserved Drosophila ribosomal protein 49 conserved region
+ATGGTGAAGAAGGCCATCGCCACCAACAAGACCATCGGCACCACCAAGGGCCTGGTGATCCTGGGCAAGTACGCC

@@ -197,3 +197,4 @@ The system provides comprehensive error reporting:
 
 - **ZFIN**: Skips MD5 validation and never uses -parse_seqids flag
 - **All others**: Mandatory -parse_seqids flag for consistent FASTA download functionality
+- remove claude from commit

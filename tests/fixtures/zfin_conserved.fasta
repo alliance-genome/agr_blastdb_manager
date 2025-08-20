@@ -1,0 +1,17 @@
+# Zebrafish conserved sequences - vertebrate-specific conserved regions
+
+# actb1 beta-actin - cytoskeletal protein conserved across vertebrates (95bp)
+>actb1_conserved Zebrafish beta-actin actb1 gene conserved region
+ATGGATGATGACATCGCCGCGCTCGTCGTCGACAACGGCTCCGGCATGTGCAAGGCCGGCTTCGCCGGCGACGATGCC
+
+# gapdh glyceraldehyde-3-phosphate dehydrogenase - metabolic enzyme (100bp)
+>gapdh_conserved Zebrafish GAPDH gene conserved region
+ATGGTGAAGGTCGGAGTCAACGGATTTGGTCGTATTGGGCGCCTGGTCACCAGGGCTGCTTTTAACTCTGGTAAAGTG
+
+# ef1a elongation factor 1 alpha - translation machinery (85bp)
+>ef1a_conserved Zebrafish elongation factor 1 alpha conserved region
+ATGGGCAAGGAAACCGCCGCCATCAAGAAGATCGGCGTGGTGCTGGGCAAGGCCACCCCCTACGACGCC
+
+# rpl13a ribosomal protein L13a - housekeeping gene (80bp)
+>rpl13a_conserved Zebrafish ribosomal protein L13a conserved region
+ATGGGCACCGCCACCGTGAAGGAGATCCTGACCGACATCAACATGACCGTGGGCTACGGC

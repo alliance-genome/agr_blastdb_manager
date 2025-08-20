@@ -1,0 +1,17 @@
+# Saccharomyces conserved sequences - should hit multiple yeast strains/species
+
+# ACT1 actin gene - highly conserved across yeast strains (100bp)
+>ACT1_conserved Saccharomyces actin ACT1 gene conserved region
+ATGGATGATGACATTGCCGCCCTCGTCGTCGACAACGGCTCCGGCATGTGCAAGGCCGGCTTCGCCGGTGACGATGCCCCCCGAGCCGTC
+
+# TEF1 translation elongation factor - essential housekeeping gene (90bp)
+>TEF1_conserved Saccharomyces translation elongation factor conserved region
+ATGGGCAAGGAAACCGCCGCCATCAAGAAGATCGGCGTGGTGCTGGGCAAGGCCACCCCCTACGACGCCGTGAAGGCC
+
+# PGK1 phosphoglycerate kinase - glycolysis enzyme conserved (110bp)
+>PGK1_conserved Saccharomyces phosphoglycerate kinase conserved region
+ATGGTCAAGGCCGTCGACACCGTGGGCAAGTTCGTCGACACCGTGGGCTACACCGCCAAGGACACCGTGGGCAAGTACGTCGACACCGTGGGC
+
+# TDH3 glyceraldehyde-3-phosphate dehydrogenase - highly conserved metabolic gene (95bp)
+>TDH3_conserved Saccharomyces glyceraldehyde-3-phosphate dehydrogenase conserved region
+ATGGTCAAGGGTCGCAGCAACGGCTTTGGCCGTATTGGGCGCCTGGTCACCAGGGCCGCTTTTAACTCTGGCAAGG

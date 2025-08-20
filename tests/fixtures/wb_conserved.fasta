@@ -1,0 +1,17 @@
+# Caenorhabditis conserved sequences - should hit multiple nematode species
+
+# unc-54 myosin heavy chain - muscle gene conserved across nematodes (100bp)
+>unc54_conserved Caenorhabditis unc-54 myosin heavy chain conserved region
+ATGGCCACCGCCAACGTGAAGGAGCTGCTGGACGACATCAACCTGACCGTGGGCTACGGCCGCAAGGACACCGGCGTGATCGGCAAC
+
+# act-1 actin gene - cytoskeletal protein highly conserved (85bp)
+>act1_conserved Caenorhabditis actin act-1 gene conserved region
+ATGGATGATGACATCGCCGCCCTCGTCGTCGACAACGGCTCCGGCATGTGCAAGGCCGGCTTCGCCGGC
+
+# gpd-3 GAPDH - glycolysis enzyme conserved across species (90bp)
+>gpd3_conserved Caenorhabditis GAPDH gpd-3 gene conserved region
+ATGGTCAAGGGTCGCAGCAACGGCTTTGGCCGTATTGGGCGCCTGGTCACCAGGGCCGCTTTTAACTC
+
+# rps-23 ribosomal protein - translation machinery conserved (75bp)
+>rps23_conserved Caenorhabditis ribosomal protein S23 conserved region
+ATGGGCAAGGCCACCGCCAACATCGAGGAGGTGCTGGACCACATCAACATGACCGTGGGC

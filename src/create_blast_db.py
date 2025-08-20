@@ -140,7 +140,7 @@ def run_makeblastdb(config_entry: Dict, output_dir: str, logger, mod_code: str) 
         makeblast_command = (
             f"makeblastdb -in {unzipped_fasta} -dbtype {config_entry['seqtype']} "
             f"-title '{sanitized_blast_title}' "
-            f"-out {output_dir}/{fasta_file.replace(extensions, 'db')} "
+            f"-out {output_dir}/{fasta_file.replace(extensions, '.db')} "
             f"-taxid {config_entry['taxon_id'].replace('NCBITaxon:', '')} "
             f"{parse_ids_flag}"
         ).strip()

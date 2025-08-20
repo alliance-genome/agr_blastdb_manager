@@ -1,0 +1,17 @@
+# Rat conserved sequences - mammalian-specific conserved regions
+
+# actb beta-actin - cytoskeletal protein highly conserved in mammals (90bp)
+>actb_conserved Rat beta-actin gene conserved region
+ATGGATGATGACATCGCCGCGCTCGTCGTCGACAACGGCTCCGGCATGTGCAAGGCCGGCTTCGCCGGC
+
+# gapdh glyceraldehyde-3-phosphate dehydrogenase - metabolic enzyme (95bp)
+>gapdh_conserved Rat GAPDH gene conserved region
+ATGGTGAAGGTCGGAGTCAACGGATTTGGTCGTATTGGGCGCCTGGTCACCAGGGCTGCTTTTAACTC
+
+# rpl32 ribosomal protein L32 - housekeeping gene (80bp)
+>rpl32_conserved Rat ribosomal protein L32 conserved region
+ATGGGCACCGCCACCGTGAAGGAGATCCTGACCGACATCAACATGACCGTGGGC
+
+# hprt1 hypoxanthine phosphoribosyltransferase - metabolic enzyme (85bp)
+>hprt1_conserved Rat HPRT1 gene conserved region
+ATGGGCAAGGAAACCGCCGCCATCAAGAAGATCGGCGTGGTGCTGGGCAAGGCC
