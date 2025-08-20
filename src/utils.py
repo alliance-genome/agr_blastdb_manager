@@ -26,7 +26,10 @@ from rich.console import Console
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
-from . import terminal
+try:
+    from . import terminal
+except ImportError:
+    import terminal
 
 console = Console()
 

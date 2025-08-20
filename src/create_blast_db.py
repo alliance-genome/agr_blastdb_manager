@@ -21,32 +21,60 @@ from typing import Dict, List, Optional, Tuple
 import click
 import yaml
 
-from terminal import (
-    log_error,
-    log_success,
-    log_warning,
-    print_error_details,
-    print_header,
-    print_minimal_header,
-    print_progress_line,
-    print_status,
-    show_summary,
-)
-from utils import (
-    cleanup_fasta_files,
-    copy_config_file,
-    copy_config_to_production,
-    copy_to_production,
-    extendable_logger,
-    get_files_ftp,
-    get_files_http,
-    get_mod_from_json,
-    s3_sync,
-    setup_detailed_logger,
-    slack_message,
-    update_genome_browser_map,
-)
-from database_validator import DatabaseValidator
+try:
+    from .terminal import (
+        log_error,
+        log_success,
+        log_warning,
+        print_error_details,
+        print_header,
+        print_minimal_header,
+        print_progress_line,
+        print_status,
+        show_summary,
+    )
+    from .utils import (
+        cleanup_fasta_files,
+        copy_config_file,
+        copy_config_to_production,
+        copy_to_production,
+        extendable_logger,
+        get_files_ftp,
+        get_files_http,
+        get_mod_from_json,
+        s3_sync,
+        setup_detailed_logger,
+        slack_message,
+        update_genome_browser_map,
+    )
+    from .database_validator import DatabaseValidator
+except ImportError:
+    from terminal import (
+        log_error,
+        log_success,
+        log_warning,
+        print_error_details,
+        print_header,
+        print_minimal_header,
+        print_progress_line,
+        print_status,
+        show_summary,
+    )
+    from utils import (
+        cleanup_fasta_files,
+        copy_config_file,
+        copy_config_to_production,
+        copy_to_production,
+        extendable_logger,
+        get_files_ftp,
+        get_files_http,
+        get_mod_from_json,
+        s3_sync,
+        setup_detailed_logger,
+        slack_message,
+        update_genome_browser_map,
+    )
+    from database_validator import DatabaseValidator
 
 # Global variables
 SLACK_MESSAGES: List[Dict[str, str]] = []
