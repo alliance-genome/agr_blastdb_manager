@@ -456,6 +456,9 @@ def get_files_http(
     logger.info(f"Starting HTTP download from: {file_uri}")
 
     try:
+        # Ensure data directory exists
+        Path("../data").mkdir(parents=True, exist_ok=True)
+        
         file_name = f"../data/{Path(file_uri).name}"
         logger.info(f"Download target: {file_name}")
 
@@ -507,6 +510,9 @@ def get_files_ftp(
     logger.info(f"Starting FTP download from: {fasta_uri}")
 
     try:
+        # Ensure data directory exists
+        Path("../data").mkdir(parents=True, exist_ok=True)
+        
         ftp_host = Path(fasta_uri).parts[1]
         ftp_path = "/".join(Path(fasta_uri).parts[2:-1])
         fasta_file = f"../data/{Path(fasta_uri).name}"

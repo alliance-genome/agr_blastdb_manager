@@ -15,11 +15,11 @@ DATA_DIR    := data
 all: docker-build docker-run
 
 # Generate the BLAST database metadata schema file.
-conf/metadata_schema.json:
-	snakemake -c1 -f $@
+# conf/metadata_schema.json:
+#	snakemake -c1 -f $@
 
 conf/flybase/databases.json:
-	poetry run ./scripts/create_flybase_metadata.py --email $(FB_EMAIL) --release $(FB_RELEASE) --dmel-annot $(DMEL_RELEASE) > $@
+	uv run ./scripts/create_flybase_metadata.py --email $(FB_EMAIL) --release $(FB_RELEASE) --dmel-annot $(DMEL_RELEASE) > $@
 
 conf/wormbase/databases.json:
 	wget ftp://ftp.ebi.ac.uk/pub/databases/wormbase/misc_datasets/AGR/blast_meta.wormbase.json -q -O - | jq '.' > $@
@@ -57,7 +57,7 @@ docker-run-help:
 build: $(DIST_DIR)/%.whl
 
 $(DIST_DIR)/%.whl:
-	poetry build
+	uv build
 
 format:
 	black agr_blastdb_manager scripts
