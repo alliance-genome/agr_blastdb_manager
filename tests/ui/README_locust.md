@@ -13,14 +13,14 @@ This document provides comprehensive instructions for running load tests against
 
 ## Prerequisites
 
-- Python 3.8 or higher
-- pip (Python package installer)
+- Python 3.10 or higher
+- uv (package management - faster alternative to pip)
 - Access to the BLAST web interface
 - Basic understanding of BLAST searches and MOD databases
 
 ## Installation
 
-1. Ensure Poetry is installed on your system. If not, install it following the [official instructions](https://python-poetry.org/docs/#installation).
+1. Ensure uv is installed on your system. If not, install it following the [official instructions](https://docs.astral.sh/uv/#installation).
 
 2. Clone this repository and navigate to the project directory:
 ```bash
@@ -28,27 +28,19 @@ git clone <repository-url>
 cd <project-directory>
 ```
 
-3. Install dependencies using Poetry:
+3. Install dependencies using uv:
 ```bash
-poetry install
+uv sync
 ```
 
-4. Add Locust dependencies to the project:
-```bash
-poetry add locust rich
-```
-
-Your `pyproject.toml` should include these dependencies:
+Dependencies are already configured in the `pyproject.toml`:
 ```toml
-[tool.poetry.dependencies]
-python = "^3.8"
-locust = "^2.15.1"
-rich = "^13.3.5"
-```
-
-5. Activate the Poetry shell:
-```bash
-poetry shell
+[project.optional-dependencies]
+dev = [
+    "locust>=2.15.1",
+    "rich>=13.5.2",
+    # ... other dependencies
+]
 ```
 
 ## Configuration
@@ -88,14 +80,14 @@ The configuration file should follow this structure:
 
 ### Basic Usage
 
-With Poetry:
+With uv:
 ```bash
-poetry run locust -f locustfile.py --host=https://blast.alliancegenome.org --mod=SGD --env=prod
+uv run locust -f tests/performance/load_testing/locustfile.py --host=https://blast.alliancegenome.org --mod=SGD --env=prod
 ```
 
-Or from within Poetry shell:
+Or using the test runner:
 ```bash
-locust -f locustfile.py --host=https://blast.alliancegenome.org --mod=SGD --env=prod
+uv run python tests/run_tests.py load --users 10 --duration 5m
 ```
 
 ### Common Options
@@ -111,16 +103,16 @@ locust -f locustfile.py --host=https://blast.alliancegenome.org --mod=SGD --env=
 
 1. Run a 1-hour test with 10 users:
 ```bash
-# Using Poetry run
-poetry run locust -f locustfile.py --host=https://blast.alliancegenome.org -t 1h -u 10 -r 1 --mod=SGD --env=prod --headless
+# Using uv run
+uv run locust -f tests/performance/load_testing/locustfile.py --host=https://blast.alliancegenome.org -t 1h -u 10 -r 1 --mod=SGD --env=prod --headless
 
-# Or from within Poetry shell
-locust -f locustfile.py --host=https://blast.alliancegenome.org -t 1h -u 10 -r 1 --mod=SGD --env=prod --headless
+# Using test runner (recommended)
+uv run python tests/run_tests.py load --users 10 --duration 1h
 ```
 
 2. Run with web interface for manual control:
 ```bash
-locust -f locustfile.py --host=https://blast.alliancegenome.org --mod=SGD --env=prod
+uv run locust -f tests/performance/load_testing/locustfile.py --host=https://blast.alliancegenome.org --mod=SGD --env=prod
 ```
 
 3. Distributed load testing (multiple workers):
@@ -177,7 +169,7 @@ The script provides rich console output:
 Generate HTML reports after test completion:
 
 ```bash
-locust -f locustfile.py --host=https://blast.alliancegenome.org --mod=SGD --env=prod --headless --html=report.html
+uv run locust -f tests/performance/load_testing/locustfile.py --host=https://blast.alliancegenome.org --mod=SGD --env=prod --headless --html=report.html
 ```
 
 ## Troubleshooting
@@ -207,20 +199,16 @@ Solution: Verify host URL and network connectivity
 Enable debug logging:
 
 ```bash
-# Using Poetry run
-poetry run locust -f locustfile.py --host=https://blast.alliancegenome.org --mod=SGD --env=prod --loglevel=DEBUG
-
-# Or from within Poetry shell
-locust -f locustfile.py --host=https://blast.alliancegenome.org --mod=SGD --env=prod --loglevel=DEBUG
+uv run locust -f tests/performance/load_testing/locustfile.py --host=https://blast.alliancegenome.org --mod=SGD --env=prod --loglevel=DEBUG
 ```
 
-You can also set Poetry-specific environment variables in the `pyproject.toml`:
+You can also set environment variables:
 
-```toml
-[tool.poetry.env]
-BLAST_CONFIG = "config.json"
-LOCUST_MOD = "SGD"
-LOCUST_ENV = "prod"
+```bash
+export BLAST_CONFIG="config.json"
+export LOCUST_MOD="SGD"
+export LOCUST_ENV="prod"
+uv run locust -f tests/performance/load_testing/locustfile.py
 ```
 
 ### Support

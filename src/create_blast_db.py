@@ -22,12 +22,18 @@ import click
 import yaml
 
 from terminal import (
+    create_progress,
     log_error,
     log_success,
     log_warning,
+    print_app_banner,
+    print_completion_message,
+    print_config_summary,
     print_error_details,
     print_header,
     print_minimal_header,
+    print_operation_start,
+    print_phase_header,
     print_progress_line,
     print_status,
     show_summary,
@@ -806,6 +812,9 @@ def create_dbs(
     """
     Main function that runs the pipeline for processing configuration files and creating BLAST databases.
     """
+    # Print professional banner
+    print_app_banner()
+    
     start_time = datetime.now()
     LOGGER.info("Starting BLAST database creation process")
     LOGGER.info(

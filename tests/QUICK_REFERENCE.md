@@ -5,43 +5,43 @@
 ### Test Runner (Recommended)
 ```bash
 # List all available test categories
-python tests/run_tests.py list
+uv run python tests/run_tests.py list
 
 # Run all tests with summary
-python tests/run_tests.py all
+uv run python tests/run_tests.py all
 
 # Run specific category
-python tests/run_tests.py unit -v           # Unit tests with verbose output
-python tests/run_tests.py integration       # Integration tests
-python tests/run_tests.py performance       # Performance benchmarks
+uv run python tests/run_tests.py unit -v           # Unit tests with verbose output
+uv run python tests/run_tests.py integration       # Integration tests
+uv run python tests/run_tests.py performance       # Performance benchmarks
 ```
 
 ### UI Testing
 ```bash
 # Test specific MOD/release
-python tests/run_tests.py ui --mod WB --release WS297
+uv run python tests/run_tests.py ui --mod WB --release WS297
 
 # Comprehensive UI testing with detailed screenshots
-python tests/run_tests.py ui --mod FB --release FB2025_03 --comprehensive
+uv run python tests/run_tests.py ui --mod FB --release FB2025_03 --comprehensive
 
 # Generate new UI config from current databases
 cd tests/ui/
-python generate_ui_config_simple.py
+uv run python generate_ui_config_simple.py
 ```
 
 ### Load Testing
 ```bash
 # Quick load test (5 users, 2 minutes)
-python tests/run_tests.py load
+uv run python tests/run_tests.py load
 
 # Custom load test
-python tests/run_tests.py load --users 20 --duration 10m
+uv run python tests/run_tests.py load --users 20 --duration 10m
 ```
 
 ### Coverage Reports
 ```bash
 # Generate coverage report
-python tests/run_tests.py coverage
+uv run python tests/run_tests.py coverage
 
 # View HTML report
 open htmlcov/index.html
@@ -51,18 +51,18 @@ open htmlcov/index.html
 
 ### Unit Tests
 ```bash
-poetry run pytest tests/unit/ -v                    # All unit tests
-poetry run pytest tests/unit/test_utils.py -v       # Specific test file
+uv run pytest tests/unit/ -v                    # All unit tests
+uv run pytest tests/unit/test_utils.py -v       # Specific test file
 ```
 
 ### Integration Tests
 ```bash
-poetry run pytest tests/integration/ -v --tb=short  # All integration tests
+uv run pytest tests/integration/ -v --tb=short  # All integration tests
 ```
 
 ### Performance Tests
 ```bash
-poetry run pytest tests/performance/test_performance.py -v
+uv run pytest tests/performance/test_performance.py -v
 ```
 
 ## File Locations After Reorganization

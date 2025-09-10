@@ -525,31 +525,105 @@ def check_output(stdout: bytes, stderr: bytes) -> bool:
 
 def slack_message(messages: list, subject="BLAST Database Update") -> bool:
     """
-    Sends a message to a Slack channel using the Slack API.
+    Sends a message to a Slack channel using the modern Slack API with blocks.
     If no Slack configuration is found, skips silently.
     """
     env = dotenv_values(f"{Path.cwd()}/.env")
 
     # Check if Slack token is configured
-    if "SLACK" not in env:
-        print_status("Skipping Slack update - no Slack token configured", "warning")
+    if "SLACK" not in env or not env["SLACK"]:
+        print_status("Skipping Slack notification - no token configured", "warning")
         return True
+
+    # Get channel from env or use default
+    channel = env.get("SLACK_CHANNEL", "#blast-status")
 
     try:
         client = WebClient(token=env["SLACK"])
-        client.chat_postMessage(
-            channel="#blast-status",
-            text=subject,
-            attachments=messages,
+        
+        # Test connection by getting auth info
+        try:
+            auth_response = client.auth_test()
+            print_status(f"Slack authenticated as: {auth_response['user']}", "info")
+        except SlackApiError as e:
+            log_error(f"Slack authentication failed: {e.response.get('error', 'Unknown error')}")
+            return False
+
+        # Convert legacy attachments to modern blocks format
+        blocks = []
+        
+        # Add header
+        blocks.append({
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": subject
+            }
+        })
+        
+        # Add divider
+        blocks.append({"type": "divider"})
+        
+        # Process messages
+        for msg in messages:
+            color = msg.get("color", "#36a64f")
+            title = msg.get("title", "Update")
+            text = msg.get("text", "")
+            
+            # Determine emoji based on color
+            if color == "#36a64f":  # green - success
+                emoji = "✅"
+            elif color == "#ff9900":  # orange - warning  
+                emoji = "⚠️"
+            elif color == "#8D2707":  # red - error
+                emoji = "❌"
+            else:
+                emoji = "ℹ️"  # info
+            
+            # Add section block
+            blocks.append({
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"{emoji} *{title}*\n{text}"
+                }
+            })
+        
+        # Add footer with timestamp
+        blocks.append({"type": "divider"})
+        blocks.append({
+            "type": "context",
+            "elements": [{
+                "type": "mrkdwn",
+                "text": f"🤖 AGR BLAST Database Manager • {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}"
+            }]
+        })
+
+        # Send message
+        response = client.chat_postMessage(
+            channel=channel,
+            text=subject,  # Fallback text for notifications
+            blocks=blocks
         )
-        print_status("Slack message sent successfully", "success")
-        return True
+        
+        if response["ok"]:
+            print_status(f"Slack notification sent to {channel}", "success")
+            return True
+        else:
+            log_error(f"Slack API returned error: {response.get('error', 'Unknown error')}")
+            return False
 
     except SlackApiError as e:
-        log_error(f"Failed to send Slack message: {e.response['error']}")
+        error_msg = e.response.get('error', 'Unknown error')
+        if error_msg == "channel_not_found":
+            log_error(f"Slack channel '{channel}' not found - check channel name and bot permissions")
+        elif error_msg == "invalid_auth":
+            log_error("Invalid Slack token - check SLACK environment variable")
+        else:
+            log_error(f"Slack API error: {error_msg}")
         return False
     except Exception as e:
-        log_error("Unexpected error sending Slack message", e)
+        log_error("Unexpected error sending Slack notification", e)
         return False
 
 

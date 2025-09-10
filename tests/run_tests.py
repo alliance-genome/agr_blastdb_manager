@@ -46,21 +46,21 @@ class TestRunner:
     
     def run_unit_tests(self, verbose: bool = False) -> bool:
         """Run all unit tests."""
-        cmd = ["poetry", "run", "pytest", "tests/unit/"]
+        cmd = ["uv", "run", "pytest", "tests/unit/"]
         if verbose:
             cmd.append("-v")
         return self.run_command(cmd, "Unit tests")
     
     def run_integration_tests(self, verbose: bool = False) -> bool:
         """Run integration tests."""
-        cmd = ["poetry", "run", "pytest", "tests/integration/"]
+        cmd = ["uv", "run", "pytest", "tests/integration/"]
         if verbose:
             cmd.extend(["-v", "--tb=short"])
         return self.run_command(cmd, "Integration tests")
     
     def run_performance_tests(self, verbose: bool = False) -> bool:
         """Run performance tests."""
-        cmd = ["poetry", "run", "pytest", "tests/performance/test_performance.py"]
+        cmd = ["uv", "run", "pytest", "tests/performance/test_performance.py"]
         if verbose:
             cmd.append("-v")
         return self.run_command(cmd, "Performance tests")
@@ -68,7 +68,7 @@ class TestRunner:
     def run_ui_tests(self, mod: str = "WB", release: str = "WS297", 
                      comprehensive: bool = False) -> bool:
         """Run UI tests."""
-        cmd = ["python", "tests/ui/test_ui.py", "-m", mod, "-t", release]
+        cmd = ["uv", "run", "python", "tests/ui/test_ui.py", "-m", mod, "-t", release]
         if comprehensive:
             cmd.append("--comprehensive")
         cmd.extend(["-c", "tests/ui/config.json"])
@@ -77,18 +77,18 @@ class TestRunner:
     
     def run_cli_tests(self) -> bool:
         """Run CLI tests."""
-        cmd = ["python", "tests/cli/test_cli.py", "--help"]
+        cmd = ["uv", "run", "python", "tests/cli/test_cli.py", "--help"]
         return self.run_command(cmd, "CLI tests (help)")
     
     def run_coverage_report(self) -> bool:
         """Generate coverage report."""
-        cmd = ["poetry", "run", "pytest", "tests/", "--cov=src", "--cov-report=html", "--cov-report=term"]
+        cmd = ["uv", "run", "pytest", "tests/", "--cov=src", "--cov-report=html", "--cov-report=term"]
         return self.run_command(cmd, "Coverage report generation")
     
     def run_load_tests(self, users: int = 5, duration: str = "2m") -> bool:
         """Run load tests with Locust."""
         cmd = [
-            "poetry", "run", "locust", 
+            "uv", "run", "locust", 
             "-f", "tests/performance/load_testing/locustfile.py",
             "--host=https://blast.alliancegenome.org",
             "-u", str(users), "-r", "1", "-t", duration,

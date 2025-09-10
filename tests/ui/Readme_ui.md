@@ -13,14 +13,14 @@ This tool provides automated UI testing capabilities for the BLAST web interface
 
 ## Prerequisites
 
-- Python 3.8 or higher
-- Poetry (dependency management)
-- Chrome or Chromium browser
+- Python 3.10 or higher
+- uv (package management - faster alternative to pip)
+- Chrome or Chromium browser  
 - ChromeDriver matching your Chrome version
 
 ## Installation
 
-1. Ensure Poetry is installed on your system. If not, install it following the [official instructions](https://python-poetry.org/docs/#installation).
+1. Ensure uv is installed on your system. If not, install it following the [official instructions](https://docs.astral.sh/uv/#installation).
 
 2. Clone this repository and navigate to the project directory:
 ```bash
@@ -28,26 +28,21 @@ git clone <repository-url>
 cd <project-directory>
 ```
 
-3. Install dependencies using Poetry:
+3. Install dependencies using uv:
 ```bash
-poetry install
+uv sync
 ```
 
-4. Add the required dependencies to your project:
-```bash
-poetry add selenium rich click
-```
-
-Your `pyproject.toml` should include these dependencies:
+Dependencies are already configured in the `pyproject.toml`:
 ```toml
-[tool.poetry.dependencies]
-python = "^3.8"
-selenium = "^4.9.0"
-rich = "^13.3.5"
-click = "^8.1.3"
-
-[tool.poetry.dev-dependencies]
-# Add any development dependencies here
+[project]
+requires-python = ">=3.10"
+dependencies = [
+    "selenium>=4.20.0",
+    "rich>=13.5.2",
+    "click>=8.1.6",
+    # ... other dependencies
+]
 ```
 
 ## Configuration
@@ -91,7 +86,7 @@ Create a `config.json` file with your test configurations:
 ### Basic Command Structure
 
 ```bash
-poetry run python test_ui.py [OPTIONS]
+uv run python test_ui.py [OPTIONS]
 ```
 
 ### Required Options
@@ -111,31 +106,29 @@ poetry run python test_ui.py [OPTIONS]
 
 1. Test a single database:
 ```bash
-poetry run python test_ui.py --mod SGD --type fungal
+uv run python test_ui.py --mod SGD --type fungal
 ```
 
 2. Test multiple databases with protein sequences:
 ```bash
-poetry run python test_ui.py --mod SGD --type fungal --molecule prot --number_of_items 3
+uv run python test_ui.py --mod SGD --type fungal --molecule prot --number_of_items 3
 ```
 
 3. Test with custom configuration:
 ```bash
-poetry run python test_ui.py --mod WB --type nematode --config custom_config.json
+uv run python test_ui.py --mod WB --type nematode --config custom_config.json
 ```
 
-### Poetry Scripts
+### Project Scripts
 
-Add these convenient scripts to your `pyproject.toml`:
+The tests can be run using the main test runner:
 
-```toml
-[tool.poetry.scripts]
-test-ui = "test_ui:run_blast_tests"
-```
-
-Then run tests using:
 ```bash
-poetry run test-ui --mod SGD --type fungal
+# Run UI tests using the test runner
+uv run python tests/run_tests.py ui --mod SGD --release fungal
+
+# Or run directly
+uv run python tests/ui/test_ui.py --mod SGD --type fungal
 ```
 
 ## Test Output
@@ -203,7 +196,7 @@ Solution: Check Chrome installation and ChromeDriver path
 2. Create a new branch
 3. Install development dependencies:
 ```bash
-poetry install --with dev
+uv sync --dev
 ```
 
 ### Code Style
@@ -218,7 +211,7 @@ Follow these guidelines:
 
 If you add tests for the testing script itself:
 ```bash
-poetry run pytest tests/
+uv run pytest tests/
 ```
 
 ### Contributing
@@ -235,7 +228,7 @@ poetry run pytest tests/
 ├── test_ui.py
 ├── config.json
 ├── pyproject.toml
-├── poetry.lock
+├── uv.lock
 ├── README.md
 └── output/
     └── <MOD>/
