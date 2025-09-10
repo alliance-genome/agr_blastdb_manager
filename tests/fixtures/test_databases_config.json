@@ -1,0 +1,75 @@
+{
+  "FB": {
+    "FB_test": {
+      "nucl_dbs": [
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/FB/FB_test/databases/Drosophila/albomicans/D_albomicans_Genome_Assembly_GCF_009650485_2_ASM965048v2_/GCF_009650485db",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/FB/FB_test/databases/Drosophila/albomicans/D_albomicans_RNA_Sequences_GCF_009650485_2_ASM965048v2_/GCF_009650485db",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/FB/FB_test/databases/Drosophila/ananassae/D_ananassae_Genome_Assembly_GCF_017639315_1_ASM1763931v2_/GCF_017639315db",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/FB/FB_test/databases/Drosophila/ananassae/D_ananassae_RNA_Sequences_GCF_017639315_1_ASM1763931v2_/GCF_017639315db"
+      ],
+      "prot_dbs": [
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/FB/FB_test/databases/Drosophila/albomicans/D_albomicans_Protein_Sequences_GCF_009650485_2_ASM965048v2_/GCF_009650485db"
+      ]
+    },
+    "FB_tess": {
+      "nucl_dbs": [
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/FB/FB_tess/databases/Drosophila/melanogaster/D_melanogaster_Genome_Assembly_6_64/dmel-assemblydb",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/FB/FB_tess/databases/Drosophila/melanogaster/D_melanogaster_Intergenic_Regions_6_64/dmel-intergenicdb",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/FB/FB_tess/databases/Drosophila/melanogaster/D_melanogaster_Transcripts_6_64/dmel-transcriptdb",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/FB/FB_tess/databases/Drosophila/melanogaster/D_melanogaster_Transposons_6_64/dmel-transposondb",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/FB/FB_tess/databases/Drosophila/simulans/D_simulans_Genome_Assembly_GCF_016746395_2_Prin_Dsim_3_1_/GCF_016746395db",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/FB/FB_tess/databases/Drosophila/yakuba/D_yakuba_Genome_Assembly_GCF_016746365_2_Prin_Dyak_Tai18E2_2_1_/GCF_016746365db",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/FB/FB_tess/databases/Aedes/aegypti/A_aegypti_Genome_Assembly_GCF_002204515_2_AaegL5_0_/GCF_002204515db",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/FB/FB_tess/databases/Anopheles/gambiae/A_gambiae_Genome_Assembly_GCF_943734735_2_idAnoGambNW_F1_1_/GCF_943734735db",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/FB/FB_tess/databases/Apis/mellifera/A_mellifera_Genome_Assembly_GCF_003254395_2_Amel_HAv3_1_/GCF_003254395db",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/FB/FB_tess/databases/Tribolium/castaneum/T_castaneum_Genome_Assembly_GCF_031307605_1_icTriCast1_1_/GCF_031307605db"
+      ],
+      "prot_dbs": [
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/FB/FB_tess/databases/Drosophila/melanogaster/D_melanogaster_Proteins_6_64/dmel-translationdb",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/FB/FB_tess/databases/Drosophila/simulans/D_simulans_Protein_Sequences_GCF_016746395_2_Prin_Dsim_3_1_/GCF_016746395db",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/FB/FB_tess/databases/Drosophila/yakuba/D_yakuba_Protein_Sequences_GCF_016746365_2_Prin_Dyak_Tai18E2_2_1_/GCF_016746365db",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/FB/FB_tess/databases/Aedes/aegypti/A_aegypti_Protein_Sequences_GCF_002204515_2_AaegL5_0_/GCF_002204515db",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/FB/FB_tess/databases/Anopheles/gambiae/A_gambiae_Protein_Sequences_GCF_943734735_2_idAnoGambNW_F1_1_/GCF_943734735db",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/FB/FB_tess/databases/Apis/mellifera/A_mellifera_Protein_Sequences_GCF_003254395_2_Amel_HAv3_1_/GCF_003254395db",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/FB/FB_tess/databases/Tribolium/castaneum/T_castaneum_Protein_Sequences_GCF_031307605_1_icTriCast1_1_/GCF_031307605db"
+      ]
+    }
+  },
+  "WB": {
+    "WB_test": {
+      "nucl_dbs": [
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/WB/WB_test/databases/Caenorhabditis/elegans/C_elegans_Genome_Assembly/c_elegansdb",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/WB/WB_test/databases/Caenorhabditis/elegans/C_elegans_VC2010_Genome_Assembly/c_elegansdb",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/WB/WB_test/databases/Caenorhabditis/elegans/C_elegans_CB4856_Genome_Assembly/c_elegansdb",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/WB/WB_test/databases/Caenorhabditis/briggsae/C_briggsae_Genome_Assembly/c_briggsaedb",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/WB/WB_test/databases/Caenorhabditis/brenneri/C_brenneri_Genome_Assembly/c_brenneridb",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/WB/WB_test/databases/Caenorhabditis/remanei/C_remanei_Genome_Assembly/c_remaneidb",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/WB/WB_test/databases/Caenorhabditis/japonica/C_japonica_Genome_Assembly/c_japonicadb",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/WB/WB_test/databases/Pristionchus/pacificus/P_pacificus_Genome_Assembly/p_pacificusdb",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/WB/WB_test/databases/Brugia/malayi/B_malayi_Genome_Assembly/b_malayidb",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/WB/WB_test/databases/Strongyloides/ratti/S_ratti_Genome_Assembly/s_rattidb"
+      ],
+      "prot_dbs": [
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/WB/WB_test/databases/Caenorhabditis/elegans/C_elegans_Protein_Sequences/c_elegansdb",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/WB/WB_test/databases/Caenorhabditis/elegans/C_elegans_VC2010_Protein_Sequences/c_elegansdb",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/WB/WB_test/databases/Caenorhabditis/briggsae/C_briggsae_Protein_Sequences/c_briggsaedb",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/WB/WB_test/databases/Caenorhabditis/brenneri/C_brenneri_Protein_Sequences/c_brenneridb",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/WB/WB_test/databases/Caenorhabditis/remanei/C_remanei_Protein_Sequences/c_remaneidb",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/WB/WB_test/databases/Caenorhabditis/japonica/C_japonica_Protein_Sequences/c_japonicadb",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/WB/WB_test/databases/Pristionchus/pacificus/P_pacificus_Protein_Sequences/p_pacificusdb",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/WB/WB_test/databases/Brugia/malayi/B_malayi_Protein_Sequences/b_malayidb",
+        "/Users/nuin/Projects/alliance/agr_blastdb_manager/data/blast/WB/WB_test/databases/Strongyloides/ratti/S_ratti_Protein_Sequences/s_rattidb"
+      ]
+    }
+  },
+  "test_sequences": {
+    "FB": {
+      "nucl": "GTGCAGCCGCCTGGTCTCTTGGTTCTGGTTGAAAAGAAGCCCACCGTTGAAGATCATGTTCAGAATATGGAGAAGAAGCTCAACAATGATAAAATAGAGAGGGATAGAGAAATTTAAATCATGAGATCATTTCAACCATGATTCATGACCTCATTGAAATTGCTGCCCGTGCTGTCCGTGATTCTGAGAATGTTCGATCTGGCAAGAGTGGCGCCATTGAAGATGGAACAGGTCAAGATTTCTCGGGTCCTTTGAATCGTCATTTCGTCGTCAATATTGGTAGGATGGCTCACATCCTTAGGCAAGAAGATAAAGCTCCAATACTGGATGATGGAGGTGTCATCAAATATGAACAGCCAGACATTTGGGATGCTGGAGCCGGAAATCAATCTCATTGTATTACGGGACTTAAAAGACACCGTTGATGGAACCCCAATTGATCGTCGACTTGCCAAAGGTGATCACAAAGCCGTACGTGAAGGAGGAGGTAGAAACAATGGCTCTGGTGGTCGTGGTAATGGTGAAGGAAGTCGTGATTATGGCAAACAAGAAGATTATGAAGAGAAAGGAGCCAGAGGAGGTCCAGGAGGAACTGTGTATCGTGGTAAAGGTGACAATGAAACAAAGGGTCGTAGTGTAACGCCTAGAAAGGTAATGAAAGTGGTAGCATAGACCTTTGTGATACACACATTTGGATATTTTTGGCAAGGACCAACAACACATCAAAAGGAAGGGGGTTTGCAACTTTCTACTAAGAGCTGGTTGAGGGGGACCCCAAACTGGCAAAACATGGATGCTTCACATTTTCCTGAAATTTATGGATACTTTGATAAAGCTGTAAGTAACGGTACCATTGAACTTGATACTGGTCTTGTGACTGACAAGATGAAGCTGTCTGAATTTGAAAAGTTTTCTAATGACATTACCCTGGAACGAAGTATTGTTATCAAGACATCTATTGCCATGGAGCTGGAGCTGGAAGCATCCCTGTCTCAGTCTGTACGTAATATTGAAGTTGGAAAGGTACAAGGTAACAACCTGTACTTCTACAATGCAAAGGCTAACTTTGAAAAGAATGATCTTGATACCATGGAGGATGTTGCTAGAGCAATAACAGATACAGTACCCGGTGGTAGCATTCGTGTTGGCAACAACCTCTGTTCTGATAAGTCTGATATTGCCATGCCCATTAACATGTACAAACGTGGATTTGGTGTTGGAAATGGTCGTGTTTACGATAAGGGTGGAGCCGTCATGGTGTCTGGTGATAGCCACATGGATGTCGATGCTACAACAGGTGGAGCCGTTATCAAACGTGGAGGTAGAACTACAGGAGGTCCTGGAGCCGGTGTCTTCCCACGCGGATATGCAGGAGGGAAGGTACGTGAGGGAGATGCTCGTGCCGTCCGTCAAGGATTCGTCGGTAATGGAGCTTATGGCAAGCTCATCGGATCTGGAGGAATAGCAGGTTCCGGTAACATCAAGTATCCAGGTAGACGTATTGGTGATGTTCACAACGATGGAATAAACATTGAAGATAAGCAGAAAGAGGCACTTGCCAATATTGATGCTGCCATGCTTGCCATTGACGGTGTATTGAACATGACAGGAGCTCTGGTTAATGCTGGAGACGGCAAAACAACAGGAGGTAACCCACAAGATGCCGCCATTGTTAGAAAAGCTCGCAACATTGCATACTCTGATACAACAAAACATGGAATTACCCTGAGAGGAGGAGAAGGAGTATACTCTAACCAACTTCAACGTGAAACAAAGTTCCACCTTGAAGTTAGGGGTGAAGCCGAGAATGAGGACATGGAGGATGGTGGTAAGGTAGGATCAATTGACCTTGGAGGTACCGCAGATAGACGTTCACCTGGAAAACAAGTAATTGACCTTGGAGGTACCGCA",
+      "prot": "MGKEKFKTEEGDKMRYGFYYGMVGGPRMKEVGHRYVGQPVQDPAPAHAGAKRHGFAEMEHRVVAMFGDKVFLRNSDVDDGPGDPGIYGLKRDEDVFIVDVDADYRTHGFAGEKRPGFVVSMGAADVVTAAEVNRNYKVHCDHEHGKGMIAALATGVVHSEVGVCQSDDGDGDGYGGVVAGDSACAAECASAGSDKRHGSGGAGVIPRAGAEAVTAGHPTAATAAGGGDFVIPDEDGTGNGGFGYGGAGDGGDGSSAGHGSGEDGKDGAGAGGADAHSAAVPAVGVVQAATVATPAVAEGVVAAVAADEEEAEDAAVAGGVQAGFGVVVAAVAARGGGVVGAGEGGGGGAVGVGDGAGVEGEDEDGQVGQIVGDGGPGGSVGDEDDTVGGVGVGQQFGSVAGVVVATDEGSDDDGAGAGGGGDGDGAGVEGQSSADAAAADKGAGAADSAAAAAAAAAAAAAAAAAAVAVQVQADFSGKYGVVDGGGDYGVGDGGGGGGGADAGGGGGMKGDYGVGGGDGDGTGTSAAAAASGSAAAGDGAGSGSAAAAGAAGQGGQGGAADGGAAGAAGAGGAGQAGAGAAAGAGSGAGAGAGAGAGAGSAGAAGAGAGAGAAGAGAGAGAGAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGGGGGGGGGGGGGVGGSGGGGGGGGGGAAA"
+    },
+    "WB": {
+      "nucl": "GTGCAGCCGCTGGTCTCTTGGTTCTGGTTGAAAAGAAGCCCACCGTTGAAGATCATGTTCAGAATATGGAGAAGAAGCTCAACAATGATAAAATGGAGAGGGATAGAGAAATTTAAATCATGAGATCATTTTAACCATGATTCATGACCTCATTGAAATTGCTGCCCGTGCTGTCCGTGATTCTGAGAATGTTCGATCTGGCAAGAGTGGCGCCATTGAAGATGGAACAGGTCAAGATTTCTCGGGTCCTTTGAATCGTCATTTCGTCGTCAATATTGGTAGGATGGCTCACATCCTTAGGCAAGAAGATAAAGCTCCAATACTGGATGATGGAGGTGTCATCAAATATGAACAGCCAGACATTTGGGATGCTGGAGCCGGAAATCAATCTCATTGTATTACGGGACTTAAAAGACACCGTTGATGGAACCCCAATTGATCGTCGACTTGCCAAAGGTGATCACAAAGCCGTACGTGAAGGAGGAGGTAGAAACAATGGCTCTGGTGGTCGTGGTAATGGTGAAGGAAGTCGTGATTATGGCAAACAAGAAGATTATGAAGAGAAAGGAGCCAGAGGAGGTCCAGGAGGAACTGTGTATCGTGGTAAAGGTGACAATGAAACAAAGGGTCGTAGTGTAACGCCTAGAAAGGTAATGAAAGTGGTAGCATAGACCTTTGTGATACACACATTTGGATATTTTTGGCAAGGACCAACAACACATCAAAAGGAAGGGGGTTTGCAACTTTCTACTAAGAGCTGGTTGAGGGGGACCCCAAACTGGCAAAACATGGATGCTTCACATTTTCCTGAAATTTATGGATACTTTGATAAAGCTGTAAGTAACGGTACCATTGAACTTGATACTGGTCTTGTGACTGACAAGATGAAGCTGTCTGAATTTGAAAAGTTTTCTAATGACATTACCCTGGAACGAAGTATTGTTATCAAGACATCTATTGCCATGGAGCTGGAGCTGGAAGCATCCCTGTCTCAGTCTGTACGTAATATTGAAGTTGGAAAGGTACAAGGTAACAACCTGTACTTCTACAATGCAAAGGCTAACTTTGAAAAGAATGATCTTGATACCATGGAGGATGTTGCTAGAGCAATAACAGATACAGTACCCGGTGGTAGCATTCGTGTTGGCAACAACCTCTGTTCTGATAAGTCTGATATTGCCATGCCCATTAACATGTACAAACGTGGATTTGGTGTTGGAAATGGTCGTGTTTACGATAAGGGTGGAGCCGTCATGGTGTCTGGTGATAGCCACATGGATGTCGATGCTACAACAGGTGGAGCCGTTATCAAACGTGGAGGTAGAACTACAGGAGGTCCTGGAGCCGGTGTCTTCCCACGCGGATATGCAGGAGGGAAGGTACGTGAGGGAGATGCTCGTGCCGTCCGTCAAGGATTCGTCGGTAATGGAGCTTATGGCAAGCTCATCGGATCTGGAGGAATAGCAGGTTCCGGTAACATCAAGTATCCAGGTAGACGTATTGGTGATGTTCACAACGATGGAATAAACATTGAAGATAAGCAGAAAGAGGCACTTGCCAATATTGATGCTGCCATGCTTGCCATTGACGGTGTATTGAACATGACAGGAGCTCTGGTTAATGCTGGAGACGGCAAAACAACAGGAGGTAACCCACAAGATGCCGCCATTGTTAGAAAAGCTCGCAACATTGCATACTCTGATACAACAAAACATGGAATTACCCTGAGAGGAGGAGAAGGAGTATACTCTAACCAACTTCAACGTGAAACAAAGTTCCACCTTGAAGTTAGGGGTGAAGCCGAGAATGAGGACATGGAGGATGGTGGTAAGGTAGGATCAATTGACCTTGGAGGTACCGCAGATAGACGTTCACCTGGAAAACAAGTAATTGACCTTGGAGGTACCGCA",
+      "prot": "MGKEKFKTEEGDKMRYGFYYGMVGGPRMKEVGHRYVGQPVQDPAPAHAGAKRHGFAEMEHRVVAMFGDKVFLRNSDVDDGPGDPGIYGLKRDEDVFIVDVDADYRTHGFAGEKRPGFVVSMGAADVVTAAEVNRNYKVHCDHEHGKGMIAALATGVVHSEVGVCQSDDGDGDGYGGVVAGDSACAAECASAGSDKRHGSGGAGVIPRAGAEAVTAGHPTAATAAGGGDFVIPDEDGTGNGGFGYGGAGDGGDGSSAGHGSGEDGKDGAGAGGADAHSAAVPAVGVVQAATVATPAVAEGVVAAVAADEEEAEDAAVAGGVQAGFGVVVAAVAARGGGVVGAGEGGGGGAVGVGDGAGVEGEDEDGQVGQIVGDGGPGGSVGDEDDTVGGVGVGQQFGSVAGVVVATDEGSDDDGAGAGGGGDGDGAGVEGQSSADAAAADKGAGAADSAAAAAAAAAAAAAAAAAAVAVQVQADFSGKYGVVDGGGDYGVGDGGGGGGGADAGGGGGMKGDYGVGGGDGDGTGTSAAAAASGSAAAGDGAGSGSAAAAGAAGQGGQGGAADGGAAGAAGAGGAGQAGAGAAAGAGSGAGAGAGAGAGAGSAGAAGAGAGAGAAGAGAGAGAGAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGGGGGGGGGGGGGVGGSGGGGGGGGGGAAA"
+    }
+  }
+}
