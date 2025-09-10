@@ -145,6 +145,7 @@ def run_makeblastdb(config_entry: Dict, output_dir: str, logger, mod_code: str) 
         ).strip()
 
         logger.info(f"Executing makeblastdb command: {makeblast_command}")
+        print_status(f"Command: {makeblast_command}", "info")
 
         # Run makeblastdb
         p = Popen(makeblast_command, shell=True, stdout=PIPE, stderr=PIPE)
@@ -154,9 +155,11 @@ def run_makeblastdb(config_entry: Dict, output_dir: str, logger, mod_code: str) 
         if stdout:
             stdout_str = stdout.decode("utf-8")
             logger.info(f"makeblastdb stdout: {stdout_str}")
+            print_status(f"makeblastdb output: {stdout_str.strip()}", "success")
         if stderr:
             stderr_str = stderr.decode("utf-8")
             logger.warning(f"makeblastdb stderr: {stderr_str}")
+            print_status(f"makeblastdb stderr: {stderr_str.strip()}", "warning")
 
         if p.returncode != 0:
             error_msg = stderr.decode("utf-8")
@@ -258,6 +261,7 @@ def process_files(
     check_only: bool = False,
     store_files: bool = False,
     cleanup: bool = False,
+    limit_dbs: Optional[int] = None,
 ) -> None:
     """
     Process configuration files with enhanced logging.
@@ -293,6 +297,7 @@ def process_files(
                             check_only,
                             store_files,
                             cleanup,
+                            limit_dbs,
                         )
                     else:
                         LOGGER.warning(f"JSON file not found: {json_file}")
@@ -305,7 +310,7 @@ def process_files(
         elif input_json:
             LOGGER.info(f"Processing single JSON file: {input_json}")
             process_json_entries(
-                input_json, environment, None, db_list, check_only, store_files, cleanup
+                input_json, environment, None, db_list, check_only, store_files, cleanup, limit_dbs
             )
 
     except Exception as e:
@@ -400,8 +405,15 @@ def process_entry(
             ):
                 logger.info(f"Unzipping {fasta_file}")
                 unzip_command = f"gunzip -v ../data/{fasta_file}"
+                logger.info(f"Executing unzip command: {unzip_command}")
+                print_status(f"Command: {unzip_command}", "info")
                 p = Popen(unzip_command, shell=True, stdout=PIPE, stderr=PIPE)
                 stdout, stderr = p.communicate()
+                
+                if stdout:
+                    stdout_str = stdout.decode("utf-8")
+                    logger.info(f"gunzip stdout: {stdout_str}")
+                    print_status(f"gunzip output: {stdout_str.strip()}", "success")
 
                 if p.returncode != 0:
                     error_msg = f"Unzip failed: {stderr.decode('utf-8')}"
@@ -512,6 +524,7 @@ def process_json_entries(
     check_only: bool = False,
     store_files: bool = False,
     cleanup: bool = True,
+    limit_dbs: Optional[int] = None,
 ) -> bool:
     """
     Process entries from a JSON configuration file with enhanced progress display.
@@ -538,6 +551,12 @@ def process_json_entries(
 
         # Process entries with progress tracking
         entries = db_coordinates.get("data", [])
+        
+        # Apply limit if specified
+        if limit_dbs is not None and limit_dbs > 0:
+            entries = entries[:limit_dbs]
+            print_status(f"Limiting processing to first {limit_dbs} databases", "warning")
+            
         total_entries = len(entries)
         processed = 0
         successful = 0
@@ -763,6 +782,12 @@ def send_slack_messages_in_batches(
     is_flag=True,
     default=False,
 )
+@click.option(
+    "--limit-dbs",
+    help="Limit processing to first N databases (for testing)",
+    type=int,
+    default=None,
+)
 def create_dbs(
     config_yaml: str,
     input_json: str,
@@ -776,6 +801,7 @@ def create_dbs(
     db_names: Optional[str],
     list_dbs: bool,
     check_parse_seqids: bool,
+    limit_dbs: Optional[int],
 ) -> None:
     """
     Main function that runs the pipeline for processing configuration files and creating BLAST databases.
@@ -818,6 +844,7 @@ def create_dbs(
                 check_parse_seqids,
                 store_files,
                 cleanup,
+                limit_dbs,
             )
         elif input_json:
             LOGGER.info(f"Processing JSON config: {input_json}")
@@ -829,6 +856,7 @@ def create_dbs(
                 check_parse_seqids,
                 store_files,
                 cleanup,
+                limit_dbs,
             )
 
         # Handle Slack updates with better error checking and batching
