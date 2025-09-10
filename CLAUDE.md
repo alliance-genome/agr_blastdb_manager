@@ -17,11 +17,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `make format` - Alternative formatting command
 - `uv build` - Build wheel distribution
 
-### Testing
-- Python 3.10+ required
-- Test structure: `tests/CLI/`, `tests/UI/` directories
-- Run tests with standard Python test runner (no pytest config found)
-- Includes Selenium-based UI tests and CLI tests
+### Testing Commands
+- `uv run pytest tests/` - Run all tests
+- `uv run pytest tests/unit/test_agr_blastdb_manager.py` - Run specific test file
+- `uv run pytest tests/ --cov=src --cov-report=html` - Run tests with coverage report
+- `uv run pytest tests/integration/test_integration.py` - Run integration tests
+- `uv run pytest tests/performance/test_performance.py` - Run performance tests
+- `uv run python tests/ui/test_ui.py -m WB -t nematode --comprehensive` - Run comprehensive UI tests
+- `uv run python tests/ui/visual_regression.py -b baseline/ -c current/ -o results/` - Run visual regression tests
+- `uv run locust -f tests/performance/load_testing/locustfile.py --host=https://blast.alliancegenome.org -u 10 -r 2 -t 5m` - Run load tests
+
+### Code Quality Commands
+- `uv run black src/ tests/` - Format code with Black
+- `uv run ruff check src/ tests/` - Lint code with Ruff
+- `uv run ruff check --fix src/ tests/` - Lint and auto-fix with Ruff
+- `uv run mypy src/` - Type check with mypy
+- `uv run isort src/ tests/` - Sort imports
 
 ### Data Management
 - `make clean-fasta` - Remove FASTA files
@@ -91,6 +102,37 @@ src/                              # Python source code
 tests/                            # Test files
 ```
 
+### Testing
+
+The project includes comprehensive test coverage across multiple categories:
+
+**Unit Tests:**
+- `tests/unit/test_utils.py` - Utility function tests (file operations, sequence analysis, configuration parsing)
+- `tests/unit/test_terminal.py` - Terminal interface and logging function tests
+- `tests/unit/test_create_blast_db.py` - Core BLAST database creation functionality tests
+
+**Integration Tests:**
+- `tests/integration/test_integration.py` - Full pipeline integration tests from configuration to database creation
+- Tests error handling, multi-MOD workflows, and production deployment scenarios
+
+**Performance Tests:**
+- `tests/performance/test_performance.py` - Performance, scalability, and resource utilization tests
+- Download speed, validation performance, memory usage, concurrent processing
+
+**UI/Visual Tests:**
+- `tests/ui/test_ui.py` - Enhanced Selenium-based web interface tests with screenshot capabilities
+- `tests/ui/visual_regression.py` - Visual regression testing comparing baseline and current screenshots
+- Comprehensive test modes with step-by-step screenshot capture and error documentation
+
+**Load Testing:**
+- `tests/performance/load_testing/locustfile.py` - Enhanced Locust-based load testing with detailed reporting
+- Multiple task types, session tracking, and performance metrics export
+
+**Test Infrastructure:**
+- `tests/conftest.py` - Pytest configuration with comprehensive fixtures
+- `tests/fixtures/` - Test data, sample configurations, and mock sequences
+- Extensive mock data for all MODs (WB, SGD, FB, ZFIN, RGD, XB)
+
 ## Important Notes
 
 - Always use Python 3.10+ with uv as primary package manager (poetry also supported)
@@ -101,3 +143,5 @@ tests/                            # Test files
 - Uses Rich library for terminal UI and progress display
 - Selenium integration for UI testing with browser automation
 - Slack SDK integration for notifications with batch message handling
+- ZFIN Special Handling: ZFIN databases skip MD5 validation and don't use -parse_seqids flag
+- Production Deployment: Automatic copy to production location with dry-run preview

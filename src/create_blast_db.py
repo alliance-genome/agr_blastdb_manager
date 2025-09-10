@@ -21,16 +21,35 @@ from typing import Dict, List, Optional, Tuple
 import click
 import yaml
 
-from terminal import (create_progress, log_error, print_header, print_status,
-                      show_summary)
-from utils import (cleanup_fasta_files, copy_config_file,
-                   extendable_logger, get_files_ftp, get_files_http,
-                   get_mod_from_json, needs_parse_seqids, s3_sync,
-                   setup_detailed_logger, slack_message,
-                   update_genome_browser_map)
+from terminal import (
+    log_error,
+    log_success,
+    log_warning,
+    print_error_details,
+    print_header,
+    print_minimal_header,
+    print_progress_line,
+    print_status,
+    show_summary,
+)
+from utils import (
+    cleanup_fasta_files,
+    copy_config_file,
+    copy_config_to_production,
+    copy_to_production,
+    extendable_logger,
+    get_files_ftp,
+    get_files_http,
+    get_mod_from_json,
+    s3_sync,
+    setup_detailed_logger,
+    slack_message,
+    update_genome_browser_map,
+)
 
 # Global variables
 SLACK_MESSAGES: List[Dict[str, str]] = []
+FAILURE_DETAILS: List[Dict[str, str]] = []  # Track detailed failure information
 LOGGER = setup_detailed_logger("create_blast_db", "blast_db_creation.log")
 
 
@@ -87,7 +106,7 @@ def create_db_structure(
     return db_path, config_path
 
 
-def run_makeblastdb(config_entry: Dict, output_dir: str, logger) -> bool:
+def run_makeblastdb(config_entry: Dict, output_dir: str, logger, mod_code: str) -> bool:
     """
     Runs the makeblastdb command to create a BLAST database.
     """
@@ -104,11 +123,13 @@ def run_makeblastdb(config_entry: Dict, output_dir: str, logger) -> bool:
             logger.error(f"Unzipped FASTA file not found: {unzipped_fasta}")
             return False
 
-        # Check for parse_seqids requirement
-        parse_ids_flag = ""
-        if needs_parse_seqids(unzipped_fasta):
+        # Apply parse_seqids flag (mandatory for all except ZFIN)
+        if mod_code == "ZFIN":
+            parse_ids_flag = ""
+            logger.info("ZFIN database - skipping -parse_seqids flag")
+        else:
             parse_ids_flag = "-parse_seqids"
-            logger.info("FASTA headers require -parse_seqids flag")
+            logger.info("Using mandatory -parse_seqids flag")
 
         # Prepare makeblastdb command
         blast_title = config_entry["blast_title"]
@@ -141,10 +162,23 @@ def run_makeblastdb(config_entry: Dict, output_dir: str, logger) -> bool:
             print_status(f"makeblastdb stderr: {stderr_str.strip()}", "warning")
 
         if p.returncode != 0:
+            error_msg = stderr.decode("utf-8")
             logger.error(f"makeblastdb command failed with return code {p.returncode}")
             logger.error(f"Command: {makeblast_command}")
-            logger.error(f"Error output: {stderr.decode('utf-8')}")
-            print_status(f"makeblastdb error: {stderr.decode('utf-8')}", "error")
+            logger.error(f"Error output: {error_msg}")
+
+            # Display detailed error information
+            print_error_details(
+                "BLAST Database Creation Error",
+                {
+                    "Return Code": p.returncode,
+                    "Command": makeblast_command,
+                    "Error Output": error_msg,
+                    "Output Directory": output_dir,
+                    "FASTA File": unzipped_fasta,
+                },
+            )
+
             if Path(output_dir).exists():
                 rmtree(output_dir)
             return False
@@ -152,6 +186,7 @@ def run_makeblastdb(config_entry: Dict, output_dir: str, logger) -> bool:
         logger.info("makeblastdb completed successfully")
         duration = datetime.now() - start_time
         logger.info(f"Process completed in {duration}")
+        log_success(f"BLAST database created successfully in {duration}")
 
         # Clean up unzipped file
         if Path(unzipped_fasta).exists():
@@ -303,7 +338,7 @@ def process_entry(
     Returns:
         bool: Success status
     """
-    print_header(f"Processing {entry['blast_title']}")
+    print_minimal_header(f"Processing {entry['blast_title']}")
     start_time = datetime.now()
     entry_name = entry["blast_title"]
 
@@ -320,13 +355,6 @@ def process_entry(
     try:
         fasta_file = Path(entry["uri"]).name
         unzipped_fasta = f"../data/{fasta_file.replace('.gz', '')}"
-
-        # Log processing parameters
-        print_status("Processing parameters:", "info")
-        print_status(f"  MOD code: {mod_code}", "info")
-        print_status(f"  Environment: {environment}", "info")
-        print_status(f"  Check only: {check_only}", "info")
-        print_status(f"  Store files: {store_files}", "info")
 
         # Download file
         print_status(f"Downloading {fasta_file}...", "info")
@@ -348,15 +376,24 @@ def process_entry(
             )
 
         if not success:
-            log_error("File download failed")
+            error_msg = f"File download failed from {entry['uri']}"
+            log_error(error_msg)
+            FAILURE_DETAILS.append(
+                {
+                    "entry": entry_name,
+                    "error": error_msg,
+                    "stage": "download",
+                    "uri": entry.get("uri", "unknown"),
+                }
+            )
             return False
 
-        print_status("File download complete", "success")
+        log_success("File download complete")
 
         # Create database if not check_only
         if not check_only:
             # Create database structure
-            print_status("Creating database structure", "info")
+            print_status("Creating database...", "info")
             output_dir, config_dir = create_db_structure(
                 environment, mod_code, entry, logger
             )
@@ -367,7 +404,6 @@ def process_entry(
                 and Path(f"../data/{fasta_file}").exists()
             ):
                 logger.info(f"Unzipping {fasta_file}")
-                print_status(f"Unzipping {fasta_file}...", "info")
                 unzip_command = f"gunzip -v ../data/{fasta_file}"
                 logger.info(f"Executing unzip command: {unzip_command}")
                 print_status(f"Command: {unzip_command}", "info")
@@ -380,16 +416,33 @@ def process_entry(
                     print_status(f"gunzip output: {stdout_str.strip()}", "success")
 
                 if p.returncode != 0:
-                    log_error(f"Unzip failed: {stderr.decode('utf-8')}")
+                    error_msg = f"Unzip failed: {stderr.decode('utf-8')}"
+                    log_error(error_msg)
+                    FAILURE_DETAILS.append(
+                        {
+                            "entry": entry_name,
+                            "error": error_msg,
+                            "stage": "unzip",
+                            "uri": entry.get("uri", "unknown"),
+                        }
+                    )
                     return False
 
             # Run makeblastdb
-            print_status("Running makeblastdb...", "info")
-            if not run_makeblastdb(entry, output_dir, logger):
-                log_error("Database creation failed")
+            if not run_makeblastdb(entry, output_dir, logger, mod_code):
+                error_msg = "Database creation failed"
+                log_error(error_msg)
+                FAILURE_DETAILS.append(
+                    {
+                        "entry": entry_name,
+                        "error": error_msg,
+                        "stage": "makeblastdb",
+                        "uri": entry.get("uri", "unknown"),
+                    }
+                )
                 return False
 
-            print_status("Database created successfully", "success")
+            log_success("Database created successfully")
 
             SLACK_MESSAGES.append(
                 {
@@ -399,34 +452,36 @@ def process_entry(
                 }
             )
 
-        # Check parse_seqids requirement if in check_only mode
+        # Show parse_seqids policy if in check_only mode
         elif check_only:
-            if Path(unzipped_fasta).exists():
-                needs_parse = needs_parse_seqids(unzipped_fasta)
-                status = "requires" if needs_parse else "does not require"
+            if mod_code == "ZFIN":
                 print_status(
-                    f"{entry_name}: {'[green]requires[/green]' if needs_parse else '[yellow]does not require[/yellow]'} -parse_seqids flag",
+                    f"{entry_name}: [yellow]ZFIN - does not use[/yellow] -parse_seqids flag",
                     "info",
                 )
-                logger.info(f"Parse seqids check: {entry_name} {status} -parse_seqids")
+                logger.info(f"Parse seqids check: {entry_name} - ZFIN exclusion (no -parse_seqids)")
+            else:
+                print_status(
+                    f"{entry_name}: [green]uses mandatory[/green] -parse_seqids flag", 
+                    "info",
+                )
+                logger.info(f"Parse seqids check: {entry_name} - mandatory -parse_seqids")
 
         # Clean up files
         try:
             if Path(unzipped_fasta).exists():
                 if check_only or not store_files:
                     file_size = Path(unzipped_fasta).stat().st_size
-                    print_status(
-                        f"Cleaning up unzipped file: {unzipped_fasta} (size: {file_size:,} bytes)",
-                        "info",
+                    logger.info(
+                        f"Cleaning up unzipped file: {unzipped_fasta} (size: {file_size:,} bytes)"
                     )
                     Path(unzipped_fasta).unlink()
 
             original_gzip = f"../data/{fasta_file}"
             if Path(original_gzip).exists() and not store_files:
                 file_size = Path(original_gzip).stat().st_size
-                print_status(
-                    f"Cleaning up original gzipped file: {original_gzip} (size: {file_size:,} bytes)",
-                    "info",
+                logger.info(
+                    f"Cleaning up original gzipped file: {original_gzip} (size: {file_size:,} bytes)"
                 )
                 Path(original_gzip).unlink()
 
@@ -440,8 +495,17 @@ def process_entry(
         return True
 
     except Exception as e:
+        error_msg = f"Entry processing failed: {str(e)}"
         log_error("Entry processing failed", e)
         logger.error(f"Entry processing failed: {str(e)}", exc_info=True)
+        FAILURE_DETAILS.append(
+            {
+                "entry": entry_name,
+                "error": error_msg,
+                "stage": "processing",
+                "uri": entry.get("uri", "unknown"),
+            }
+        )
         SLACK_MESSAGES.append(
             {
                 "title": "Processing Error",
@@ -499,47 +563,38 @@ def process_json_entries(
 
         print_status(f"Found {total_entries} entries to process", "info")
 
-        with create_progress() as progress:
-            task = progress.add_task("Processing entries...", total=total_entries)
+        # Process entries without progress bars for cleaner output
+        for entry in entries:
+            processed += 1
+            entry_name = entry.get("blast_title", "Unknown")
 
-            for entry in entries:
-                processed += 1
+            if db_list and entry_name not in db_list:
+                log_warning(f"Skipping {entry_name} (not in requested list)")
+                continue
 
-                if db_list and entry["blast_title"] not in db_list:
-                    print_status(
-                        f"Skipping {entry['blast_title']} (not in requested list)",
-                        "warning",
-                    )
-                    progress.advance(task)
-                    continue
-
-                try:
-                    if process_entry(
-                        entry, mod_code, environment, check_only, store_files
-                    ):
-                        successful += 1
-                except Exception as e:
-                    log_error(f"Failed to process entry {entry['blast_title']}", e)
-
-                progress.advance(task)
+            try:
+                if process_entry(entry, mod_code, environment, check_only, store_files):
+                    successful += 1
+                    print_progress_line(processed, total_entries, entry_name, "success")
+                else:
+                    print_progress_line(processed, total_entries, entry_name, "error")
+            except Exception as e:
+                log_error(f"Failed to process entry {entry_name}", e)
+                print_progress_line(processed, total_entries, entry_name, "error")
 
         # After all entries are processed successfully, copy the configuration file
         if successful > 0 and not check_only:
-            print_status("Copying configuration file", "info")
             config_dir = Path(f"../data/config/{mod_code}/{environment}")
             if copy_config_file(Path(json_file), config_dir, LOGGER):
-                print_status("Configuration file copied successfully", "success")
+                LOGGER.info("Configuration file copied successfully")
             else:
                 log_error("Failed to copy configuration file")
 
             # Update genome browser mappings after all entries are processed
-            print_status("Updating genome browser mappings", "info")
             for entry in entries:
                 if "genome_browser" in entry:
                     if update_genome_browser_map(entry, mod_code, environment, LOGGER):
-                        print_status(
-                            f"Updated mapping for {entry['blast_title']}", "success"
-                        )
+                        LOGGER.info(f"Updated mapping for {entry['blast_title']}")
                     else:
                         log_error(
                             f"Failed to update mapping for {entry['blast_title']}"
@@ -547,35 +602,57 @@ def process_json_entries(
 
         # Clean up all FASTA files after processing if cleanup is enabled
         if cleanup and not check_only:
-            print_status("Starting post-processing cleanup", "info")
             try:
                 cleanup_fasta_files(Path("../data"), LOGGER)
-                print_status("Cleanup completed successfully", "success")
+                LOGGER.info("Cleanup completed successfully")
             except Exception as e:
                 log_error("Cleanup failed", e)
 
         # Show final summary
         duration = datetime.now() - start_time
+        failed_count = processed - successful
+
         show_summary(
             "JSON Processing",
             {
                 "Total Entries": total_entries,
                 "Processed": processed,
                 "Successful": successful,
-                "Failed": processed - successful,
+                "Failed": failed_count,
+                "Success Rate": f"{(successful / total_entries * 100):.1f}%"
+                if total_entries > 0
+                else "0%",
                 "Cleanup Performed": str(cleanup and not check_only),
             },
             duration,
         )
+
+        # Show detailed failure summary if there were failures
+        if failed_count > 0:
+            show_failure_summary()
+
+        # Create failure summary for Slack if there were failures
+        failure_summary = ""
+        if failed_count > 0:
+            stage_counts = {}
+            for failure in FAILURE_DETAILS:
+                stage = failure.get("stage", "unknown")
+                stage_counts[stage] = stage_counts.get(stage, 0) + 1
+
+            failure_summary = "\n\n*Failure Breakdown:*\n"
+            for stage, count in sorted(stage_counts.items()):
+                failure_summary += f"• {stage.title()}: {count}\n"
 
         summary_text = (
             "*JSON Processing Summary*\n"
             f"• *Total Entries:* {total_entries}\n"
             f"• *Processed:* {processed}\n"
             f"• *Successful:* {successful}\n"
-            f"• *Failed:* {processed - successful}\n"
+            f"• *Failed:* {failed_count}\n"
+            f"• *Success Rate:* {(successful / total_entries * 100):.1f}%\n"
             f"• *Cleanup Performed:* {cleanup and not check_only}\n"
             f"• *Duration:* {duration}"
+            f"{failure_summary}"
         )
 
         SLACK_MESSAGES.append(
@@ -594,7 +671,63 @@ def process_json_entries(
         return False
 
 
-def send_slack_messages_in_batches(messages: List[Dict[str, str]], batch_size: int = 20) -> None:
+def show_failure_summary() -> None:
+    """
+    Display a detailed summary of all failures that occurred during processing.
+    """
+    if not FAILURE_DETAILS:
+        return
+
+    print_header("Failure Summary")
+    print_status(f"Total failures: {len(FAILURE_DETAILS)}", "error")
+
+    # Group failures by stage
+    stage_failures = {}
+    for failure in FAILURE_DETAILS:
+        stage = failure.get("stage", "unknown")
+        if stage not in stage_failures:
+            stage_failures[stage] = []
+        stage_failures[stage].append(failure)
+
+    # Display failures by stage
+    for stage, failures in stage_failures.items():
+        print_status(f"\n{stage.upper()} failures ({len(failures)}):", "warning")
+        for failure in failures:
+            print_status(f"  ✗ {failure['entry']}", "error")
+            print_status(f"    Error: {failure['error']}", "error")
+            if failure.get("uri"):
+                print_status(f"    URI: {failure['uri']}", "info")
+
+    # Show common failure patterns
+    error_patterns = {}
+    for failure in FAILURE_DETAILS:
+        error = failure.get("error", "")
+        # Extract common error patterns
+        if "makeblastdb" in error.lower():
+            key = "BLAST database creation"
+        elif "download" in error.lower():
+            key = "File download"
+        elif "unzip" in error.lower():
+            key = "File extraction"
+        elif "md5" in error.lower():
+            key = "Checksum validation"
+        else:
+            key = "Other"
+
+        if key not in error_patterns:
+            error_patterns[key] = 0
+        error_patterns[key] += 1
+
+    print_status("\nFailure patterns:", "warning")
+    for pattern, count in sorted(
+        error_patterns.items(), key=lambda x: x[1], reverse=True
+    ):
+        print_status(f"  {pattern}: {count} failures", "info")
+
+
+def send_slack_messages_in_batches(
+    messages: List[Dict[str, str]], batch_size: int = 20
+) -> None:
     """
     Sends Slack messages in smaller batches to avoid the too_many_attachments error.
 
@@ -603,11 +736,11 @@ def send_slack_messages_in_batches(messages: List[Dict[str, str]], batch_size: i
         batch_size: Maximum number of messages to send in each batch
     """
     for i in range(0, len(messages), batch_size):
-        batch = messages[i:i + batch_size]
+        batch = messages[i : i + batch_size]
         try:
             slack_message(batch)
         except Exception as e:
-            LOGGER.error(f"Failed to send Slack batch {i//batch_size + 1}: {str(e)}")
+            LOGGER.error(f"Failed to send Slack batch {i // batch_size + 1}: {str(e)}")
 
 
 @click.command()
@@ -645,7 +778,7 @@ def send_slack_messages_in_batches(messages: List[Dict[str, str]], batch_size: i
 @click.option(
     "-c",
     "--check-parse-seqids",
-    help="Only check if files need parse_seqids",
+    help="Only check parse_seqids policy (mandatory except ZFIN)",
     is_flag=True,
     default=False,
 )
@@ -733,6 +866,117 @@ def create_dbs(
                 send_slack_messages_in_batches(SLACK_MESSAGES)
             except Exception as e:
                 log_error("Failed to send Slack updates - check SLACK token in .env", e)
+
+        # Copy databases and config to production location
+        if not check_parse_seqids:
+            LOGGER.info("Preparing to copy to production location")
+            from terminal import console
+
+            try:
+                # Collect all directories to copy
+                copy_operations = []
+
+                # Find databases to copy
+                data_blast_dir = Path("../data/blast")
+                if data_blast_dir.exists():
+                    for mod_dir in data_blast_dir.iterdir():
+                        if mod_dir.is_dir():
+                            mod_name = mod_dir.name
+                            for env_dir in mod_dir.iterdir():
+                                if env_dir.is_dir():
+                                    env_name = env_dir.name
+                                    databases_dir = env_dir / "databases"
+                                    if databases_dir.exists():
+                                        copy_operations.append(
+                                            (
+                                                "databases",
+                                                str(databases_dir),
+                                                mod_name,
+                                                env_name,
+                                            )
+                                        )
+
+                # Find config files to copy
+                data_config_dir = Path("../data/config")
+                if data_config_dir.exists():
+                    for mod_dir in data_config_dir.iterdir():
+                        if mod_dir.is_dir():
+                            mod_name = mod_dir.name
+                            for env_dir in mod_dir.iterdir():
+                                if env_dir.is_dir():
+                                    env_name = env_dir.name
+                                    copy_operations.append(
+                                        ("config", str(env_dir), mod_name, env_name)
+                                    )
+
+                if not copy_operations:
+                    print_status("No data to copy to production", "info")
+                else:
+                    # Show dry run
+                    console.print(
+                        "\n[bold yellow]═══ PRODUCTION COPY PREVIEW ═══[/bold yellow]"
+                    )
+                    for copy_type, source_path, mod_name, env_name in copy_operations:
+                        if copy_type == "databases":
+                            copy_to_production(
+                                source_path, mod_name, env_name, LOGGER, dry_run=True
+                            )
+                        else:
+                            copy_config_to_production(
+                                source_path, mod_name, env_name, LOGGER, dry_run=True
+                            )
+                        console.print()
+
+                    # Ask for confirmation
+                    console.print(
+                        "[bold]Do you want to proceed with copying to production? [y/N]:[/bold]",
+                        end=" ",
+                    )
+                    response = input().strip().lower()
+
+                    if response == "y" or response == "yes":
+                        console.print(
+                            "[green]Proceeding with production copy...[/green]\n"
+                        )
+
+                        # Perform actual copy
+                        for (
+                            copy_type,
+                            source_path,
+                            mod_name,
+                            env_name,
+                        ) in copy_operations:
+                            if copy_type == "databases":
+                                if copy_to_production(
+                                    source_path, mod_name, env_name, LOGGER
+                                ):
+                                    print_status(
+                                        f"Copied {mod_name}/{env_name} databases to production",
+                                        "success",
+                                    )
+                                else:
+                                    log_error(
+                                        f"Failed to copy {mod_name}/{env_name} databases to production"
+                                    )
+                            else:
+                                if copy_config_to_production(
+                                    source_path, mod_name, env_name, LOGGER
+                                ):
+                                    print_status(
+                                        f"Copied {mod_name}/{env_name} config to production",
+                                        "success",
+                                    )
+                                else:
+                                    log_error(
+                                        f"Failed to copy {mod_name}/{env_name} config to production"
+                                    )
+                    else:
+                        console.print(
+                            "[yellow]Skipped copying to production location[/yellow]"
+                        )
+
+            except Exception as e:
+                log_error("Failed to copy to production", e)
 
         if sync_s3 and not check_parse_seqids:
             LOGGER.info("Starting S3 sync")
