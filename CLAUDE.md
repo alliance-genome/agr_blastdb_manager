@@ -23,6 +23,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `uv run pytest tests/ --cov=src --cov-report=html` - Run tests with coverage report
 - `uv run pytest tests/integration/test_integration.py` - Run integration tests
 - `uv run pytest tests/performance/test_performance.py` - Run performance tests
+
+#### UI Testing Framework (New Two-Phase Approach)
+- `uv run python tests/ui/test_ui_comprehensive.py -m FB --discovery --no-headless` - **Phase 1: Discovery mode** (visible browser, saves checkbox config)
+- `uv run python tests/ui/test_ui_comprehensive.py --systematic --max-checkboxes 10` - **Phase 2: Systematic testing** (tests individual checkboxes from saved config)
+- `uv run python tests/ui/test_ui_comprehensive.py -m WB --markdown-report "reports/wb_test.md"` - **Traditional mode** (test multiple checkboxes at once)
+
+#### Legacy UI Testing
 - `uv run python tests/ui/test_ui.py -m WB -t nematode --comprehensive` - Run comprehensive UI tests
 - `uv run python tests/ui/visual_regression.py -b baseline/ -c current/ -o results/` - Run visual regression tests
 - `uv run locust -f tests/performance/load_testing/locustfile.py --host=https://blast.alliancegenome.org -u 10 -r 2 -t 5m` - Run load tests
@@ -120,6 +127,13 @@ The project includes comprehensive test coverage across multiple categories:
 - Download speed, validation performance, memory usage, concurrent processing
 
 **UI/Visual Tests:**
+- `tests/ui/test_ui_comprehensive.py` - **New comprehensive UI testing framework** with two-phase approach:
+  - **Discovery Mode**: Discovers all checkboxes on BLAST interfaces and saves to temp config file
+  - **Systematic Mode**: Tests individual checkboxes systematically from saved configuration
+  - **Traditional Mode**: Tests multiple checkboxes simultaneously (original behavior)
+  - Automatic URL discovery from AGR BLAST service configurations
+  - Biological test sequences (18S rRNA, HSP70, Actin, Histone H3) for cross-species compatibility
+  - Rich progress tracking and comprehensive markdown reporting
 - `tests/ui/test_ui.py` - Enhanced Selenium-based web interface tests with screenshot capabilities
 - `tests/ui/visual_regression.py` - Visual regression testing comparing baseline and current screenshots
 - Comprehensive test modes with step-by-step screenshot capture and error documentation
