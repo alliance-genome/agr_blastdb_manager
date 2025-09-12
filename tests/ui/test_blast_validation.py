@@ -30,15 +30,23 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
 
-# Test sequences for BLAST validation
+# Test sequences for BLAST validation - highly conserved sequences likely to get hits
 TEST_SEQUENCES = {
     "nucl": {
-        # 18S rRNA - should give hits across all eukaryotic databases
-        "universal": "TACCTGGTTGATCCTGCCAGTAGTCATATGCTTGTCTCAAAGATTAAGCCATGCATGTCTAAGTATAAACAAATTGACGGAAGGGCACCACCAGGAGTGGAGCCTGCGGCTTAATTTGACTCAACACGGGGAAACTCACCAGGTCCAGA",
+        # Multiple options for nucleotide BLAST testing
+        "ribosomal_18s": ">18S_ribosomal_RNA_partial_highly_conserved\nTACCTGGTTGATCCTGCCAGTAGTCATATGCTTGTCTCAAAGATTAAGCCATGCATGTCTAAGTATAAACAAATTGACGGAAGGGCACCACCAGGAGTGGAGCCTGCGGCTTAATTTGACTCAACACGGGGAAACTCACCAGGTCCAGA",
+        
+        "actin_beta": ">Beta_actin_gene_partial_universal\nATGGATGATGAAATCGCCGCACTCTTCCTCATGAAGATCCTCACCGAGCGCGGCTACACCTTCACCACCATGGAGAAGATCTGGCACCACACCTTCTACAATGAGCTGCGTGTGGCTCCCGAGGAGCACCCCGTGCTGCTGACCGAGGCCCCCCTGAACCCCAAAGCCAACCGCGAGAAGATGACCCAGATCATGTTTGAGACCTTCAACACCCCAGCCATGTACGTAGCCATCCAGGCTGTGCTGTCCCTGTATGCCTCTGGTCGTACCACAGGCATTGTGATGGACTCCGGAGACGGGGTCACCCACACTGTGCCCATCTACGAGGGCTATGCTCTCCCTCACGCCATCCTGCGTCTGGACCTGGCTGGCCGGGACCTGACCGACTACCTCATGAAGATC",
+        
+        "tubulin_alpha": ">Alpha_tubulin_gene_partial_cytoskeletal\nATGCGTGAGATTGTCCGTCACATTGGCCCCTTCCGTTCGCTCGCCCTCCTCTTGGACGACGCTTACTCCGCCGGCTACGCCGGCAAGCAGAGCCTGAAAAAGAACATGATCGCCGCCAAGTTCGACGCCAAGCACTACGCCGAGGACGGCGCCAAGATCTACGAGGACGGCGGCGTCTTCGACATGGAGGGCAACAACGACATCTTCAAGAAAGTCGCCAAGTTCGCCAACGACCCCGGCGAAGCCGAAGGCAACGTCGCCGCCGCCAACGAACAGGCCGCCGCCATCGTCGCCGAAATCTTCGACGGCGGCGGCAACGGCGGCGGCGGCGGCAACGCCGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGCAACGGC",
     },
     "prot": {
-        # HSP70 - conserved heat shock protein
-        "universal": "MAKAAAIGIDLGTTYSCVGVFQHGKVEIIANDQGNRTTPSYVAFTDTERLIGDAAKNQVAMNPTNTVFDAKRLIGRRFDDAVVQSDMKHWPFMVVNDAGRPKVQVEYKGETKSFYPEEVSSMVLTKMKEIAEAYLGYPVTNAVITVPAYFNDSQRQATKDAGVIAGLNVLRIINEPTAAAIAYGLDKKVGAERNVLIFDLGGGTFDVSILTIEGIFEVKATAGDTHLGGEDFDNRMVNHFIAEFKRKHKKDISENKRAVRRLRTACERAKRTLSSSTQASLEIDSLFEGIDFYTSITRARFEELNADLFRGTLDPVEKALRDAKLDKSQIHDIVLVGGSTRIPKIQKLLQDFFNGKELNKSINPDEAVAYGAAVQAAILSGDKSENVQDLLLLDVAPLSLGLETAGGVMTALIKRNSTIPTKQTQTFTTYSDNQPGVLIQVYEGERAMTKDNNLLGKFELTGIPPAPRGVPQIEVTFDIDANGILNVSAKDKSTGKENKITITNDKGRLSKEDIERMVQEAEKYKAEDEKQRDKVSSKNSALESYAFNMKSAVEDEGLKGKISEADKKKVLDKCQEVISWLDANTLAEKDEFEHKRKELEQVCNPIISGLYQGAGGPGPGGFGAQGPKGGSGSGPTIEEVD"
+        # Multiple options for protein BLAST testing
+        "hsp70_heat_shock": ">HSP70_heat_shock_protein_highly_conserved\nMAKAAAAIGIDLGTTYSCVGVFQHGKVEIIANDQGNRTTPSYVAFTDTERLIGDAKNQVAMNPTNTVFDAKRLIGRRFDDAVVQSDMKHWPFMVVNDAGRPKVQVEYKGETKSFYPEEVSSMVLTKMKEIAEAYLGYPVTNAVITVPAYFNDSQRQATKDAGVIAGLNVLRIINEPTAAAIAYGLDKKVGAERNVLIFDLGGGTFDVSILTIEGIFEVKATAGDTHLGGEDFDNRMVNHFIAEFKRKHKKDISENKRAVRRLRTACERAKRTLSSST",
+        
+        "cytochrome_c": ">Cytochrome_c_electron_transport_universal\nMGDVEKGKKIFVQKCAQCHTVEKGGKHKTGPNLHGLFGRKTGQAAEGYSYTDANIKKNVWDEWNDLTKNWK",
+        
+        "ubiquitin": ">Ubiquitin_protein_universal_regulatory\nMQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYNIQKESTLHLVLRLRGG"
     }
 }
 
@@ -107,10 +115,16 @@ class BlastValidator:
             # Get all checkboxes and inspect them
             checkbox_elements = self.driver.find_elements(By.CSS_SELECTOR, "input[type='checkbox']")
             
+            self.console.print(f"[dim]DEBUG: Found {len(checkbox_elements)} total checkboxes[/dim]")
+            
             for i, checkbox in enumerate(checkbox_elements):
                 try:
                     value = checkbox.get_attribute('value') or f"checkbox_{i}"
                     name = checkbox.get_attribute('name') or ""
+                    
+                    # Debug first few checkboxes
+                    if i < 5:
+                        self.console.print(f"[dim]  Checkbox {i}: value='{value}', name='{name}'[/dim]")
                     
                     # Look for database-like checkboxes
                     is_database = (
@@ -129,7 +143,8 @@ class BlastValidator:
                             'label': db_label, 
                             'element_index': i
                         })
-                        self.console.print(f"[green]    → Added database: {db_label}[/green]")
+                        if len(checkboxes) <= 5:  # Only show first 5
+                            self.console.print(f"[green]    → Added database: {db_label}[/green]")
                         
                 except Exception as e:
                     continue
@@ -155,8 +170,14 @@ class BlastValidator:
             self.wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
             time.sleep(2)
             
-            # Get test sequence
-            sequence = TEST_SEQUENCES[sequence_type]["universal"]
+            # Get ALL test sequences as a single FASTA file for better hit rate
+            sequences = TEST_SEQUENCES[sequence_type]
+            # Combine all sequences into one FASTA
+            combined_fasta = "\n\n".join(sequences.values())
+            sequence = combined_fasta
+            
+            sequence_count = len(sequences)
+            self.console.print(f"[dim]Using {sequence_count} test sequences in FASTA format: {', '.join(sequences.keys())}[/dim]")
             
             # Find and select the specific database checkbox
             checkboxes = self.driver.find_elements(By.CSS_SELECTOR, "input[type='checkbox']")
@@ -225,7 +246,7 @@ class BlastValidator:
             # Clear and enter sequence
             sequence_input.clear()
             sequence_input.send_keys(sequence)
-            self.console.print(f"[green]✅ Entered {len(sequence)} character test sequence[/green]")
+            self.console.print(f"[green]✅ Entered {len(sequence)} characters ({sequence_count} FASTA sequences)[/green]")
             
             # Find and click BLAST button
             blast_button = None
