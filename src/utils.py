@@ -444,12 +444,17 @@ def slack_message(messages: list, subject="BLAST Database Update") -> bool:
 
     try:
         for msg in messages:
+            # Truncate message text if it's too long (Slack limit is 3000 chars for section text)
+            msg_text = msg["text"]
+            if len(msg_text) > 2900:
+                msg_text = msg_text[:2900] + "...\n(message truncated)"
+
             blocks = [
                 {
                     "type": "header",
-                    "text": {"type": "plain_text", "text": subject, "emoji": True},
+                    "text": {"type": "plain_text", "text": subject[:150], "emoji": True},
                 },
-                {"type": "section", "text": {"type": "mrkdwn", "text": msg["text"]}},
+                {"type": "section", "text": {"type": "mrkdwn", "text": msg_text}},
                 {"type": "divider"},
             ]
 
