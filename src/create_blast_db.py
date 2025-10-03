@@ -87,18 +87,22 @@ def create_db_structure(
     """
     LOGGER.info("Creating database structure")
 
+    # Sanitize all path components to remove special characters
     blast_title = config_entry["blast_title"]
     sanitized_blast_title = re.sub(r"\W+", "_", blast_title)
 
     if "seqcol" in config_entry:
         LOGGER.info("seqcol found in config file")
+        sanitized_seqcol = re.sub(r"\W+", "_", config_entry['seqcol'])
         db_path = Path(
-            f"../data/blast/{mod}/{environment}/databases/{config_entry['seqcol']}/{sanitized_blast_title}/"
+            f"../data/blast/{mod}/{environment}/databases/{sanitized_seqcol}/{sanitized_blast_title}/"
         )
     else:
         LOGGER.info("seqcol not found in config file")
+        sanitized_genus = re.sub(r"\W+", "_", config_entry['genus'])
+        sanitized_species = re.sub(r"\W+", "_", config_entry['species'])
         db_path = Path(
-            f"../data/blast/{mod}/{environment}/databases/{config_entry['genus']}/{config_entry['species']}/{sanitized_blast_title}/"
+            f"../data/blast/{mod}/{environment}/databases/{sanitized_genus}/{sanitized_species}/{sanitized_blast_title}/"
         )
 
     config_path = Path(f"../data/config/{mod}/{environment}")
@@ -212,12 +216,13 @@ def run_makeblastdb(config_entry: Dict[str, str], output_dir: Path) -> bool:
         return False
 
 
-def process_yaml(config_yaml: Path) -> bool:
+def process_yaml(config_yaml: Path, db_info: Optional[dict] = None) -> bool:
     """
     Process a YAML file containing configuration details for multiple data providers.
 
     Args:
         config_yaml (Path): The path to the YAML file that needs to be processed.
+        db_info (Optional[dict]): Dictionary to track database creation information.
 
     Returns:
         bool: True if the YAML file was successfully processed, False otherwise.
@@ -247,7 +252,7 @@ def process_yaml(config_yaml: Path) -> bool:
                         config_yaml.parent
                         / f"{provider['name']}/databases.{provider['name']}.{environment}.json"
                     )
-                    process_json(json_file, environment, provider["name"], progress)
+                    process_json(json_file, environment, provider["name"], db_info)
                     progress.update(provider_task, advance=1)
 
                 progress.update(main_task, advance=1)
@@ -317,7 +322,7 @@ def process_json(
 
         return True
     except Exception as e:
-        LOGGER.error(f"Error processing JSON file: {str(e)}")
+        LOGGER.error(f"Error processing JSON file: {str(e)}", exc_info=True)
         return False
 
 
@@ -329,13 +334,32 @@ def derive_mod_from_input(input_file):
         input_file (str): The path to the input file.
 
     Returns:
-        str: The MOD (Model Organism) extracted from the input file name. If the input file name does not have the expected format or the MOD cannot be extracted, returns 'Unknown'.
+        str: The MOD (Model Organism) extracted from the input file name. If the input file name does not have the expected format or the MOD cannot be extracted, returns None.
     """
+    from utils import MODS
+
     file_name = Path(input_file).name
     parts = file_name.split('.')
+
+    # Try standard pattern: databases.MOD.environment.json
     if len(parts) >= 3 and parts[0] == 'databases':
-        return parts[1]  # This should be the MOD
-    return 'Unknown'
+        mod_part = parts[1]
+
+        # First, check exact match with known MODs
+        if mod_part.upper() in [m.upper() for m in MODS]:
+            return mod_part.upper()
+
+        # Try prefix match against known MODs, handling cases like "SGD_test"
+        for known_mod in MODS:
+            if mod_part.upper().startswith(known_mod.upper()):
+                return known_mod
+
+        # If no match found, return the extracted value anyway
+        # This allows flexibility for test/custom MODs
+        return mod_part
+
+    # If pattern doesn't match, return None to indicate MOD should be specified explicitly
+    return None
 
 
 
@@ -370,6 +394,18 @@ def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_
         # If mod is not provided, try to derive it from the input file
         if mod is None:
             mod = derive_mod_from_input(input_json or config_yaml)
+            if mod is None:
+                LOGGER.error("Could not derive MOD from filename. Please specify MOD explicitly using -m/--mod option.")
+                console.print(
+                    Panel(
+                        "[bold red]Error:[/bold red] Could not determine MOD from filename.\n"
+                        "Please specify the MOD explicitly using the -m/--mod option.\n"
+                        "Example: python create_blast_db.py -j <file> -m SGD",
+                        title="Missing MOD",
+                        border_style="red",
+                    )
+                )
+                return
 
         db_info = {
             "mod": mod,

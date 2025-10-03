@@ -132,7 +132,7 @@ def get_mod_from_json(input_json) -> str:
     """
     Retrieves the model organism (mod) from the input JSON file.
 
-    This function extracts the mod from the filename of the input JSON file. The mod is the second element when the filename is split by the "." character. If the mod is not found in the predefined list of mods, the function returns False. Otherwise, it returns the mod.
+    This function extracts the mod from the filename of the input JSON file. The mod is the second element when the filename is split by the "." character. If the mod cannot be determined, returns False.
 
     :param input_json: The path to the input JSON file.
     :type input_json: str
@@ -140,15 +140,30 @@ def get_mod_from_json(input_json) -> str:
     :rtype: str or bool
     """
     filename = Path(input_json).name
-    mod = filename.split(".")[1]
+    parts = filename.split(".")
 
-    if mod not in MODS:
-        console.log(f"Mod {mod} not found in {MODS}")
-        return False
+    # Extract the potential MOD from the second part (index 1)
+    if len(parts) > 1:
+        mod_part = parts[1]
 
-    console.log(f"Mod found: {mod}")
+        # First, check if it matches exactly with known MODs
+        if mod_part.upper() in [m.upper() for m in MODS]:
+            console.log(f"Mod found (exact match): {mod_part.upper()}")
+            return mod_part.upper()
 
-    return mod
+        # Try to match prefix against known MODs, handling cases like "SGD_test"
+        for known_mod in MODS:
+            if mod_part.upper().startswith(known_mod.upper()):
+                console.log(f"Mod found (prefix match): {known_mod}")
+                return known_mod
+
+        # If no match found in predefined list, just return the extracted part
+        # This allows for flexibility with new or test MODs
+        console.log(f"Using extracted MOD (not in predefined list): {mod_part}")
+        return mod_part
+
+    console.log(f"Could not extract MOD from filename {filename}")
+    return False
 
 
 def edit_fasta(fasta_file: str, config_entry: dict) -> bool:
@@ -365,14 +380,27 @@ def needs_parse_id(fasta_file: Path) -> bool:
     open_func = gzip.open if fasta_file.suffix == ".gz" else open
     mode = "rt" if fasta_file.suffix == ".gz" else "r"
 
-    with open_func(fasta_file, mode) as f:
-        headers = [next(f).strip() for _ in range(100) if next(f).startswith(">")]
+    try:
+        with open_func(fasta_file, mode) as f:
+            headers = []
+            for line in f:
+                if line.startswith(">"):
+                    headers.append(line.strip())
+                    if len(headers) >= 100:
+                        break
 
-    # Analyze headers here
-    complex_headers = any("|" in header for header in headers)
-    consistent_format = len(set(header.count("|") for header in headers)) == 1
+        # If no headers found, return False
+        if not headers:
+            return False
 
-    return complex_headers and consistent_format
+        # Analyze headers here
+        complex_headers = any("|" in header for header in headers)
+        consistent_format = len(set(header.count("|") for header in headers)) == 1
+
+        return complex_headers and consistent_format
+    except Exception as e:
+        LOGGER.warning(f"Error analyzing FASTA headers in {fasta_file}: {e}")
+        return False
 
 
 def setup_logger(name, log_file, level=logging.INFO):
@@ -441,15 +469,28 @@ def slack_message(messages: list, subject="BLAST Database Update") -> bool:
 
 def get_ftp_file_size(fasta_uri: str) -> int:
     """
-    Get the size of a file on an FTP server.
+    Get the size of a file from FTP or HTTP/HTTPS server.
 
     Args:
-        fasta_uri (str): The URI of the FASTA file on the FTP server.
+        fasta_uri (str): The URI of the FASTA file (FTP, HTTP, or HTTPS).
 
     Returns:
         int: The size of the file in bytes, or 0 if size couldn't be determined.
     """
     try:
+        # Check if it's an HTTP/HTTPS URL
+        if fasta_uri.startswith(('http://', 'https://')):
+            import requests
+            response = requests.head(fasta_uri, allow_redirects=True, timeout=10)
+            size = int(response.headers.get('content-length', 0))
+            if size > 0:
+                console.log(f"File size for {fasta_uri.split('/')[-1]} is {size} bytes")
+                return size
+            else:
+                console.log(f"Couldn't determine size for {fasta_uri.split('/')[-1]}")
+                return 0
+
+        # Handle FTP URLs
         ftp_parts = fasta_uri.split("/")
         ftp_server = ftp_parts[2]
         ftp_path = "/".join(ftp_parts[3:-1])
@@ -468,5 +509,5 @@ def get_ftp_file_size(fasta_uri: str) -> int:
             return 0
 
     except Exception as e:
-        console.log(f"Error getting FTP file size: {e}")
+        console.log(f"Error getting file size: {e}")
         return 0
