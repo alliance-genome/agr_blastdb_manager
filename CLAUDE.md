@@ -124,6 +124,23 @@ make clean-all-blast
 - `-s, --skip_efs_sync`: Skip EFS sync (flag)
 - `-u, --update-slack`: Send Slack notifications (flag)
 - `-s3, --sync-s3`: Sync to S3 bucket (flag)
+- `--skip-local-storage`: Skip local archival storage of FASTA files (flag)
+
+### Logging
+
+Each pipeline run creates a unique log file with the following naming convention:
+```
+blast_db_{MOD}_{environment}_{timestamp}.log
+```
+
+Example: `blast_db_SGD_sgdtest2_20251007_010940.log`
+
+Log files include:
+- Configuration file used
+- MOD and environment
+- All processing steps
+- Errors and warnings
+- Timing information
 
 ### Directory Structure
 
@@ -138,6 +155,10 @@ data/
     └── {MOD}/
         └── {environment}/
 ```
+
+### Local Storage
+
+By default, FASTA files are archived in `../data/database_{YYYY_Mon_DD}/` for record-keeping. Use `--skip-local-storage` to disable this behavior when archival storage is not needed (e.g., when databases are immediately synced to S3).
 
 ### Adding New Model Organisms
 

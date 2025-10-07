@@ -41,16 +41,21 @@ console = Console()
 
 # Global variables
 SLACK_MESSAGES: List[Dict[str, str]] = []
-LOGGER = setup_logger("create_blast_db", "blast_db_creation.log")
+LOGGER = None  # Will be initialized in create_dbs()
 
 
-def store_fasta_files(fasta_file: Path) -> None:
+def store_fasta_files(fasta_file: Path, skip_local_storage: bool = False) -> None:
     """
     Store the downloaded FASTA files in a specific directory.
 
     Args:
         fasta_file (Path): The path to the FASTA file that needs to be stored.
+        skip_local_storage (bool): If True, skip storing the file locally.
     """
+    if skip_local_storage:
+        LOGGER.info(f"Skipping local storage for {fasta_file} (--skip-local-storage enabled)")
+        return
+
     date_to_add = datetime.now().strftime("%Y_%b_%d")
     original_files_store = Path(f"../data/database_{date_to_add}")
     original_files_store.mkdir(parents=True, exist_ok=True)
@@ -129,13 +134,14 @@ def create_db_structure(
     return db_path, config_path
 
 
-def get_files_ftp(fasta_uri: str, md5sum: str) -> bool:
+def get_files_ftp(fasta_uri: str, md5sum: str, skip_local_storage: bool = False) -> bool:
     LOGGER.info(f"Downloading {fasta_uri}")
 
     today_date = datetime.now().strftime("%Y_%b_%d")
     fasta_file = Path(f"../data/{Path(fasta_uri).name}")
 
-    if (Path(f"../data/database_{today_date}") / fasta_file.name).exists():
+    # Only check for already-processed files if we're storing locally
+    if not skip_local_storage and (Path(f"../data/database_{today_date}") / fasta_file.name).exists():
         LOGGER.info(f"{fasta_file} already processed")
         return False
 
@@ -148,7 +154,7 @@ def get_files_ftp(fasta_uri: str, md5sum: str) -> bool:
         wget.download(fasta_uri, str(fasta_file), bar=bar_custom)
         LOGGER.info(f"Downloaded {fasta_uri}")
 
-        store_fasta_files(fasta_file)
+        store_fasta_files(fasta_file, skip_local_storage)
 
         if check_md5sum(fasta_file, md5sum):
             LOGGER.info(f"Successfully downloaded and verified {fasta_uri}")
@@ -223,13 +229,14 @@ def run_makeblastdb(config_entry: Dict[str, str], output_dir: Path) -> bool:
         return False
 
 
-def process_yaml(config_yaml: Path, db_info: Optional[dict] = None) -> bool:
+def process_yaml(config_yaml: Path, db_info: Optional[dict] = None, skip_local_storage: bool = False) -> bool:
     """
     Process a YAML file containing configuration details for multiple data providers.
 
     Args:
         config_yaml (Path): The path to the YAML file that needs to be processed.
         db_info (Optional[dict]): Dictionary to track database creation information.
+        skip_local_storage (bool): If True, skip local storage of FASTA files.
 
     Returns:
         bool: True if the YAML file was successfully processed, False otherwise.
@@ -259,7 +266,7 @@ def process_yaml(config_yaml: Path, db_info: Optional[dict] = None) -> bool:
                         config_yaml.parent
                         / f"{provider['name']}/databases.{provider['name']}.{environment}.json"
                     )
-                    process_json(json_file, environment, provider["name"], db_info)
+                    process_json(json_file, environment, provider["name"], db_info, skip_local_storage)
                     progress.update(provider_task, advance=1)
 
                 progress.update(main_task, advance=1)
@@ -282,6 +289,7 @@ def process_json(
     environment: str,
     mod: Optional[str] = None,
     db_info: Optional[dict] = None,
+    skip_local_storage: bool = False,
 ) -> bool:
     LOGGER.info(f"Processing JSON file: {json_file}")
 
@@ -304,7 +312,7 @@ def process_json(
 
             for entry in db_coordinates["data"]:
                 LOGGER.info(f"Processing {entry['uri']}")
-                if get_files_ftp(entry["uri"], entry["md5sum"]):
+                if get_files_ftp(entry["uri"], entry["md5sum"], skip_local_storage):
                     output_dir, config_dir = create_db_structure(
                         environment, mod, entry
                     )
@@ -378,10 +386,11 @@ def derive_mod_from_input(input_file):
 @click.option("-s", "--skip_efs_sync", help="Skip EFS sync", is_flag=True, default=False)
 @click.option("-u", "--update-slack", help="Update Slack", is_flag=True, default=False)
 @click.option("-s3", "--sync-s3", help="Sync to S3", is_flag=True, default=False)
-def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_slack, sync_s3):
+@click.option("--skip-local-storage", help="Skip local storage of FASTA files", is_flag=True, default=False)
+def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_slack, sync_s3, skip_local_storage):
     """
     A command line interface function that creates BLAST databases based on the provided configuration.
-    
+
     Parameters:
     - config_yaml (str): YAML file with all MODs configuration.
     - input_json (str): JSON file input coordinates.
@@ -390,12 +399,30 @@ def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_
     - skip_efs_sync (bool): Skip EFS sync. Default is False.
     - update_slack (bool): Update Slack. Default is False.
     - sync_s3 (bool): Sync to S3. Default is False.
-    
+    - skip_local_storage (bool): Skip local storage of FASTA files. Default is False.
+
     Returns:
     None
     """
+    global LOGGER
     start_time = time.time()
-    LOGGER.info("Starting create_dbs function")
+
+    # Derive MOD first for log filename
+    temp_mod = mod if mod else derive_mod_from_input(input_json or config_yaml)
+    temp_mod = temp_mod if temp_mod else "unknown"
+
+    # Create per-run log file with timestamp and config info
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    config_name = Path(input_json or config_yaml or "unknown").stem if (input_json or config_yaml) else "unknown"
+    log_filename = f"blast_db_{temp_mod}_{environment}_{timestamp}.log"
+
+    # Initialize logger for this run
+    LOGGER = setup_logger("create_blast_db", log_filename)
+
+    LOGGER.info(f"Starting BLAST database creation")
+    LOGGER.info(f"Config file: {config_yaml or input_json}")
+    LOGGER.info(f"MOD: {temp_mod}, Environment: {environment}")
+    LOGGER.info(f"Skip local storage: {skip_local_storage}")
 
     try:
         # If mod is not provided, try to derive it from the input file
@@ -421,9 +448,9 @@ def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_
         }
 
         if config_yaml:
-            success = process_yaml(Path(config_yaml), db_info)
+            success = process_yaml(Path(config_yaml), db_info, skip_local_storage)
         elif input_json:
-            success = process_json(Path(input_json), environment, db_info['mod'], db_info)
+            success = process_json(Path(input_json), environment, db_info['mod'], db_info, skip_local_storage)
         else:
             LOGGER.error("Neither config_yaml nor input_json provided")
             return
