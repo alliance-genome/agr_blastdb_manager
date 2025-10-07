@@ -434,9 +434,11 @@ def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_
         if update_slack:
             message = f"*MOD:* {db_info['mod']}\n"
             message += f"*Environment:* {db_info['environment']}\n"
-            message += f"*Databases created:*\n"
+            message += f"*Databases created:* {len(db_info['databases_created'])}\n\n"
             for db in db_info['databases_created']:
-                message += f"• *{db['name']}* (Type: `{db['type']}`, Taxon ID: `{db['taxon_id']}`)\n"
+                # Escape underscores in database names for Slack markdown
+                db_name = db['name'].replace('_', r'\_')
+                message += f"• {db_name}\n  - Type: `{db['type']}`\n  - Taxon ID: `{db['taxon_id']}`\n"
 
             slack_success = slack_message([{"text": message}], subject="BLAST Database Update")
             LOGGER.info(f"Slack update {'successful' if slack_success else 'failed'}")
