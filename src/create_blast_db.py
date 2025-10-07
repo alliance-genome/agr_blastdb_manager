@@ -16,7 +16,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from shutil import copyfile, rmtree
+from shutil import copyfile, copytree, rmtree
 from typing import Dict, List, Optional, Tuple
 
 import click
@@ -69,6 +69,74 @@ def store_fasta_files(fasta_file: Path, skip_local_storage: bool = False) -> Non
     )
     copyfile(fasta_file, original_files_store / fasta_file.name)
     LOGGER.info(f"Stored {fasta_file} in {original_files_store}")
+
+
+def copy_to_sequenceserver(mod: str, environment: str) -> bool:
+    """
+    Copy BLAST databases and config files to /var/sequenceserver-data/.
+
+    Args:
+        mod (str): The model organism.
+        environment (str): The environment name.
+
+    Returns:
+        bool: True if successful, False otherwise.
+    """
+    try:
+        source_blast = Path(f"../data/blast/{mod}/{environment}")
+        source_config = Path(f"../data/config/{mod}/{environment}")
+
+        dest_blast = Path(f"/var/sequenceserver-data/blast/{mod}/{environment}")
+        dest_config = Path(f"/var/sequenceserver-data/config/{mod}/{environment}")
+
+        # Check if source directories exist
+        if not source_blast.exists():
+            LOGGER.warning(f"Source BLAST directory does not exist: {source_blast}")
+            return False
+
+        if not source_config.exists():
+            LOGGER.warning(f"Source config directory does not exist: {source_config}")
+            return False
+
+        # Remove existing destination directories if they exist
+        if dest_blast.exists():
+            LOGGER.info(f"Removing existing BLAST directory: {dest_blast}")
+            rmtree(dest_blast)
+
+        if dest_config.exists():
+            LOGGER.info(f"Removing existing config directory: {dest_config}")
+            rmtree(dest_config)
+
+        # Copy directories
+        LOGGER.info(f"Copying BLAST databases: {source_blast} -> {dest_blast}")
+        copytree(source_blast, dest_blast)
+
+        LOGGER.info(f"Copying config files: {source_config} -> {dest_config}")
+        copytree(source_config, dest_config)
+
+        console.log(
+            Panel(
+                f"Successfully copied to SequenceServer:\n"
+                f"  BLAST: [cyan]{dest_blast}[/cyan]\n"
+                f"  Config: [cyan]{dest_config}[/cyan]",
+                title="SequenceServer Sync",
+                border_style="green",
+            )
+        )
+
+        LOGGER.info("Successfully copied files to /var/sequenceserver-data/")
+        return True
+
+    except Exception as e:
+        LOGGER.error(f"Error copying to sequenceserver-data: {str(e)}", exc_info=True)
+        console.print(
+            Panel(
+                f"[bold red]Error:[/bold red] Failed to copy to SequenceServer\n{str(e)}",
+                title="Copy Error",
+                border_style="red",
+            )
+        )
+        return False
 
 
 def bar_custom(current, total, width=80):
@@ -387,7 +455,8 @@ def derive_mod_from_input(input_file):
 @click.option("-u", "--update-slack", help="Update Slack", is_flag=True, default=False)
 @click.option("-s3", "--sync-s3", help="Sync to S3", is_flag=True, default=False)
 @click.option("--skip-local-storage", help="Skip local storage of FASTA files", is_flag=True, default=False)
-def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_slack, sync_s3, skip_local_storage):
+@click.option("--copy-to-sequenceserver/--no-copy-to-sequenceserver", "enable_sequenceserver_copy", help="Copy databases and config to /var/sequenceserver-data/", default=True)
+def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_slack, sync_s3, skip_local_storage, enable_sequenceserver_copy):
     """
     A command line interface function that creates BLAST databases based on the provided configuration.
 
@@ -400,6 +469,7 @@ def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_
     - update_slack (bool): Update Slack. Default is False.
     - sync_s3 (bool): Sync to S3. Default is False.
     - skip_local_storage (bool): Skip local storage of FASTA files. Default is False.
+    - enable_sequenceserver_copy (bool): Copy to /var/sequenceserver-data/. Default is True.
 
     Returns:
     None
@@ -423,6 +493,7 @@ def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_
     LOGGER.info(f"Config file: {config_yaml or input_json}")
     LOGGER.info(f"MOD: {temp_mod}, Environment: {environment}")
     LOGGER.info(f"Skip local storage: {skip_local_storage}")
+    LOGGER.info(f"Copy to SequenceServer: {enable_sequenceserver_copy}")
 
     try:
         # If mod is not provided, try to derive it from the input file
@@ -474,6 +545,10 @@ def create_dbs(config_yaml, input_json, environment, mod, skip_efs_sync, update_
         if sync_s3:
             s3_success = s3_sync(Path("../data"), skip_efs_sync)
             LOGGER.info(f"S3 sync {'successful' if s3_success else 'failed'}")
+
+        if enable_sequenceserver_copy:
+            copy_success = copy_to_sequenceserver(mod, environment)
+            LOGGER.info(f"SequenceServer copy {'successful' if copy_success else 'failed'}")
 
     except Exception as e:
         LOGGER.error(f"Unhandled exception in create_dbs: {str(e)}", exc_info=True)

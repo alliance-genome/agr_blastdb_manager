@@ -125,6 +125,7 @@ make clean-all-blast
 - `-u, --update-slack`: Send Slack notifications (flag)
 - `-s3, --sync-s3`: Sync to S3 bucket (flag)
 - `--skip-local-storage`: Skip local archival storage of FASTA files (flag)
+- `--copy-to-sequenceserver` / `--no-copy-to-sequenceserver`: Copy databases and config to /var/sequenceserver-data/ (default: enabled)
 
 ### Logging
 
@@ -159,6 +160,32 @@ data/
 ### Local Storage
 
 By default, FASTA files are archived in `../data/database_{YYYY_Mon_DD}/` for record-keeping. Use `--skip-local-storage` to disable this behavior when archival storage is not needed (e.g., when databases are immediately synced to S3).
+
+### SequenceServer Integration
+
+By default, the pipeline automatically copies generated BLAST databases and configuration files to `/var/sequenceserver-data/` at the end of each successful run. This directory structure is:
+
+```
+/var/sequenceserver-data/
+├── blast/
+│   └── {MOD}/
+│       └── {environment}/
+│           └── databases/
+└── config/
+    └── {MOD}/
+        └── {environment}/
+            └── environment.json
+```
+
+**Behavior:**
+- Enabled by default (use `--no-copy-to-sequenceserver` to disable)
+- Removes existing data for the same MOD/environment before copying
+- Only runs after successful database creation
+- Copies both BLAST database files (.nhr, .nin, .nsq, etc.) and config files
+
+**Use cases:**
+- Enable (default): For production deployments where SequenceServer serves the databases
+- Disable (`--no-copy-to-sequenceserver`): For testing or when databases are served from a different location
 
 ### Adding New Model Organisms
 
