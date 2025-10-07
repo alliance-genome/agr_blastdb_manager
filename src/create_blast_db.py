@@ -95,8 +95,9 @@ def create_db_structure(
     if "seqcol_type" in config_entry:
         LOGGER.info("seqcol_type found in config file (SGD main)")
         seqcol_type = config_entry['seqcol_type']
+        sanitized_seqcol_type = re.sub(r"\W+", "_", seqcol_type)
         db_path = Path(
-            f"../data/blast/{mod}/{environment}/databases/{seqcol_type}/{sanitized_blast_title}/"
+            f"../data/blast/{mod}/{environment}/databases/{sanitized_seqcol_type}/{sanitized_blast_title}/"
         )
     # Legacy seqcol field (used by some MODs)
     elif "seqcol" in config_entry:
