@@ -87,22 +87,28 @@ def create_db_structure(
     """
     LOGGER.info("Creating database structure")
 
-    # Sanitize all path components to remove special characters
+    # Sanitize blast_title for use in directory paths
     blast_title = config_entry["blast_title"]
     sanitized_blast_title = re.sub(r"\W+", "_", blast_title)
 
-    if "seqcol" in config_entry:
-        LOGGER.info("seqcol found in config file")
-        sanitized_seqcol = re.sub(r"\W+", "_", config_entry['seqcol'])
+    # SGD main (non-fungal) uses seqcol_type for top-level organization
+    if "seqcol_type" in config_entry:
+        LOGGER.info("seqcol_type found in config file (SGD main)")
+        seqcol_type = config_entry['seqcol_type']
         db_path = Path(
-            f"../data/blast/{mod}/{environment}/databases/{sanitized_seqcol}/{sanitized_blast_title}/"
+            f"../data/blast/{mod}/{environment}/databases/{seqcol_type}/{sanitized_blast_title}/"
         )
-    else:
-        LOGGER.info("seqcol not found in config file")
-        sanitized_genus = re.sub(r"\W+", "_", config_entry['genus'])
-        sanitized_species = re.sub(r"\W+", "_", config_entry['species'])
+    # Legacy seqcol field (used by some MODs)
+    elif "seqcol" in config_entry:
+        LOGGER.info("seqcol found in config file")
         db_path = Path(
-            f"../data/blast/{mod}/{environment}/databases/{sanitized_genus}/{sanitized_species}/{sanitized_blast_title}/"
+            f"../data/blast/{mod}/{environment}/databases/{config_entry['seqcol']}/{sanitized_blast_title}/"
+        )
+    # Default: use genus/species organization
+    else:
+        LOGGER.info("Using genus/species organization")
+        db_path = Path(
+            f"../data/blast/{mod}/{environment}/databases/{config_entry['genus']}/{config_entry['species']}/{sanitized_blast_title}/"
         )
 
     config_path = Path(f"../data/config/{mod}/{environment}")
