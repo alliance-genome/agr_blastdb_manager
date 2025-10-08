@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Overview
+
+AGR BLAST Database Manager - A Python-based pipeline for automating the aggregation of model organism datasets and production of BLAST databases for the Alliance of Genome Resources.
+
 ## Development Commands
 
 ### Docker-based Development (Recommended)
@@ -10,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `make docker-run` - Run the BLAST database creation pipeline
 - `make docker-run-help` - Run container with help output
 
-### Native Development  
+### Native Development
 - `uv sync` or `poetry install` - Install Python dependencies (project uses uv as primary package manager)
 - `uv run python src/create_blast_db.py --help` - Main script help
 - `black agr_blastdb_manager scripts` - Format code
@@ -36,7 +40,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Data Management
 - `make clean-fasta` - Remove FASTA files
-- `make clean-blast` - Remove BLAST database files 
+- `make clean-blast` - Remove BLAST database files
 - `make clean-meta` - Remove metadata files
 - `make clean-all-blast` - Remove all BLAST-related data
 
@@ -89,6 +93,34 @@ This is a **Python CLI tool** for automating model organism dataset aggregation 
 8. Clean up temporary files
 9. Optional S3 sync and Slack notifications
 
+### CLI Options
+
+- `-g, --config_yaml`: YAML file with all MODs configuration (processes multiple organisms)
+- `-j, --input_json`: JSON file input coordinates (for single organism)
+- `-e, --environment`: Environment name (default: "dev")
+- `-m, --mod`: Model organism abbreviation (FB, SGD, WB, XB, ZFIN)
+- `-s, --skip_efs_sync`: Skip EFS sync (flag)
+- `-u, --update-slack`: Send Slack notifications (flag)
+- `-s3, --sync-s3`: Sync to S3 bucket (flag)
+- `--skip-local-storage`: Skip local archival storage of FASTA files (flag)
+- `--copy-to-sequenceserver` / `--no-copy-to-sequenceserver`: Copy databases and config to /var/sequenceserver-data/ (default: enabled)
+
+### Logging
+
+Each pipeline run creates a unique log file with the following naming convention:
+```
+blast_db_{MOD}_{environment}_{timestamp}.log
+```
+
+Example: `blast_db_SGD_sgdtest2_20251007_010940.log`
+
+Log files include:
+- Configuration file used
+- MOD and environment
+- All processing steps
+- Errors and warnings
+- Timing information
+
 ### Directory Structure
 
 ```
@@ -101,6 +133,36 @@ conf/                             # Configuration files (if present)
 src/                              # Python source code
 tests/                            # Test files
 ```
+
+### Local Storage
+
+By default, FASTA files are archived in `../data/database_{YYYY_Mon_DD}/` for record-keeping. Use `--skip-local-storage` to disable this behavior when archival storage is not needed (e.g., when databases are immediately synced to S3).
+
+### SequenceServer Integration
+
+By default, the pipeline automatically copies generated BLAST databases and configuration files to `/var/sequenceserver-data/` at the end of each successful run. This directory structure is:
+
+```
+/var/sequenceserver-data/
+├── blast/
+│   └── {MOD}/
+│       └── {environment}/
+│           └── databases/
+└── config/
+    └── {MOD}/
+        └── {environment}/
+            └── environment.json
+```
+
+**Behavior:**
+- Enabled by default (use `--no-copy-to-sequenceserver` to disable)
+- Removes existing data for the same MOD/environment before copying
+- Only runs after successful database creation
+- Copies both BLAST database files (.nhr, .nin, .nsq, etc.) and config files
+
+**Use cases:**
+- Enable (default): For production deployments where SequenceServer serves the databases
+- Disable (`--no-copy-to-sequenceserver`): For testing or when databases are served from a different location
 
 ### Testing
 
@@ -133,6 +195,27 @@ The project includes comprehensive test coverage across multiple categories:
 - `tests/fixtures/` - Test data, sample configurations, and mock sequences
 - Extensive mock data for all MODs (WB, SGD, FB, ZFIN, RGD, XB)
 
+### Adding New Model Organisms
+
+1. Create `conf/{MOD}/databases.{MOD}.{ENV}.json` with database metadata
+2. Add MOD entry to `conf/global.yaml` under `data_providers`
+3. Run pipeline to generate BLAST databases
+
+### Environment Variables
+
+Create a `.env` file in `src/` directory (see `src/.env.example` for template):
+
+- `MODS`: Comma-separated list of model organisms (e.g., "FB,SGD,WB,XB,ZFIN")
+- `AWS_ACCESS_KEY_ID`: AWS access key for S3 operations
+- `AWS_SECRET_ACCESS_KEY`: AWS secret key for S3 operations
+- `S3`: S3 bucket path for syncing databases
+- `EFS`: EFS mount path for syncing databases
+- `MAKEBLASTDB_BIN`: Path to makeblastdb binary (if not in PATH)
+- `SLACK`: Slack webhook URL for notifications
+- `FB_EMAIL`: FlyBase email for metadata generation
+- `FB_RELEASE`: FlyBase release version
+- `DMEL_RELEASE`: Drosophila melanogaster annotation release
+
 ## Important Notes
 
 - Always use Python 3.10+ with uv as primary package manager (poetry also supported)
@@ -145,3 +228,12 @@ The project includes comprehensive test coverage across multiple categories:
 - Slack SDK integration for notifications with batch message handling
 - ZFIN Special Handling: ZFIN databases skip MD5 validation and don't use -parse_seqids flag
 - Production Deployment: Automatic copy to production location with dry-run preview
+
+### Dependencies
+
+- Python 3.10+
+- Poetry for dependency management
+- NCBI BLAST+ tools (makeblastdb)
+- Docker for containerized execution
+- AWS CLI/boto3 for S3 operations
+- Slack SDK for notifications

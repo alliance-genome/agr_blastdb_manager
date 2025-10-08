@@ -77,9 +77,17 @@ def create_db_structure(
     sanitized_blast_title = re.sub(r"\W+", "_", blast_title)
 
     # Determine the path based on config
-    if "seqcol" in config_entry:
+    # SGD main (non-fungal) uses seqcol_type for top-level organization
+    if "seqcol_type" in config_entry:
+        seqcol_type = config_entry['seqcol_type']
+        sanitized_seqcol_type = re.sub(r"\W+", "_", seqcol_type)
+        db_path = f"../data/blast/{mod}/{environment}/databases/{sanitized_seqcol_type}/{sanitized_blast_title}/"
+        logger.info(f"Using seqcol_type path structure: {db_path}")
+    # Legacy seqcol field (used by some MODs)
+    elif "seqcol" in config_entry:
         db_path = f"../data/blast/{mod}/{environment}/databases/{config_entry['seqcol']}/{sanitized_blast_title}/"
         logger.info(f"Using seqcol path structure: {db_path}")
+    # Default: use genus/species organization
     else:
         db_path = (
             f"../data/blast/{mod}/{environment}/databases/{config_entry['genus']}/{config_entry['species']}/"

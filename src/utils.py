@@ -369,16 +369,33 @@ def check_md5sum(fasta_file: str, expected_md5: str, logger) -> bool:
 def get_mod_from_json(input_json) -> str:
     """
     Retrieves the model organism (mod) from the input JSON file.
+    Supports generic MOD extraction with prefix matching for variants like "SGD_test".
     """
     filename = Path(input_json).name
-    mod = filename.split(".")[1]
+    parts = filename.split(".")
 
-    if mod not in MODS:
-        console.log(f"Mod {mod} not found in {MODS}")
-        return False
+    # Extract the potential MOD from the second part (index 1)
+    if len(parts) > 1:
+        mod_part = parts[1]
 
-    console.log(f"Mod found: {mod}")
-    return mod
+        # First, check if it matches exactly with known MODs
+        if mod_part.upper() in [m.upper() for m in MODS]:
+            console.log(f"Mod found (exact match): {mod_part.upper()}")
+            return mod_part.upper()
+
+        # Try to match prefix against known MODs, handling cases like "SGD_test"
+        for known_mod in MODS:
+            if mod_part.upper().startswith(known_mod.upper()):
+                console.log(f"Mod found (prefix match): {known_mod}")
+                return known_mod
+
+        # If no match found in predefined list, just return the extracted part
+        # This allows for flexibility with new or test MODs
+        console.log(f"Using extracted MOD (not in predefined list): {mod_part}")
+        return mod_part
+
+    console.log(f"Could not extract MOD from filename {filename}")
+    return False
 
 
 def edit_fasta(fasta_file: str, config_entry: dict) -> bool:
@@ -813,18 +830,32 @@ def get_files_ftp(
 
 def get_ftp_file_size(fasta_uri: str, logger) -> int:
     """
-    Gets the size of a file on an FTP server with enhanced logging.
+    Gets the size of a file from FTP or HTTP/HTTPS server with enhanced logging.
 
     Args:
-        fasta_uri (str): FTP URI of the file
+        fasta_uri (str): URI of the file (FTP, HTTP, or HTTPS)
         logger (logging.Logger): Logger instance
 
     Returns:
         int: Size of the file in bytes
     """
-    logger.info(f"Getting file size from FTP: {fasta_uri}")
-
     try:
+        # Check if it's an HTTP/HTTPS URL
+        if fasta_uri.startswith(('http://', 'https://')):
+            logger.info(f"Getting file size from HTTP/HTTPS: {fasta_uri}")
+            import requests
+            response = requests.head(fasta_uri, allow_redirects=True, timeout=10)
+            size = int(response.headers.get('content-length', 0))
+            if size > 0:
+                logger.info(f"File size retrieved: {size:,} bytes")
+                return size
+            else:
+                logger.warning(f"Couldn't determine size for {fasta_uri}")
+                return 0
+
+        # Handle FTP URLs
+        logger.info(f"Getting file size from FTP: {fasta_uri}")
+
         # Parse FTP URI
         ftp_host = Path(fasta_uri).parts[1]
         ftp_path = "/".join(Path(fasta_uri).parts[2:-1])
@@ -852,7 +883,7 @@ def get_ftp_file_size(fasta_uri: str, logger) -> int:
             return 0
 
     except Exception as e:
-        logger.error(f"Failed to get FTP file size: {str(e)}", exc_info=True)
+        logger.error(f"Failed to get file size: {str(e)}", exc_info=True)
         return 0
 
 
