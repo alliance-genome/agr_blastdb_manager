@@ -98,11 +98,18 @@ This is a **Python CLI tool** for automating model organism dataset aggregation 
 - `-g, --config_yaml`: YAML file with all MODs configuration (processes multiple organisms)
 - `-j, --input_json`: JSON file input coordinates (for single organism)
 - `-e, --environment`: Environment name (default: "dev")
-- `-m, --mod`: Model organism abbreviation (FB, SGD, WB, XB, ZFIN)
+- `-m, --mod`: Model organism abbreviation (FB, SGD, WB, XB, ZFIN, RGD)
 - `-s, --skip_efs_sync`: Skip EFS sync (flag)
 - `-u, --update-slack`: Send Slack notifications (flag)
 - `-s3, --sync-s3`: Sync to S3 bucket (flag)
-- `--skip-local-storage`: Skip local archival storage of FASTA files (flag)
+- `--store-files`: Store original FASTA files in dated directory `../data/database_{YYYY_Mon_DD}/` (flag)
+- `-cl, --cleanup`: Clean up FASTA files after processing (default: enabled)
+- `-d, --db_names`: Comma-separated list of specific database names to create
+- `-l, --list`: List available databases from configuration file
+- `-c, --check-parse-seqids`: Only check parse_seqids policy without creating databases (flag)
+- `--limit-dbs`: Limit processing to first N databases (for testing)
+- `--validate`: Validate BLAST databases after creation using conserved sequences (flag)
+- `--validation-path`: Path to databases for validation (default: /var/sequenceserver-data/blast)
 - `--copy-to-sequenceserver` / `--no-copy-to-sequenceserver`: Copy databases and config to /var/sequenceserver-data/ (default: enabled)
 
 ### Logging
@@ -136,7 +143,7 @@ tests/                            # Test files
 
 ### Local Storage
 
-By default, FASTA files are archived in `../data/database_{YYYY_Mon_DD}/` for record-keeping. Use `--skip-local-storage` to disable this behavior when archival storage is not needed (e.g., when databases are immediately synced to S3).
+FASTA files can be optionally archived in `../data/database_{YYYY_Mon_DD}/` for record-keeping using the `--store-files` flag. This is disabled by default. Use this when you want to keep original FASTA files separately from the processing workflow.
 
 ### SequenceServer Integration
 
@@ -156,6 +163,8 @@ By default, the pipeline automatically copies generated BLAST databases and conf
 
 **Behavior:**
 - Enabled by default (use `--no-copy-to-sequenceserver` to disable)
+- Shows a dry-run preview of what will be copied with file counts and sizes
+- Prompts for interactive confirmation before copying (y/N)
 - Removes existing data for the same MOD/environment before copying
 - Only runs after successful database creation
 - Copies both BLAST database files (.nhr, .nin, .nsq, etc.) and config files
@@ -218,21 +227,89 @@ Create a `.env` file in `src/` directory (see `src/.env.example` for template):
 
 ## Important Notes
 
-- Always use Python 3.10+ with uv as primary package manager (poetry also supported)
+- Always use Python 3.10+ with **uv** as primary package manager (poetry also supported)
 - Docker is the recommended deployment method
 - The system requires external tools: makeblastdb, gunzip, wget, jq
-- FASTA files can be large - cleanup is automatic but configurable
-- Parse seqids detection is automatic based on FASTA header format
+- FASTA files can be large - cleanup is enabled by default but configurable with `-cl/--cleanup`
 - Uses Rich library for terminal UI and progress display
 - Selenium integration for UI testing with browser automation
 - Slack SDK integration for notifications with batch message handling
-- ZFIN Special Handling: ZFIN databases skip MD5 validation and don't use -parse_seqids flag
-- Production Deployment: Automatic copy to production location with dry-run preview
+- **ZFIN Special Handling**: ZFIN databases skip MD5 validation and don't use -parse_seqids flag
+- **Parse seqids policy**: All MODs except ZFIN use mandatory `-parse_seqids` flag
+- **Production Deployment**: Automatic copy to production location (`/var/sequenceserver-data/`) with dry-run preview and interactive confirmation
+- **Genome Browser Mapping**: Pipeline automatically generates both JSON and Ruby mapping files for databases with `genome_browser` metadata
+
+### Database Validation
+
+The pipeline includes post-creation validation using biologically conserved sequences:
+
+**Validation Features:**
+- Tests with 8 highly conserved sequences (18S rRNA, 28S rRNA, COI, actin, GAPDH, U6 snRNA, histone H3, EF-1α)
+- Tests with MOD-specific sequences (e.g., white/rosy genes for Drosophila, unc-22/dpy-10 for C. elegans)
+- Auto-discovers databases in production location
+- Auto-selects blastn vs blastp based on database type
+- Relaxed e-value (10) for validation purposes
+- Comprehensive reporting with hit rates, pass/fail statistics
+- Integrates with Slack notifications
+- Advisory-only (doesn't block pipeline on validation failure)
+
+**Validation Sequence Library:**
+- **Conserved Sequences:** Found across all eukaryotic organisms
+  - 18S rRNA, 28S rRNA (ribosomal RNA)
+  - COI (cytochrome c oxidase - mitochondrial marker)
+  - Actin, GAPDH (housekeeping genes)
+  - U6 snRNA (small nuclear RNA)
+  - Histone H3, EF-1α (highly conserved proteins)
+
+- **MOD-Specific Sequences:**
+  - FB (FlyBase): white gene, rosy gene
+  - WB (WormBase): unc-22, dpy-10
+  - SGD (Yeast): GAL1, ACT1
+  - ZFIN (Zebrafish): pax2a, sonic hedgehog
+  - RGD (Rat): albumin, insulin1
+  - XB (Xenopus): sox2, bmp4
+
+### Common Workflows
+
+**List available databases:**
+```bash
+uv run python src/create_blast_db.py -g conf/global.yaml -l
+```
+
+**Check parse_seqids policy without creating databases:**
+```bash
+uv run python src/create_blast_db.py -g conf/global.yaml -c
+```
+
+**Process specific databases only:**
+```bash
+uv run python src/create_blast_db.py -j conf/sgd/databases.sgd.dev.json -d "Database 1,Database 2"
+```
+
+**Test with limited databases:**
+```bash
+uv run python src/create_blast_db.py -g conf/global.yaml --limit-dbs 2
+```
+
+**Create databases with validation:**
+```bash
+uv run python src/create_blast_db.py -g conf/global.yaml --validate
+```
+
+**Validate existing databases (without creation):**
+```bash
+uv run python src/create_blast_db.py -g conf/global.yaml --validate -c
+```
+
+**Full production run with validation, Slack notifications, and S3 sync:**
+```bash
+uv run python src/create_blast_db.py -g conf/global.yaml -e prod --validate -u -s3
+```
 
 ### Dependencies
 
 - Python 3.10+
-- Poetry for dependency management
+- uv (primary) or Poetry for dependency management
 - NCBI BLAST+ tools (makeblastdb)
 - Docker for containerized execution
 - AWS CLI/boto3 for S3 operations

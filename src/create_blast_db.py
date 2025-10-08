@@ -46,6 +46,7 @@ from utils import (
     slack_message,
     update_genome_browser_map,
 )
+from validation import DatabaseValidator
 
 # Global variables
 SLACK_MESSAGES: List[Dict[str, str]] = []
@@ -796,6 +797,18 @@ def send_slack_messages_in_batches(
     type=int,
     default=None,
 )
+@click.option(
+    "--validate",
+    help="Validate BLAST databases after creation using conserved sequences",
+    is_flag=True,
+    default=False,
+)
+@click.option(
+    "--validation-path",
+    help="Path to databases for validation (default: /var/sequenceserver-data/blast)",
+    type=str,
+    default="/var/sequenceserver-data/blast",
+)
 def create_dbs(
     config_yaml: str,
     input_json: str,
@@ -810,6 +823,8 @@ def create_dbs(
     list_dbs: bool,
     check_parse_seqids: bool,
     limit_dbs: Optional[int],
+    validate: bool,
+    validation_path: str,
 ) -> None:
     """
     Main function that runs the pipeline for processing configuration files and creating BLAST databases.
@@ -985,6 +1000,70 @@ def create_dbs(
 
             except Exception as e:
                 log_error("Failed to copy to production", e)
+
+        # Run validation if requested
+        if validate and not check_parse_seqids:
+            LOGGER.info("Starting post-creation database validation")
+            print_header("Post-Creation Database Validation")
+
+            try:
+                validator = DatabaseValidator(LOGGER)
+
+                # Determine which MOD to validate
+                mod_filter = None
+                if mod:
+                    mod_filter = mod
+                elif input_json:
+                    # Extract MOD from JSON filename
+                    mod_filter = get_mod_from_json(input_json)
+
+                # Run validation
+                validation_results = validator.validate_all(
+                    validation_path,
+                    mod_filter=mod_filter
+                )
+
+                # Add validation results to Slack messages
+                if validation_results and update_slack:
+                    for mod_name, stats in validation_results.items():
+                        pass_rate = (
+                            (stats["passed"] / stats["total"] * 100)
+                            if stats["total"] > 0
+                            else 0
+                        )
+
+                        # Determine color based on pass rate
+                        if pass_rate >= 80:
+                            color = "#36a64f"  # green
+                        elif pass_rate >= 50:
+                            color = "#ff9900"  # orange
+                        else:
+                            color = "#8D2707"  # red
+
+                        validation_msg = (
+                            f"*{mod_name} Database Validation*\n"
+                            f"• Total Databases: {stats['total']}\n"
+                            f"• Passed: {stats['passed']}\n"
+                            f"• Failed: {stats['failed']}\n"
+                            f"• Pass Rate: {pass_rate:.1f}%\n"
+                            f"• Total Hits: {stats['total_hits']}\n"
+                            f"• Duration: {stats['duration']}"
+                        )
+
+                        SLACK_MESSAGES.append({
+                            "color": color,
+                            "title": f"{mod_name} Validation Results",
+                            "text": validation_msg,
+                            "mrkdwn_in": ["text"],
+                        })
+
+                log_success("Database validation completed")
+
+            except Exception as e:
+                log_error("Database validation failed", e)
+                LOGGER.error(f"Validation error: {str(e)}", exc_info=True)
+                # Don't fail the entire pipeline on validation errors
+                log_warning("Continuing despite validation failure")
 
         if sync_s3 and not check_parse_seqids:
             LOGGER.info("Starting S3 sync")
