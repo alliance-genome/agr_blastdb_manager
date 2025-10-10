@@ -75,13 +75,13 @@ def create_db_structure(
     )
 
     blast_title = config_entry["blast_title"]
-    sanitized_blast_title = re.sub(r"\W+", "_", blast_title)
+    sanitized_blast_title = re.sub(r"\W+", "_", blast_title).strip("_")
 
     # Determine the path based on config
     # SGD main (non-fungal) uses seqcol_type for top-level organization
     if "seqcol_type" in config_entry:
         seqcol_type = config_entry['seqcol_type']
-        sanitized_seqcol_type = re.sub(r"\W+", "_", seqcol_type)
+        sanitized_seqcol_type = re.sub(r"\W+", "_", seqcol_type).strip("_")
         db_path = f"../data/blast/{mod}/{environment}/databases/{sanitized_seqcol_type}/{sanitized_blast_title}/"
         logger.info(f"Using seqcol_type path structure: {db_path}")
     # Legacy seqcol field (used by some MODs)
@@ -142,7 +142,7 @@ def run_makeblastdb(config_entry: Dict, output_dir: str, logger, mod_code: str) 
 
         # Prepare makeblastdb command
         blast_title = config_entry["blast_title"]
-        sanitized_blast_title = re.sub(r"\W+", "_", blast_title)
+        sanitized_blast_title = re.sub(r"\W+", "_", blast_title).strip("_")
         extensions = "".join(Path(fasta_file).suffixes)
 
         makeblast_command = (
