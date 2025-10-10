@@ -950,11 +950,8 @@ def create_dbs(
                             )
                         console.print()
 
-                    # Ask for confirmation
-                    console.print(
-                        "[bold]Do you want to proceed with copying to production? [y/N]:[/bold]",
-                        end=" ",
-                    )
+                    # Ask for confirmation (use plain print to avoid Rich formatting issues with input)
+                    print("\nDo you want to proceed with copying to production? [y/N]: ", end="")
                     response = input().strip().lower()
 
                     if response == "y" or response == "yes":
@@ -1072,9 +1069,32 @@ def create_dbs(
         duration = datetime.now() - start_time
         LOGGER.info(f"Process completed successfully in {duration}")
 
+        # Print final summary
+        print("\n" + "="*80)
+        print("║" + " "*78 + "║")
+        print("║" + " PIPELINE COMPLETED SUCCESSFULLY ".center(78) + "║")
+        print("║" + " "*78 + "║")
+        print("="*80)
+        print(f"\n✓ Total Duration: {duration}")
+        print(f"✓ Check the log file for details: {LOGGER.handlers[0].baseFilename if LOGGER.handlers else 'blast_db_creation.log'}")
+        if not check_parse_seqids:
+            print(f"✓ Databases location: /var/sequenceserver-data/blast/")
+        print("\n" + "="*80 + "\n")
+
     except Exception as e:
         LOGGER.error(f"Process failed: {str(e)}", exc_info=True)
         log_error(str(e))
+
+        # Print failure summary
+        print("\n" + "="*80)
+        print("║" + " "*78 + "║")
+        print("║" + " PIPELINE FAILED ".center(78) + "║")
+        print("║" + " "*78 + "║")
+        print("="*80)
+        print(f"\n✗ Error: {str(e)}")
+        print(f"✗ Check the log file for details: {LOGGER.handlers[0].baseFilename if LOGGER.handlers else 'blast_db_creation.log'}")
+        print("\n" + "="*80 + "\n")
+
         sys.exit(1)
 
 
