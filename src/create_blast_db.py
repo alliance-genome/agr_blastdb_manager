@@ -935,9 +935,9 @@ def create_dbs(
                 if not copy_operations:
                     print_status("No data to copy to production", "info")
                 else:
-                    # Show dry run
+                    # Show what will be copied
                     console.print(
-                        "\n[bold yellow]═══ PRODUCTION COPY PREVIEW ═══[/bold yellow]"
+                        "\n[bold yellow]═══ COPYING TO PRODUCTION ═══[/bold yellow]"
                     )
                     for copy_type, source_path, mod_name, env_name in copy_operations:
                         if copy_type == "databases":
@@ -950,50 +950,39 @@ def create_dbs(
                             )
                         console.print()
 
-                    # Ask for confirmation (use plain print to avoid Rich formatting issues with input)
-                    print("\nDo you want to proceed with copying to production? [y/N]: ", end="")
-                    response = input().strip().lower()
+                    console.print("[green]Proceeding with production copy...[/green]\n")
 
-                    if response == "y" or response == "yes":
-                        console.print(
-                            "[green]Proceeding with production copy...[/green]\n"
-                        )
-
-                        # Perform actual copy
-                        for (
-                            copy_type,
-                            source_path,
-                            mod_name,
-                            env_name,
-                        ) in copy_operations:
-                            if copy_type == "databases":
-                                if copy_to_production(
-                                    source_path, mod_name, env_name, LOGGER
-                                ):
-                                    print_status(
-                                        f"Copied {mod_name}/{env_name} databases to production",
-                                        "success",
-                                    )
-                                else:
-                                    log_error(
-                                        f"Failed to copy {mod_name}/{env_name} databases to production"
-                                    )
+                    # Perform actual copy (default behavior)
+                    for (
+                        copy_type,
+                        source_path,
+                        mod_name,
+                        env_name,
+                    ) in copy_operations:
+                        if copy_type == "databases":
+                            if copy_to_production(
+                                source_path, mod_name, env_name, LOGGER
+                            ):
+                                print_status(
+                                    f"Copied {mod_name}/{env_name} databases to production",
+                                    "success",
+                                )
                             else:
-                                if copy_config_to_production(
-                                    source_path, mod_name, env_name, LOGGER
-                                ):
-                                    print_status(
-                                        f"Copied {mod_name}/{env_name} config to production",
-                                        "success",
-                                    )
-                                else:
-                                    log_error(
-                                        f"Failed to copy {mod_name}/{env_name} config to production"
-                                    )
-                    else:
-                        console.print(
-                            "[yellow]Skipped copying to production location[/yellow]"
-                        )
+                                log_error(
+                                    f"Failed to copy {mod_name}/{env_name} databases to production"
+                                )
+                        else:
+                            if copy_config_to_production(
+                                source_path, mod_name, env_name, LOGGER
+                            ):
+                                print_status(
+                                    f"Copied {mod_name}/{env_name} config to production",
+                                    "success",
+                                )
+                            else:
+                                log_error(
+                                    f"Failed to copy {mod_name}/{env_name} config to production"
+                                )
 
             except Exception as e:
                 log_error("Failed to copy to production", e)
