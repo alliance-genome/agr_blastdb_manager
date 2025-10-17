@@ -130,6 +130,9 @@ class ValidationResult:
         self.success = False
         self.error_message: Optional[str] = None
         self.hit_details: List[Dict] = []
+        self.db_info: Dict = {}  # Store database metadata from blastdbcmd -info
+        self.file_check_passed: bool = False
+        self.integrity_check_passed: bool = False
 
     def add_hit(self, sequence_name: str, hit_count: int, identity: float):
         """Record a successful BLAST hit."""
@@ -157,6 +160,9 @@ class DatabaseValidator:
         word_size: str = "7",
         timeout: int = 30,
         num_threads: int = 2,
+        log_dir: str = "../logs",
+        enable_file_checks: bool = True,
+        enable_integrity_checks: bool = True,
     ):
         """
         Initialize the validator.
@@ -167,16 +173,188 @@ class DatabaseValidator:
             word_size: BLAST word size (default: 7 for sensitivity)
             timeout: Timeout in seconds for each BLAST search
             num_threads: Number of threads for BLAST
+            log_dir: Directory for dedicated validation logs
+            enable_file_checks: Enable file integrity checks
+            enable_integrity_checks: Enable blastdbcmd validation
         """
         self.logger = logger
         self.evalue = evalue
         self.word_size = word_size
         self.timeout = timeout
         self.num_threads = num_threads
+        self.enable_file_checks = enable_file_checks
+        self.enable_integrity_checks = enable_integrity_checks
+
+        # Setup dedicated validation logging
+        self.log_dir = Path(log_dir)
+        self.log_dir.mkdir(exist_ok=True, parents=True)
+        self._setup_validation_logging()
+
         self.logger.info("DatabaseValidator initialized")
         self.logger.info(
             f"Settings: evalue={evalue}, word_size={word_size}, timeout={timeout}s"
         )
+        self.logger.info(
+            f"Enhanced validation: file_checks={enable_file_checks}, "
+            f"integrity_checks={enable_integrity_checks}"
+        )
+
+    def _setup_validation_logging(self):
+        """Setup dedicated validation logging with detailed file handler."""
+        import logging
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file = self.log_dir / f"database_validation_{timestamp}.log"
+
+        # Create dedicated validation logger
+        self.validation_logger = logging.getLogger(f"validation_{timestamp}")
+        self.validation_logger.setLevel(logging.DEBUG)
+        self.validation_logger.propagate = False  # Don't propagate to root logger
+
+        # File handler for detailed validation logs
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setLevel(logging.DEBUG)
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+        file_handler.setFormatter(formatter)
+        self.validation_logger.addHandler(file_handler)
+
+        self.validation_log_file = str(log_file)
+        self.logger.info(f"Validation logging initialized: {log_file}")
+
+    def validate_file_integrity(self, db_path: str) -> Tuple[bool, str]:
+        """
+        Validate that all required BLAST database files exist and are readable.
+
+        Args:
+            db_path: Path to BLAST database (without extension)
+
+        Returns:
+            Tuple of (success, message)
+        """
+        if not self.enable_file_checks:
+            return True, "File checks disabled"
+
+        required_extensions = [".nin", ".nhr", ".nsq"]  # nucleotide database files
+
+        # Check if this is a protein database
+        if Path(f"{db_path}.pin").exists():
+            required_extensions = [".pin", ".phr", ".psq"]
+
+        missing_files = []
+        unreadable_files = []
+
+        for ext in required_extensions:
+            file_path = f"{db_path}{ext}"
+            if not Path(file_path).exists():
+                missing_files.append(file_path)
+                self.validation_logger.error(f"Missing required file: {file_path}")
+            elif not Path(file_path).is_file():
+                unreadable_files.append(file_path)
+                self.validation_logger.error(f"Path exists but is not a file: {file_path}")
+
+        if missing_files:
+            message = f"Missing files: {', '.join(missing_files)}"
+            self.validation_logger.error(message)
+            return False, message
+
+        if unreadable_files:
+            message = f"Unreadable files: {', '.join(unreadable_files)}"
+            self.validation_logger.error(message)
+            return False, message
+
+        self.validation_logger.debug(f"All required files present for: {db_path}")
+        return True, "All files present"
+
+    def validate_database_integrity(self, db_path: str) -> Tuple[bool, str, Dict]:
+        """
+        Validate database integrity using blastdbcmd -info.
+
+        Args:
+            db_path: Path to BLAST database (without extension)
+
+        Returns:
+            Tuple of (success, message, info_dict)
+        """
+        if not self.enable_integrity_checks:
+            return True, "Integrity checks disabled", {}
+
+        try:
+            self.validation_logger.debug(f"Checking database integrity: {db_path}")
+            result = subprocess.run(
+                ["blastdbcmd", "-db", db_path, "-info"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+
+            if result.returncode != 0:
+                error_msg = f"blastdbcmd failed: {result.stderr[:200]}"
+                self.validation_logger.error(error_msg)
+                return False, error_msg, {}
+
+            # Parse database info
+            info_output = result.stdout
+            db_info = self._parse_database_info(info_output)
+
+            # Check if database has sequences
+            seq_count = db_info.get("sequences", 0)
+            if seq_count == 0:
+                message = "Database contains 0 sequences"
+                self.validation_logger.warning(f"{message}: {db_path}")
+                return False, message, db_info
+
+            message = f"{seq_count:,} sequences"
+            self.validation_logger.info(f"Database valid: {db_path} ({message})")
+            return True, message, db_info
+
+        except subprocess.TimeoutExpired:
+            error_msg = "Database validation timeout"
+            self.validation_logger.error(f"{error_msg}: {db_path}")
+            return False, error_msg, {}
+        except FileNotFoundError:
+            error_msg = "blastdbcmd not found - ensure BLAST+ is installed"
+            self.validation_logger.error(error_msg)
+            return False, error_msg, {}
+        except Exception as e:
+            error_msg = f"Validation error: {str(e)[:100]}"
+            self.validation_logger.error(f"{error_msg}: {db_path}")
+            return False, error_msg, {}
+
+    def _parse_database_info(self, info_output: str) -> Dict:
+        """Parse blastdbcmd -info output into structured data."""
+        db_info = {}
+
+        try:
+            lines = info_output.strip().split("\n")
+            for line in lines:
+                if "sequences;" in line:
+                    # Extract sequence count
+                    parts = line.split("sequences;")
+                    if parts:
+                        seq_str = parts[0].strip().split()[-1].replace(",", "")
+                        db_info["sequences"] = int(seq_str)
+
+                if "total letters" in line or "total bases" in line:
+                    # Extract total base pairs
+                    try:
+                        words = line.split()
+                        for i, word in enumerate(words):
+                            if word.replace(",", "").isdigit() and i > 0:
+                                db_info["total_bp"] = int(word.replace(",", ""))
+                                break
+                    except:
+                        pass
+
+                if "Database:" in line:
+                    # Extract database name
+                    db_info["name"] = line.split("Database:")[-1].strip()
+
+        except Exception as e:
+            self.validation_logger.warning(f"Error parsing database info: {e}")
+
+        return db_info
 
     def discover_databases(self, base_path: str, mod: Optional[str] = None) -> Dict:
         """
@@ -327,6 +505,34 @@ class DatabaseValidator:
         result = ValidationResult(db_name, db_path, mod, blast_type)
 
         self.logger.info(f"Validating {mod}/{db_name} using {blast_type}")
+        self.validation_logger.info(f"=== Validating {mod}/{db_name} ===")
+
+        # Step 1: File integrity check
+        file_ok, file_msg = self.validate_file_integrity(db_path)
+        result.file_check_passed = file_ok
+        if not file_ok:
+            result.error_message = f"File check failed: {file_msg}"
+            self.logger.error(f"File integrity check failed for {db_name}: {file_msg}")
+            self.validation_logger.error(f"File integrity failed: {file_msg}")
+            return result
+
+        self.validation_logger.info(f"File integrity: {file_msg}")
+
+        # Step 2: Database integrity check (blastdbcmd -info)
+        integrity_ok, integrity_msg, db_info = self.validate_database_integrity(db_path)
+        result.integrity_check_passed = integrity_ok
+        if not integrity_ok:
+            result.error_message = f"Integrity check failed: {integrity_msg}"
+            self.logger.error(f"Database integrity check failed for {db_name}: {integrity_msg}")
+            self.validation_logger.error(f"Database integrity failed: {integrity_msg}")
+            return result
+
+        self.validation_logger.info(f"Database integrity: {integrity_msg}")
+        if db_info:
+            result.db_info = db_info
+            self.validation_logger.info(f"Database info: {db_info}")
+
+        # Step 3: BLAST search validation
 
         # Test with conserved sequences
         for seq_name, seq_content in CONSERVED_SEQUENCES.items():
