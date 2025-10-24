@@ -51,6 +51,7 @@ from validation import DatabaseValidator
 # Global variables
 SLACK_MESSAGES: List[Dict[str, str]] = []
 FAILURE_DETAILS: List[Dict[str, str]] = []  # Track detailed failure information
+PROCESSED_DATABASES: List[Tuple[str, str]] = []  # Track (MOD, environment) pairs that were processed
 LOGGER = setup_detailed_logger("create_blast_db", "blast_db_creation.log")
 
 
@@ -271,13 +272,14 @@ def process_files(
     store_files: bool = False,
     cleanup: bool = False,
     limit_dbs: Optional[int] = None,
+    skip_md5_check: bool = False,
 ) -> None:
     """
     Process configuration files with enhanced logging.
     """
     LOGGER.info("Starting configuration file processing")
     LOGGER.info(
-        f"Parameters: check_only={check_only}, store_files={store_files}, cleanup={cleanup}"
+        f"Parameters: check_only={check_only}, store_files={store_files}, cleanup={cleanup}, skip_md5_check={skip_md5_check}"
     )
 
     try:
@@ -307,6 +309,7 @@ def process_files(
                             store_files,
                             cleanup,
                             limit_dbs,
+                            skip_md5_check,
                         )
                     else:
                         LOGGER.warning(f"JSON file not found: {json_file}")
@@ -319,7 +322,7 @@ def process_files(
         elif input_json:
             LOGGER.info(f"Processing single JSON file: {input_json}")
             process_json_entries(
-                input_json, environment, None, db_list, check_only, store_files, cleanup, limit_dbs
+                input_json, environment, None, db_list, check_only, store_files, cleanup, limit_dbs, skip_md5_check
             )
 
     except Exception as e:
@@ -333,6 +336,7 @@ def process_entry(
     environment: str,
     check_only: bool = False,
     store_files: bool = False,
+    skip_md5_check: bool = False,
 ) -> bool:
     """
     Process a single database entry with comprehensive logging and progress display.
@@ -343,6 +347,7 @@ def process_entry(
         environment: Deployment environment
         check_only: Whether to only check parse_seqids
         store_files: Whether to store original files
+        skip_md5_check: Whether to skip MD5 checksum verification
 
     Returns:
         bool: Success status
@@ -374,6 +379,7 @@ def process_entry(
                 logger,
                 mod=mod_code,
                 store_files=store_files,
+                skip_md5_check=skip_md5_check,
             )
         else:
             success = get_files_http(
@@ -382,6 +388,7 @@ def process_entry(
                 logger,
                 mod=mod_code,
                 store_files=store_files,
+                skip_md5_check=skip_md5_check,
             )
 
         if not success:
@@ -534,6 +541,7 @@ def process_json_entries(
     store_files: bool = False,
     cleanup: bool = True,
     limit_dbs: Optional[int] = None,
+    skip_md5_check: bool = False,
 ) -> bool:
     """
     Process entries from a JSON configuration file with enhanced progress display.
@@ -541,6 +549,9 @@ def process_json_entries(
     print_header("Processing JSON Entries")
     start_time = datetime.now()
     LOGGER.info(f"Processing JSON entries from: {json_file}")
+
+    if skip_md5_check:
+        LOGGER.warning("MD5 checksum verification is DISABLED for this run")
 
     try:
         with open(json_file, "r") as f:
@@ -582,7 +593,7 @@ def process_json_entries(
                 continue
 
             try:
-                if process_entry(entry, mod_code, environment, check_only, store_files):
+                if process_entry(entry, mod_code, environment, check_only, store_files, skip_md5_check):
                     successful += 1
                     print_progress_line(processed, total_entries, entry_name, "success")
                 else:
@@ -593,6 +604,10 @@ def process_json_entries(
 
         # After all entries are processed successfully, copy the configuration file
         if successful > 0 and not check_only:
+            # Track this MOD/environment pair for selective production copy
+            PROCESSED_DATABASES.append((mod_code, environment))
+            LOGGER.info(f"Tracked {mod_code}/{environment} for production copy")
+
             config_dir = Path(f"../data/config/{mod_code}/{environment}")
             if copy_config_file(Path(json_file), config_dir, LOGGER):
                 LOGGER.info("Configuration file copied successfully")
@@ -809,6 +824,12 @@ def send_slack_messages_in_batches(
     type=str,
     default="/var/sequenceserver-data/blast",
 )
+@click.option(
+    "--skip-md5-check",
+    help="Skip MD5 checksum verification (use with caution)",
+    is_flag=True,
+    default=False,
+)
 def create_dbs(
     config_yaml: str,
     input_json: str,
@@ -825,6 +846,7 @@ def create_dbs(
     limit_dbs: Optional[int],
     validate: bool,
     validation_path: str,
+    skip_md5_check: bool,
 ) -> None:
     """
     Main function that runs the pipeline for processing configuration files and creating BLAST databases.
@@ -832,8 +854,12 @@ def create_dbs(
     start_time = datetime.now()
     LOGGER.info("Starting BLAST database creation process")
     LOGGER.info(
-        f"Parameters: environment={environment}, mod={mod}, store_files={store_files}, cleanup={cleanup}"
+        f"Parameters: environment={environment}, mod={mod}, store_files={store_files}, cleanup={cleanup}, skip_md5_check={skip_md5_check}"
     )
+
+    if skip_md5_check:
+        LOGGER.warning("MD5 checksum verification is DISABLED - use with caution")
+        print_status("⚠️  MD5 checksum verification is DISABLED", "warning")
 
     try:
         if db_names:
@@ -868,6 +894,7 @@ def create_dbs(
                 store_files,
                 cleanup,
                 limit_dbs,
+                skip_md5_check,
             )
         elif input_json:
             LOGGER.info(f"Processing JSON config: {input_json}")
@@ -880,6 +907,7 @@ def create_dbs(
                 store_files,
                 cleanup,
                 limit_dbs,
+                skip_md5_check,
             )
 
         # Handle Slack updates with better error checking and batching
@@ -896,10 +924,12 @@ def create_dbs(
             from terminal import console
 
             try:
-                # Collect all directories to copy
+                # Collect directories to copy - only those processed in this run
                 copy_operations = []
 
-                # Find databases to copy
+                LOGGER.info(f"Production copy will only include: {PROCESSED_DATABASES}")
+
+                # Find databases to copy (only from processed MOD/environment pairs)
                 data_blast_dir = Path("../data/blast")
                 if data_blast_dir.exists():
                     for mod_dir in data_blast_dir.iterdir():
@@ -908,18 +938,21 @@ def create_dbs(
                             for env_dir in mod_dir.iterdir():
                                 if env_dir.is_dir():
                                     env_name = env_dir.name
-                                    databases_dir = env_dir / "databases"
-                                    if databases_dir.exists():
-                                        copy_operations.append(
-                                            (
-                                                "databases",
-                                                str(databases_dir),
-                                                mod_name,
-                                                env_name,
+                                    # Only copy if this MOD/environment was processed in this run
+                                    if (mod_name, env_name) in PROCESSED_DATABASES:
+                                        databases_dir = env_dir / "databases"
+                                        if databases_dir.exists():
+                                            copy_operations.append(
+                                                (
+                                                    "databases",
+                                                    str(databases_dir),
+                                                    mod_name,
+                                                    env_name,
+                                                )
                                             )
-                                        )
+                                            LOGGER.info(f"Added {mod_name}/{env_name} databases to copy queue")
 
-                # Find config files to copy
+                # Find config files to copy (only from processed MOD/environment pairs)
                 data_config_dir = Path("../data/config")
                 if data_config_dir.exists():
                     for mod_dir in data_config_dir.iterdir():
@@ -928,9 +961,12 @@ def create_dbs(
                             for env_dir in mod_dir.iterdir():
                                 if env_dir.is_dir():
                                     env_name = env_dir.name
-                                    copy_operations.append(
-                                        ("config", str(env_dir), mod_name, env_name)
-                                    )
+                                    # Only copy if this MOD/environment was processed in this run
+                                    if (mod_name, env_name) in PROCESSED_DATABASES:
+                                        copy_operations.append(
+                                            ("config", str(env_dir), mod_name, env_name)
+                                        )
+                                        LOGGER.info(f"Added {mod_name}/{env_name} config to copy queue")
 
                 if not copy_operations:
                     print_status("No data to copy to production", "info")

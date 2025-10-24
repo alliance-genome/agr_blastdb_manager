@@ -1,0 +1,6 @@
+# Ignore individual test result files, only keep the comprehensive report
+*.txt
+*.fasta
+
+# Keep the comprehensive test report
+!TEST_REPORT.md

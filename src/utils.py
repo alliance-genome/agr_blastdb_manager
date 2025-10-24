@@ -616,11 +616,14 @@ def get_files_http(
     logger,
     mod: Optional[str] = None,
     store_files: bool = False,
+    skip_md5_check: bool = False,
 ) -> bool:
     """
     Downloads files from HTTP/HTTPS sites with controlled output.
     """
     logger.info(f"Starting HTTP download from: {file_uri}")
+    if skip_md5_check:
+        logger.warning("MD5 checksum verification is DISABLED")
 
     try:
         # Ensure data directory exists
@@ -675,16 +678,20 @@ def get_files_http(
             logger.info("Storing original file (store_files=True)")
             store_fasta_files(file_name, logger)
 
-        if mod != "ZFIN":
+        # Skip MD5 check if explicitly disabled or for ZFIN
+        if skip_md5_check:
+            logger.warning("Skipping MD5 check (disabled via --skip-md5-check)")
+            return True
+        elif mod == "ZFIN":
+            logger.info("Skipping MD5 check for ZFIN")
+            return True
+        else:
             logger.info(f"Verifying MD5 checksum: expected={md5sum}")
             if not check_md5sum(file_name, md5sum, logger):
                 logger.error("MD5 checksum verification failed")
                 return False
             logger.info("MD5 checksum verified successfully")
-        else:
-            logger.info("Skipping MD5 check for ZFIN")
-
-        return True
+            return True
 
     except Exception as e:
         logger.error(f"Download failed: {str(e)}", exc_info=True)
@@ -697,12 +704,15 @@ def get_files_ftp(
     logger,
     mod: Optional[str] = None,
     store_files: bool = False,
+    skip_md5_check: bool = False,
 ) -> bool:
     """
     Downloads files from FTP sites with controlled output.
     """
     start_time = datetime.now()
     logger.info(f"Starting FTP download from: {fasta_uri}")
+    if skip_md5_check:
+        logger.warning("MD5 checksum verification is DISABLED")
 
     try:
         # Ensure data directory exists
@@ -800,25 +810,33 @@ def get_files_ftp(
                 logger.error(f"File storage failed: {str(e)}", exc_info=True)
                 return False
 
-        if mod == "ZFIN":
-            logger.info("Skipping MD5 check for ZFIN")
-            return True
-
-        logger.info(f"Verifying MD5 checksum: expected={md5sum}")
-        if check_md5sum(fasta_file, md5sum, logger):
-            logger.info("MD5 checksum verification successful")
+        # Skip MD5 check if explicitly disabled or for ZFIN
+        if skip_md5_check:
+            logger.warning("Skipping MD5 check (disabled via --skip-md5-check)")
             duration = datetime.now() - start_time
-            logger.info(
-                f"FTP download and verification completed successfully in {duration}"
-            )
+            logger.info(f"FTP download completed successfully in {duration}")
+            return True
+        elif mod == "ZFIN":
+            logger.info("Skipping MD5 check for ZFIN")
+            duration = datetime.now() - start_time
+            logger.info(f"FTP download completed successfully in {duration}")
             return True
         else:
-            logger.error(
-                f"MD5 checksum verification failed:\n"
-                f"  File: {fasta_file}\n"
-                f"  Expected: {md5sum}"
-            )
-            return False
+            logger.info(f"Verifying MD5 checksum: expected={md5sum}")
+            if check_md5sum(fasta_file, md5sum, logger):
+                logger.info("MD5 checksum verification successful")
+                duration = datetime.now() - start_time
+                logger.info(
+                    f"FTP download and verification completed successfully in {duration}"
+                )
+                return True
+            else:
+                logger.error(
+                    f"MD5 checksum verification failed:\n"
+                    f"  File: {fasta_file}\n"
+                    f"  Expected: {md5sum}"
+                )
+                return False
 
     except Exception as e:
         logger.error(
