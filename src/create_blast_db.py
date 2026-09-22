@@ -33,6 +33,7 @@ from terminal import (
     show_summary,
 )
 from utils import (
+    build_name_index,
     cleanup_fasta_files,
     copy_config_file,
     copy_config_to_production,
@@ -197,6 +198,13 @@ def run_makeblastdb(config_entry: Dict, output_dir: str, logger, mod_code: str) 
         duration = datetime.now() - start_time
         logger.info(f"Process completed in {duration}")
         log_success(f"BLAST database created successfully in {duration}")
+
+        # Index gene names before the FASTA is removed below, so SequenceServer
+        # can resolve ?name= deep links without scanning every database.
+        db_path = f"{output_dir}/{fasta_file.replace(extensions, 'db')}"
+        indexed = build_name_index(unzipped_fasta, db_path, logger)
+        if indexed:
+            print_status(f"Indexed {indexed} gene names", "success")
 
         # Clean up unzipped file
         if Path(unzipped_fasta).exists():

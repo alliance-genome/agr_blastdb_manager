@@ -425,6 +425,113 @@ def edit_fasta(fasta_file: str, config_entry: dict) -> bool:
     return True
 
 
+# Defline tags that name a gene, e.g. "[locus_tag=YFL039C] [gene=ACT1]".
+GENE_NAME_TAG_RE = re.compile(r"\[(locus_tag|gene)=([^\]]+)\]")
+
+# Suffix of the index file written next to each BLAST database.
+NAME_INDEX_SUFFIX = ".names.json"
+
+
+def index_entries(entries) -> dict:
+    """
+    Build a lower-cased name -> accession map from (accession, defline) pairs.
+
+    Shared by build_name_index and by any tool backfilling indexes for databases
+    whose source FASTA is already gone, so both derive names the same way.
+    """
+    index: dict[str, str] = {}
+    for accession, text in entries:
+        if not accession:
+            continue
+        index.setdefault(accession.lower(), accession)
+        for _tag, value in GENE_NAME_TAG_RE.findall(text):
+            index.setdefault(value.strip().lower(), accession)
+        symbol = sgd_symbol(text)
+        if symbol:
+            index.setdefault(symbol.lower(), accession)
+    return index
+
+
+def sgd_symbol(defline: str) -> Optional[str]:
+    """
+    Return the gene symbol from an SGD defline, or None.
+
+    SGD's own FASTAs carry no [gene=] tag. They are shaped
+    ">YFL039C ACT1 SGDID:S000001855, ..." — the symbol sits between the
+    systematic name and the SGDID: tag, and is simply the systematic name again
+    when the gene has no symbol (">YAL069W YAL069W SGDID:...").
+
+    Keying on the SGDID: marker rather than token position keeps this from
+    firing on any other MOD's deflines.
+    """
+    if "SGDID:" not in defline:
+        return None
+
+    tokens = defline.split()
+    for i, token in enumerate(tokens):
+        if token.startswith("SGDID:") and i > 0:
+            return tokens[i - 1]
+    return None
+
+
+def build_name_index(fasta_file: str, db_path: str, logger=None) -> int:
+    """
+    Write a gene-name -> accession index next to a BLAST database.
+
+    SequenceServer resolves deep links like ?name=YFL039C against this index.
+    Without one it has to read every defline of every database until it matches,
+    which on the SGD fungal set means ~100 coding databases and ~1.3M entries per
+    lookup, so a request takes seconds and a miss has to read all of them.
+    Building the index here, where the FASTA is already on disk and being read
+    anyway, turns that into a single file read at request time.
+
+    Two things are indexed, because MODs name sequences differently:
+      - [locus_tag=...] and [gene=...] tags, used by the NCBI-derived FASTAs
+        (SGD's fungal set, where the accession is an opaque RefSeq CDS id);
+      - the accession itself, used by SGD's main set among others, where the
+        defline is just ">YAL069W ..." and the systematic name IS the accession.
+
+    Names are stored lower-cased so lookups can be case-insensitive. Where two
+    deflines claim the same name the first wins, matching the scan it replaces.
+
+    An index is written even when a FASTA carries no gene tags at all, which is
+    the normal case for genomic and protein files. An empty index tells the
+    server that the database holds no names, so it can skip it outright instead
+    of falling back to reading every defline looking for tags that are not there.
+
+    Returns the number of names indexed.
+    """
+    def deflines():
+        with open(fasta_file, "r") as fh:
+            for line in fh:
+                if line.startswith(">"):
+                    # ">ACCESSION [gene=X] [locus_tag=Y] ..."
+                    parts = line[1:].split(None, 1)
+                    if parts:
+                        yield parts[0], line
+
+    try:
+        index = index_entries(deflines())
+    except OSError as e:
+        if logger:
+            logger.warning(f"Could not read {fasta_file} to build name index: {e}")
+        return 0
+
+    index_path = Path(f"{db_path}{NAME_INDEX_SUFFIX}")
+    try:
+        with open(index_path, "w") as fh:
+            json.dump(index, fh, separators=(",", ":"), sort_keys=True)
+    except OSError as e:
+        if logger:
+            logger.warning(f"Could not write name index {index_path}: {e}")
+        return 0
+
+    if logger:
+        logger.info(f"Wrote name index with {len(index)} names to {index_path}")
+
+    return len(index)
+
+
 def validate_fasta(filename: str) -> bool:
     """
     Validates if a file is in FASTA format without using Biopython.
