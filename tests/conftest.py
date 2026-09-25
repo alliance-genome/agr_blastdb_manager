@@ -5,12 +5,32 @@ Pytest configuration file with shared fixtures for the AGR BLAST DB Manager test
 """
 
 import json
+import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
+
+# src/ is a plain directory rather than an installed package, so tests that
+# import utils/terminal/validation need it on the path.
+SRC = Path(__file__).resolve().parents[1] / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
+
+# Operational scripts that happen to be named test_*.py. They run work at import
+# time -- shelling out to blastdbcmd, reading files relative to the cwd -- so
+# collecting them aborts the whole run before any real test executes. They are
+# meant to be invoked directly, not by pytest.
+collect_ignore = [
+    "test_blast_databases.py",
+    "unit/test_blast_databases.py",
+    "unit/test_all_fb_dbs.py",
+    "unit/test_final_sequences.py",
+    "unit/test_winning_sequence.py",
+    "unit/test_blast_coverage.py",
+]
 
 
 @pytest.fixture
@@ -170,3 +190,12 @@ def environment_vars():
         "S3": "test_bucket",
         "EFS": "/test/efs/path"
     }
+
+# ---------------------------------------------------------------------------
+# Operational scripts that happen to be named test_*.py are excluded above via
+# collect_ignore. Everything else under tests/unit is expected to pass.
+#
+# The 18 tests that previously asserted against an API src/ does not have were
+# rewritten against the real signatures; there is no xfail list any more, so a
+# failure here is a real one.
+# ---------------------------------------------------------------------------

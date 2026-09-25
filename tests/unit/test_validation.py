@@ -280,28 +280,57 @@ class TestDatabaseValidator:
 
     @patch.object(DatabaseValidator, "run_blast_test")
     def test_validate_database(self, mock_blast):
-        """Test database validation."""
+        """validate_database runs every conserved and MOD-specific sequence.
+
+        The previous version keyed its mock on substrings like "18S_rRNA" being
+        present in the sequence CONTENT, but the content's header reads
+        ">18S_ribosomal_RNA_conserved_region" -- so only "actin" ever matched and
+        the test saw one hit where it expected two. Keying off the dict names
+        instead of guessing at the FASTA text keeps it robust to the sequences
+        being edited.
+        """
+        from validation import CONSERVED_SEQUENCES, MOD_SPECIFIC_SEQUENCES
+
         logger = MagicMock()
         validator = DatabaseValidator(logger)
 
-        # Mock BLAST returning hits for some sequences
-        def blast_side_effect(seq, db, blast_type):
-            if "18S_rRNA" in seq:
-                return True, 5, 98.5
-            elif "actin" in seq:
-                return True, 3, 95.0
-            else:
-                return False, 0, 0.0
-
-        mock_blast.side_effect = blast_side_effect
+        mock_blast.return_value = (True, 5, 98.5)
 
         result = validator.validate_database("test_db", "/path/to/db", "FB")
 
+        expected = len(CONSERVED_SEQUENCES) + len(MOD_SPECIFIC_SEQUENCES.get("FB", {}))
         assert result.db_name == "test_db"
         assert result.success is True
+        assert result.test_count == expected, \
+            f"expected every conserved and FB-specific sequence to be tried ({expected})"
+        assert len(result.hit_details) == expected
         assert result.conserved_hits > 0
-        assert result.total_hits > 0
-        assert len(result.hit_details) >= 2
+
+    @patch.object(DatabaseValidator, "run_blast_test")
+    def test_validate_database_records_only_successful_hits(self, mock_blast):
+        """Sequences that find nothing are counted as tried but not as hits."""
+        logger = MagicMock()
+        validator = DatabaseValidator(logger)
+
+        mock_blast.return_value = (False, 0, 0.0)
+
+        result = validator.validate_database("empty_db", "/path/to/db", "FB")
+
+        assert result.test_count > 0, "sequences should still have been attempted"
+        assert result.hit_details == []
+        assert result.conserved_hits == 0
+
+    @patch.object(DatabaseValidator, "run_blast_test")
+    def test_validate_database_picks_blastp_for_protein_databases(self, mock_blast):
+        """The BLAST program is chosen from the database path."""
+        mock_blast.return_value = (True, 1, 100.0)
+        validator = DatabaseValidator(MagicMock())
+
+        nucleotide = validator.validate_database("n", "/path/to/genome_db", "FB")
+        protein = validator.validate_database("p", "/path/to/protein_db", "FB")
+
+        assert nucleotide.blast_type == "blastn"
+        assert protein.blast_type == "blastp"
 
     @patch.object(DatabaseValidator, "run_blast_test")
     def test_validate_database_no_hits(self, mock_blast):
