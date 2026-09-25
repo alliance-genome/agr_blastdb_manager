@@ -192,49 +192,10 @@ def environment_vars():
     }
 
 # ---------------------------------------------------------------------------
-# Known API drift.
+# Operational scripts that happen to be named test_*.py are excluded above via
+# collect_ignore. Everything else under tests/unit is expected to pass.
 #
-# Collection of tests/unit was broken until now (an operational script named
-# test_*.py aborted the run at import), so these tests have never executed since
-# they were written. They assert against an API the code does not have -- wrong
-# arity, exceptions the code deliberately no longer raises, patch targets that
-# were never module-level. They are marked xfail rather than deleted so the
-# drift stays visible and the suite can serve as a gate; each needs rewriting
-# against the real signature in src/.
-#
-# Remove an entry here once its test is rewritten. Any that starts PASSING will
-# be reported as XPASS, which is the signal that it has been fixed.
+# The 18 tests that previously asserted against an API src/ does not have were
+# rewritten against the real signatures; there is no xfail list any more, so a
+# failure here is a real one.
 # ---------------------------------------------------------------------------
-STALE_TESTS = {
-    "test_terminal.py::TestLoggingFunctions::test_log_error",
-    "test_terminal.py::TestLoggingFunctions::test_print_header",
-    "test_terminal.py::TestLoggingFunctions::test_print_progress_line",
-    "test_terminal.py::TestSummaryDisplay::test_show_summary_success",
-    "test_terminal.py::TestSummaryDisplay::test_show_summary_with_failures",
-    "test_terminal.py::TestSummaryDisplay::test_show_summary_all_failures",
-    "test_terminal.py::TestSummaryDisplay::test_show_summary_empty",
-    "test_terminal.py::TestProgressDisplay::test_progress_indicators",
-    "test_utils.py::TestFileOperations::test_copy_config_file",
-    "test_utils.py::TestFileOperations::test_copy_config_file_nonexistent_source",
-    "test_utils.py::TestSequenceAnalysis::test_needs_parse_seqids_nonexistent_file",
-    "test_utils.py::TestConfigurationParsing::test_get_mod_from_json",
-    "test_utils.py::TestConfigurationParsing::test_get_mod_from_json_invalid_file",
-    "test_utils.py::TestConfigurationParsing::test_get_mod_from_json_nonexistent",
-    "test_utils.py::TestHTTPDownload::test_get_files_http_success",
-    "test_utils.py::TestHTTPDownload::test_get_files_http_failure",
-    "test_utils.py::TestHTTPDownload::test_get_files_http_network_error",
-    "test_validation.py::TestDatabaseValidator::test_validate_database",
-}
-
-
-def pytest_collection_modifyitems(config, items):
-    """Mark the known-stale tests xfail without editing their files."""
-    import pytest as _pytest
-
-    for item in items:
-        key = item.nodeid.split("tests/unit/")[-1]
-        if key in STALE_TESTS:
-            item.add_marker(_pytest.mark.xfail(
-                reason="asserts against an API src/ does not have; needs rewriting",
-                strict=False,
-            ))

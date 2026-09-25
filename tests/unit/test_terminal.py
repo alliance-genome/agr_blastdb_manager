@@ -4,10 +4,23 @@ test_terminal.py
 Unit tests for terminal interface functions.
 """
 
+from datetime import timedelta
+import re
 from io import StringIO
 from unittest.mock import patch
 
 import pytest
+
+# rich styles its output, so a value like "3/10" arrives as
+# "\x1b[1;36m3\x1b[0m/\x1b[1;36m10\x1b[0m" and a plain substring check fails.
+# Strip the escape sequences before asserting on rendered text.
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def plain(text):
+    """Rendered console text with styling removed."""
+    return ANSI.sub("", text)
+
 
 try:
     from src.terminal import (
@@ -38,14 +51,23 @@ class TestLoggingFunctions:
         output = mock_stdout.getvalue()
         assert message in output
 
-    @patch('sys.stderr', new_callable=StringIO)
-    def test_log_error(self, mock_stderr):
-        """Test error logging."""
-        message = "An error occurred"
-        log_error(message)
-        
-        output = mock_stderr.getvalue()
-        assert message in output
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_log_error(self, mock_stdout):
+        """log_error writes to stdout via rich's console, not to stderr."""
+        log_error("An error occurred")
+
+        output = mock_stdout.getvalue()
+        assert "An error occurred" in output
+        assert "Error" in output
+
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_log_error_includes_exception_detail(self, mock_stdout):
+        """The optional exception argument is rendered alongside the message."""
+        log_error("Download failed", ValueError("bad checksum"))
+
+        output = mock_stdout.getvalue()
+        assert "Download failed" in output
+        assert "bad checksum" in output
 
     @patch('sys.stdout', new_callable=StringIO)
     def test_log_warning(self, mock_stdout):
@@ -56,13 +78,12 @@ class TestLoggingFunctions:
         output = mock_stdout.getvalue()
         assert message in output
 
-    def test_print_header(self):
-        """Test header printing."""
-        # Test that function exists and can be called
-        print_header("Test Header", "Test Subheader")
-        
-        # More detailed testing would require mocking rich console output
-        assert True
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_print_header(self, mock_stdout):
+        """print_header(text) renders the text it is given."""
+        print_header("Creating databases")
+
+        assert "Creating databases" in mock_stdout.getvalue()
 
     def test_print_minimal_header(self):
         """Test minimal header printing."""
@@ -74,10 +95,24 @@ class TestLoggingFunctions:
         print_status("Processing", "test.fa")
         assert True
 
-    def test_print_progress_line(self):
-        """Test progress line printing."""
-        print_progress_line("Step 1", "Downloading files")
-        assert True
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_print_progress_line(self, mock_stdout):
+        """print_progress_line(current, total, name, status) shows position and name."""
+        print_progress_line(3, 10, "c_elegans", "success")
+
+        output = plain(mock_stdout.getvalue())
+        assert "3/10" in output
+        assert "c_elegans" in output
+
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_print_progress_line_marks_failure_differently(self, mock_stdout):
+        """An error status is visually distinct from a success."""
+        print_progress_line(1, 2, "ok_db", "success")
+        print_progress_line(2, 2, "bad_db", "error")
+
+        output = mock_stdout.getvalue()
+        assert "\u2713" in output, "expected a tick for the successful entry"
+        assert "\u2717" in output, "expected a cross for the failed entry"
 
 
 class TestErrorDisplay:
@@ -103,59 +138,55 @@ class TestErrorDisplay:
 class TestSummaryDisplay:
     """Test summary display functions."""
 
-    def test_show_summary_success(self):
-        """Test summary display for successful operations."""
-        successful_entries = ["db1", "db2", "db3"]
-        failed_entries = []
-        
-        show_summary(successful_entries, failed_entries, "WB", "WS285")
-        assert True
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_show_summary_success(self, mock_stdout):
+        """show_summary(operation, stats, duration) tabulates the stats mapping."""
+        show_summary("Database creation", {"Created": 3, "Failed": 0}, timedelta(seconds=42))
 
-    def test_show_summary_with_failures(self):
-        """Test summary display with some failures."""
-        successful_entries = ["db1", "db2"]
-        failed_entries = ["db3", "db4"]
-        
-        show_summary(successful_entries, failed_entries, "WB", "WS285")
-        assert True
+        output = mock_stdout.getvalue()
+        assert "Database creation" in output
+        assert "Created" in output
+        assert "3" in output
 
-    def test_show_summary_all_failures(self):
-        """Test summary display with all failures."""
-        successful_entries = []
-        failed_entries = ["db1", "db2", "db3"]
-        
-        show_summary(successful_entries, failed_entries, "WB", "WS285")
-        assert True
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_show_summary_reports_failures(self, mock_stdout):
+        """Failure counts appear in the table rather than being swallowed."""
+        show_summary("Database creation", {"Created": 2, "Failed": 4}, timedelta(seconds=5))
 
-    def test_show_summary_empty(self):
-        """Test summary display with empty lists."""
-        successful_entries = []
-        failed_entries = []
-        
-        show_summary(successful_entries, failed_entries, "WB", "WS285")
-        assert True
+        output = mock_stdout.getvalue()
+        assert "Failed" in output
+        assert "4" in output
 
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_show_summary_formats_large_numbers(self, mock_stdout):
+        """Numeric values are thousands-separated; strings pass through."""
+        show_summary("Indexing", {"Sequences": 1234567, "Mode": "full"}, timedelta(seconds=1))
 
-class TestProgressDisplay:
-    """Test progress display functionality."""
+        output = mock_stdout.getvalue()
+        assert "1,234,567" in plain(output)
+        assert "full" in output
 
-    def test_progress_indicators(self):
-        """Test various progress indicators."""
-        # These would test rich progress bars and spinners
-        # For now, just test that functions can be called
-        
-        steps = [
-            ("Initializing", "Setting up environment"),
-            ("Downloading", "Fetching FASTA files"),
-            ("Validating", "Checking file integrity"),
-            ("Processing", "Creating BLAST databases"),
-            ("Finalizing", "Cleaning up temporary files")
-        ]
-        
-        for step, description in steps:
-            print_progress_line(step, description)
-        
-        assert len(steps) == 5
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_show_summary_empty_stats(self, mock_stdout):
+        """An empty stats mapping still renders a summary with its duration."""
+        show_summary("Nothing to do", {}, timedelta(0))
+
+        output = mock_stdout.getvalue()
+        assert "Nothing to do" in output
+        assert "Duration" in output
+
+    @patch('sys.stdout', new_callable=StringIO)
+    def test_progress_indicators(self, mock_stdout):
+        """A sequence of progress lines reports each step and its position."""
+        steps = ["Initializing", "Downloading", "Validating", "Processing", "Finalizing"]
+        for i, name in enumerate(steps, start=1):
+            print_progress_line(i, len(steps), name, "success")
+
+        output = plain(mock_stdout.getvalue())
+        for name in steps:
+            assert name in output, f"{name} missing from progress output"
+        assert "5/5" in output
+
 
     def test_status_updates(self):
         """Test status update displays."""
