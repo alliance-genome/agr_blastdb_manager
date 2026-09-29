@@ -12,6 +12,7 @@ Date: started September 2023
 import hashlib
 import json
 import logging
+import os
 import re
 from datetime import datetime
 from ftplib import FTP
@@ -133,16 +134,36 @@ def copy_to_production(
         return False
 
 
+# Where a build deploys its environment.json files.
+#
+# This used to be /var/sequenceserver-data/config, which the dev and prod
+# containers both mounted read-write. A config change therefore took effect on
+# production the moment it was written -- no deploy, no review -- and that is
+# how production ended up serving genome browser links for code that only
+# existed on dev.
+#
+# Dev now reads config-dev, and that is the default here: a build lands where
+# it can be checked, and reaching production is a deliberate copy:
+#
+#     cp -a /var/sequenceserver-data/config-dev/. /var/sequenceserver-data/config/
+#
+# Set AGR_CONFIG_ROOT to override, including back to the production directory.
+CONFIG_DEPLOY_ROOT = Path(
+    os.environ.get("AGR_CONFIG_ROOT", "/var/sequenceserver-data/config-dev")
+)
+
 def copy_config_to_production(
     source_config_path: str, mod: str, environment: str, logger, dry_run: bool = False
 ) -> bool:
     """
-    Copies config files from data directory to production location (/var/sequenceserver-data).
-    If dry_run is True, only shows what would be copied without actually copying.
+    Copies config files from the data directory to CONFIG_DEPLOY_ROOT, which
+    defaults to the dev config directory rather than the production one -- see
+    the note on that constant. If dry_run is True, only shows what would be
+    copied without actually copying.
     """
     try:
         source_path = Path(source_config_path)
-        dest_path = Path(f"/var/sequenceserver-data/config/{mod}/{environment}")
+        dest_path = CONFIG_DEPLOY_ROOT / mod / environment
 
         if not source_path.exists():
             logger.error(f"Source config path does not exist: {source_path}")
