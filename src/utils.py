@@ -334,11 +334,24 @@ def cleanup_fasta_files(data_dir: Path, logger) -> None:
         print_status(error_msg, "error")
 
 
+def log_safe_filename(value: Any) -> str:
+    """
+    One component of a log filename, with anything unsafe collapsed.
+
+    Config metadata is free text: SGD's genus is "S288C Reference
+    (DNA/RNA/Vector)", whose slashes would otherwise be read as directory
+    separators. Letters, digits, dots, dashes, plus and parentheses are kept so
+    the result stays recognisable; everything else becomes an underscore.
+    """
+    return re.sub(r"[^\w.()+-]+", "_", str(value)).strip("_") or "unnamed"
+
+
 def extendable_logger(log_name, file_name, level=logging.INFO) -> Any:
     """
     Creates a logger that can be extended with additional handlers and configurations.
     """
     formatter = logging.Formatter("[%(asctime)s] %(levelname)s %(message)s")
+    Path(file_name).parent.mkdir(parents=True, exist_ok=True)
     handler = logging.FileHandler(file_name)
     handler.setFormatter(formatter)
     specified_logger = logging.getLogger(log_name)
