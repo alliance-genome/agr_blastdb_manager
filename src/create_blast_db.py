@@ -33,6 +33,7 @@ from terminal import (
     show_summary,
 )
 from utils import (
+    log_safe_filename,
     build_name_index,
     cleanup_fasta_files,
     copy_config_file,
@@ -364,9 +365,19 @@ def process_entry(
     start_time = datetime.now()
     entry_name = entry["blast_title"]
 
-    # Setup entry-specific logging
+    # Setup entry-specific logging.
+    #
+    # genus, species and seqtype are free text from the config and are not safe
+    # to drop into a filename. SGD uses "S288C Reference (DNA/RNA/Vector)" as a
+    # genus, and those slashes made this a path into directories that do not
+    # exist, so opening the log raised FileNotFoundError before the entry was
+    # downloaded. Every S288C reference database -- the core SGD set -- failed
+    # that way, counted as a failed entry while the run still reported success.
     date_to_add = datetime.now().strftime("%Y_%b_%d")
-    log_path = f"../logs/{entry['genus']}_{entry['species']}_{entry['seqtype']}_{date_to_add}.log"
+    parts = "_".join(
+        log_safe_filename(entry[field]) for field in ("genus", "species", "seqtype")
+    )
+    log_path = f"../logs/{parts}_{date_to_add}.log"
     logger = extendable_logger(entry_name, log_path)
 
     logger.info(f"Starting processing of entry: {entry_name}")
