@@ -150,7 +150,7 @@ class TestRunner:
             ("unit", "Unit tests for individual components", "tests/unit/"),
             ("integration", "End-to-end integration tests", "tests/integration/"),
             ("performance", "Performance and benchmarking tests", "tests/performance/"),
-            ("ui", "User interface tests with Selenium", "tests/ui/"),
+            ("ui", "User interface tests with Playwright", "tests/ui/"),
             ("cli", "Command-line interface tests", "tests/cli/"),
             ("load", "Load testing with Locust", "tests/performance/load_testing/")
         ]

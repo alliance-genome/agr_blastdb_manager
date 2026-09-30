@@ -10,7 +10,6 @@ Generate UI test configuration by:
 
 import json
 import re
-import time
 from pathlib import Path
 from typing import Dict, List, Optional
 import warnings
@@ -19,11 +18,9 @@ import requests
 from bs4 import BeautifulSoup
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.common.exceptions import TimeoutException, WebDriverException
+from playwright.sync_api import Error as PlaywrightError
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import sync_playwright
 from urllib3.exceptions import InsecureRequestWarning
 
 # Try to import cloudscraper if available
@@ -45,34 +42,36 @@ class UIConfigGenerator:
     def __init__(self, base_url: str = "http://127.0.0.1:4569/blast"):
         self.base_url = base_url
         self.data_path = Path("/var/sequenceserver-data")
+        self._playwright = None
         self.browser = None
+        self.page = None
         
-    def setup_browser(self) -> None:
+    def setup_browser(self, channel: Optional[str] = None) -> None:
         """Initialize browser for UI inspection."""
-        options = webdriver.ChromeOptions()
-        options.add_argument('--headless')
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--disable-gpu')
-        options.add_argument('--window-size=1920,1080')
-        options.add_argument('--disable-web-security')
-        options.add_argument('--ignore-certificate-errors')
-        options.add_argument('--allow-insecure-localhost')
-        options.add_argument('--ignore-ssl-errors=yes')
-        options.add_argument('--ignore-certificate-errors-spki-list')
-        
+        self._playwright = sync_playwright().start()
         try:
-            self.browser = webdriver.Chrome(options=options)
-            self.browser.set_page_load_timeout(30)
+            self.browser = self._playwright.chromium.launch(headless=True, channel=channel)
+            context = self.browser.new_context(
+                viewport={"width": 1920, "height": 1080},
+                ignore_https_errors=True,
+            )
+            context.set_default_timeout(30_000)
+            self.page = context.new_page()
             console.log("[green]✓ Browser initialized[/green]")
         except Exception as e:
             console.log(f"[red]Failed to initialize browser: {str(e)}[/red]")
+            self.cleanup()
             raise
     
     def cleanup(self) -> None:
         """Clean up browser resources."""
         if self.browser:
-            self.browser.quit()
+            self.browser.close()
+            self.browser = None
+            self.page = None
+        if self._playwright:
+            self._playwright.stop()
+            self._playwright = None
     
     def get_latest_releases(self) -> Dict[str, str]:
         """Get the latest release for each MOD from the filesystem."""
@@ -205,19 +204,14 @@ class UIConfigGenerator:
         anchors = []
         
         try:
-            self.browser.get(url)
-            
-            # Wait for page to load
-            WebDriverWait(self.browser, 15).until(
-                EC.presence_of_element_located((By.TAG_NAME, "body"))
-            )
+            self.page.goto(url, timeout=15_000)
             
             # Give time for JavaScript to render
-            time.sleep(3)
+            self.page.wait_for_timeout(3_000)
             
             # Look for ALL elements with id containing 'anchor' (main and subdivisions)
             # This should capture both Genus_anchor and Genus_species_anchor patterns
-            elements_with_anchor = self.browser.find_elements(By.XPATH, "//*[contains(@id, '_anchor')]")
+            elements_with_anchor = self.page.locator("xpath=//*[contains(@id, '_anchor')]").all()
             console.log(f"[yellow]Found {len(elements_with_anchor)} elements with '_anchor' in id[/yellow]")
             
             for element in elements_with_anchor:
@@ -241,7 +235,7 @@ class UIConfigGenerator:
             
             for pattern in subdivision_patterns:
                 try:
-                    sub_elements = self.browser.find_elements(By.XPATH, pattern)
+                    sub_elements = self.page.locator(f"xpath={pattern}").all()
                     if sub_elements:
                         console.log(f"[cyan]Found {len(sub_elements)} elements with pattern: {pattern}[/cyan]")
                         for elem in sub_elements[:3]:  # Show first 3 examples
@@ -264,9 +258,9 @@ class UIConfigGenerator:
                 if len(anchors) > 5:
                     console.log(f"  ... and {len(anchors) - 5} more")
             
-        except TimeoutException:
+        except PlaywrightTimeoutError:
             console.log(f"[red]Timeout loading {url}[/red]")
-        except WebDriverException as e:
+        except PlaywrightError as e:
             console.log(f"[red]Browser error for {url}: {str(e)}[/red]")
             # Try fallback method with requests
             console.log(f"[yellow]Falling back to requests method...[/yellow]")
@@ -283,7 +277,7 @@ class UIConfigGenerator:
             "prot": "MKLLIVDDSSGKVRAEIKQLLKQGVNPEMKLLIVDDSSGKVRAEIKQLLKQGVNPE"
         }
     
-    def generate_config(self, use_selenium: bool = True) -> Dict:
+    def generate_config(self, use_browser: bool = True, channel: Optional[str] = None) -> Dict:
         """Generate complete UI test configuration."""
         console.log("[bold blue]Generating UI test configuration...[/bold blue]")
         
@@ -300,14 +294,14 @@ class UIConfigGenerator:
         
         console.log(f"[green]Using existing releases: {releases}[/green]")
         
-        # Try to set up browser if using Selenium
-        if use_selenium:
+        # Try to set up browser unless running requests-only
+        if use_browser:
             try:
-                self.setup_browser()
+                self.setup_browser(channel)
             except Exception as e:
                 console.log(f"[yellow]Browser setup failed: {e}[/yellow]")
                 console.log("[yellow]Falling back to requests-only mode[/yellow]")
-                use_selenium = False
+                use_browser = False
         
         try:
             with Progress(
@@ -320,8 +314,8 @@ class UIConfigGenerator:
                     task_desc = f"Processing {mod}/{release}"
                     progress.add_task(task_desc, total=None)
                     
-                    # Use requests method directly if Selenium is disabled
-                    if not use_selenium:
+                    # Use requests method directly if the browser is disabled
+                    if not use_browser:
                         anchors = self.get_database_anchors_requests(mod, release)
                     else:
                         anchors = self.get_database_anchors(mod, release)
@@ -397,15 +391,17 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='Generate UI test configuration')
-    parser.add_argument('--no-selenium', action='store_true', 
-                       help='Skip Selenium and use requests only (for server environments)')
+    parser.add_argument('--no-browser', '--no-selenium', dest='no_browser', action='store_true',
+                       help='Skip the browser and use requests only (for server environments)')
+    parser.add_argument('--browser-channel', default=None,
+                       help='Use an installed browser (e.g. chrome) instead of Playwright Chromium')
     args = parser.parse_args()
     
     generator = UIConfigGenerator()
     
     try:
         # Generate configuration from live data
-        config = generator.generate_config(use_selenium=not args.no_selenium)
+        config = generator.generate_config(use_browser=not args.no_browser, channel=args.browser_channel)
         
         if config:
             # Save configuration

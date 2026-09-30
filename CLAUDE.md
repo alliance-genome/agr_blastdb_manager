@@ -191,7 +191,8 @@ The project includes comprehensive test coverage across multiple categories:
 - Download speed, validation performance, memory usage, concurrent processing
 
 **UI/Visual Tests:**
-- `tests/ui/test_ui.py` - Enhanced Selenium-based web interface tests with screenshot capabilities
+- `tests/ui/test_ui.py` - Playwright-based web interface tests with screenshot capabilities
+- `tests/ui/test_ui_flow.py` - pytest check of the UI test flow against a local stand-in page (needs `uv run playwright install chromium`)
 - `tests/ui/visual_regression.py` - Visual regression testing comparing baseline and current screenshots
 - Comprehensive test modes with step-by-step screenshot capture and error documentation
 
@@ -232,7 +233,7 @@ Create a `.env` file in `src/` directory (see `src/.env.example` for template):
 - The system requires external tools: makeblastdb, gunzip, wget, jq
 - FASTA files can be large - cleanup is enabled by default but configurable with `-cl/--cleanup`
 - Uses Rich library for terminal UI and progress display
-- Selenium integration for UI testing with browser automation
+- Playwright for UI testing with browser automation
 - Slack SDK integration for notifications with batch message handling
 - **ZFIN Special Handling**: ZFIN databases skip MD5 validation and don't use -parse_seqids flag
 - **Parse seqids policy**: All MODs except ZFIN use mandatory `-parse_seqids` flag

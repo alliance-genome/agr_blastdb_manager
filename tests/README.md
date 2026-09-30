@@ -25,7 +25,8 @@ poetry run pytest tests/unit/
 poetry run pytest tests/integration/
 poetry run pytest tests/performance/
 
-# UI tests (Selenium-based)
+# UI tests (Playwright-based; first run: uv run playwright install chromium)
+uv run pytest tests/ui/test_ui_flow.py
 python tests/ui/test_ui.py -m WB -t nematode --comprehensive
 
 # With coverage
