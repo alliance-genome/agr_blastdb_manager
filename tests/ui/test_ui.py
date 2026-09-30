@@ -111,7 +111,12 @@ class BlastUITester:
         return f"{self.base_url}/{mod}/{test_type}"
 
     def run_test(
-        self, mod: str, items: List[str], test_type: str, sequence: str, output_dir: Path
+        self,
+        mod: str,
+        items: List[str],
+        test_type: str,
+        sequence: str,
+        output_dir: Path,
     ) -> None:
         """
         Run UI tests for specified BLAST configurations.
@@ -159,7 +164,9 @@ class BlastUITester:
                         console.log(f"[red]Timeout waiting for results: {item}[/red]")
                     except PlaywrightError as e:
                         console.log(f"[red]Browser error for {item}: {str(e)}[/red]")
-                        self._error_screenshot(output_path / f"{item}_browser_error.png")
+                        self._error_screenshot(
+                            output_path / f"{item}_browser_error.png"
+                        )
                     except Exception as e:
                         console.log(f"[red]Unexpected error for {item}: {str(e)}[/red]")
                         self._error_screenshot(output_path / f"{item}_error.png")
@@ -268,7 +275,9 @@ class BlastUITester:
                         )
 
                         # Verify page loaded correctly
-                        element_check = self.verify_page_elements(["sequence", "method"])
+                        element_check = self.verify_page_elements(
+                            ["sequence", "method"]
+                        )
                         if not all(element_check.values()):
                             missing = [k for k, v in element_check.items() if not v]
                             test_result["errors"].append(f"Missing elements: {missing}")
@@ -292,7 +301,9 @@ class BlastUITester:
                             continue
                         page.locator(SEQUENCE_INPUT).fill(sequence)
                         self.take_screenshot(
-                            output_path, f"{item}_03_sequence_entered", "Sequence entered"
+                            output_path,
+                            f"{item}_03_sequence_entered",
+                            "Sequence entered",
                         )
 
                         # Submit search
@@ -321,7 +332,9 @@ class BlastUITester:
                                 output_path, f"{item}_06_results", "Final results"
                             )
                             test_result["success"] = True
-                            console.log(f"[green]✓ {item} completed successfully[/green]")
+                            console.log(
+                                f"[green]✓ {item} completed successfully[/green]"
+                            )
                         else:
                             test_result["errors"].append("Timeout waiting for results")
 
@@ -348,8 +361,12 @@ class BlastUITester:
 
 @click.command()
 @click.option("-m", "--mod", required=True, help="Model organism database to test")
-@click.option("-t", "--type", required=True, help="Database type (e.g., fungal for SGD)")
-@click.option("-s", "--single_item", type=int, default=1, help="Number of items to test")
+@click.option(
+    "-t", "--type", required=True, help="Database type (e.g., fungal for SGD)"
+)
+@click.option(
+    "-s", "--single_item", type=int, default=1, help="Number of items to test"
+)
 @click.option(
     "-M",
     "--molecule",
@@ -357,7 +374,9 @@ class BlastUITester:
     default="nucl",
     help="Molecule type to test",
 )
-@click.option("-n", "--number_of_items", type=int, help="Number of random items to test")
+@click.option(
+    "-n", "--number_of_items", type=int, help="Number of random items to test"
+)
 @click.option(
     "-c",
     "--config",
@@ -373,7 +392,9 @@ class BlastUITester:
     help="Output directory for screenshots",
 )
 @click.option(
-    "--comprehensive", is_flag=True, help="Run comprehensive tests with detailed screenshots"
+    "--comprehensive",
+    is_flag=True,
+    help="Run comprehensive tests with detailed screenshots",
 )
 @click.option(
     "--headless/--no-headless", default=True, help="Run browser in headless mode"
@@ -443,7 +464,9 @@ def run_blast_tests(
                 console.log("\n[red]Failed tests:[/red]")
                 for detail in results["details"]:
                     if not detail["success"]:
-                        console.log(f"- {detail['item']}: {', '.join(detail['errors'])}")
+                        console.log(
+                            f"- {detail['item']}: {', '.join(detail['errors'])}"
+                        )
         else:
             tester.run_test(mod, items, type, sequence, Path(output))
 

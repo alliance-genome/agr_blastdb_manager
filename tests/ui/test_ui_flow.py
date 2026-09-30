@@ -88,7 +88,9 @@ def make_tester(base_url):
 
 def test_run_test_screenshots_each_database(base_url, tmp_path):
     tester = make_tester(base_url)
-    tester.run_test("FB", ["Drosophila_anchor", "Apis_anchor"], "FB2025_03", "ACGT", tmp_path)
+    tester.run_test(
+        "FB", ["Drosophila_anchor", "Apis_anchor"], "FB2025_03", "ACGT", tmp_path
+    )
 
     assert (tmp_path / "FB" / "Drosophila_anchor.png").stat().st_size > 0
     assert (tmp_path / "FB" / "Apis_anchor.png").stat().st_size > 0
