@@ -9,6 +9,7 @@ Authors: Paulo Nuin, Adam Wright
 Date: Started July 2023, Refactored [Current Date]
 """
 
+import hashlib
 import json
 import re
 import sys
@@ -118,6 +119,138 @@ def create_db_structure(
     return db_path, config_path
 
 
+# Residues a FASTA of each type may contain: IUPAC codes, gaps and stops.
+# Anything else means the record is not sequence data.
+VALID_RESIDUES = {
+    "nucl": set("ACGTURYSWKMBDHVN-*acgturyswkmbdhvn"),
+    "prot": set("ABCDEFGHIKLMNPQRSTVWXYZU O-*abcdefghiklmnpqrstvwxyzuo".replace(" ", "")),
+}
+
+
+def deduplicate_fasta(fasta_path: str, seqtype: str, logger) -> Optional[Dict]:
+    """
+    Make a FASTA indexable under -parse_seqids, which refuses duplicate ids.
+
+    Two different things produce a duplicate id, and they deserve different
+    treatment:
+
+    * The same record emitted twice. Dropping the copy loses nothing.
+    * One copy corrupt. FlyBase's dmel-transcript 6.69 carries FBtr0077872
+      twice: once as the 71 bp tRNA its own loc= describes, and once as that
+      same sequence with a line of `ls -l` output concatenated onto it --
+      a directory listing that leaked into their export. The corrupt copy is
+      identifiable without guessing, because it is not sequence data.
+
+    So: identical copies collapse, and where copies differ, a copy whose
+    residues are invalid is discarded in favour of a valid one. If that still
+    leaves more than one distinct record under an id, this refuses to choose
+    and lets makeblastdb reject the file, because at that point the right
+    answer is a conversation with whoever produced it.
+
+    Returns None when there is nothing to do, so the normal path rewrites
+    nothing and costs one streaming pass.
+    """
+    alphabet = VALID_RESIDUES.get(seqtype)
+
+    def record_id(header: str) -> str:
+        return header[1:].split(None, 1)[0]
+
+    def is_sequence(body: str) -> bool:
+        if alphabet is None:
+            return True
+        return not (set(body.replace("\n", "")) - alphabet)
+
+    def scan():
+        header, body = None, []
+        with open(fasta_path, "r") as handle:
+            for line in handle:
+                if line.startswith(">"):
+                    if header is not None:
+                        yield header, "".join(body)
+                    header, body = line, []
+                else:
+                    body.append(line)
+        if header is not None:
+            yield header, "".join(body)
+
+    # Pass one: which ids repeat, and which repeats are resolvable.
+    variants: Dict[str, list] = {}
+    total = 0
+    for header, body in scan():
+        total += 1
+        seq_id = record_id(header)
+        seen = variants.setdefault(seq_id, [])
+        if (header, body) not in seen:
+            seen.append((header, body))
+
+    repeated = {i: v for i, v in variants.items() if len(v) > 1 or total != len(variants)}
+    duplicated_ids = total - len(variants)
+    if duplicated_ids == 0:
+        return None
+
+    keep: Dict[str, tuple] = {}
+    unresolved = []
+    corrupt_dropped = 0
+    for seq_id, copies in variants.items():
+        if len(copies) == 1:
+            keep[seq_id] = copies[0]
+            continue
+        valid = [c for c in copies if is_sequence(c[1])]
+        if len(valid) == 1:
+            keep[seq_id] = valid[0]
+            corrupt_dropped += len(copies) - 1
+            logger.warning(
+                f"{fasta_path}: {seq_id} appears {len(copies)} times with different "
+                f"content; keeping the only copy that is valid {seqtype} sequence "
+                f"and discarding {len(copies) - 1}."
+            )
+        else:
+            unresolved.append(seq_id)
+
+    if unresolved:
+        sample = ", ".join(sorted(unresolved)[:5])
+        logger.error(
+            f"{fasta_path}: {len(unresolved)} sequence id(s) name several distinct, "
+            f"individually valid records (e.g. {sample}). Not de-duplicating: "
+            f"choosing between them here would hide a real problem in the source."
+        )
+        return {"unresolved": len(unresolved), "removed": 0, "corrupt": 0, "total": total}
+
+    logger.warning(
+        f"{fasta_path}: {total} records under {len(variants)} distinct ids. "
+        f"Removing {duplicated_ids} repeat(s) so makeblastdb can index this file "
+        f"under -parse_seqids. This is a workaround; the source export should be "
+        f"fixed."
+    )
+
+    temp_path = f"{fasta_path}.dedup"
+    written = 0
+    emitted = set()
+    with open(temp_path, "w") as out:
+        for header, body in scan():
+            seq_id = record_id(header)
+            if seq_id in emitted:
+                continue
+            if keep.get(seq_id) != (header, body):
+                continue
+            emitted.add(seq_id)
+            out.write(header)
+            out.write(body)
+            written += 1
+
+    Path(temp_path).replace(fasta_path)
+    logger.info(
+        f"{fasta_path}: wrote {written} records, removed {total - written} "
+        f"({corrupt_dropped} of them corrupt)"
+    )
+    return {
+        "unresolved": 0,
+        "removed": total - written,
+        "corrupt": corrupt_dropped,
+        "total": total,
+    }
+
+
 def run_makeblastdb(config_entry: Dict, output_dir: str, logger, mod_code: str) -> bool:
     """
     Runs the makeblastdb command to create a BLAST database.
@@ -142,6 +275,23 @@ def run_makeblastdb(config_entry: Dict, output_dir: str, logger, mod_code: str) 
         else:
             parse_ids_flag = "-parse_seqids"
             logger.info("Using mandatory -parse_seqids flag")
+
+            # Only matters under -parse_seqids: that is what makes a duplicate
+            # id fatal rather than merely untidy.
+            dedup = deduplicate_fasta(
+                unzipped_fasta, config_entry["seqtype"], logger
+            )
+            if dedup and dedup["removed"]:
+                note = f"Removed {dedup['removed']} repeated records of {dedup['total']}"
+                if dedup["corrupt"]:
+                    note += f" ({dedup['corrupt']} corrupt)"
+                print_status(f"{note} -- fix the source export", "warning")
+            elif dedup and dedup["unresolved"]:
+                print_status(
+                    f"{dedup['unresolved']} sequence id(s) name several distinct "
+                    f"records; letting makeblastdb reject this file",
+                    "error",
+                )
 
         # Prepare makeblastdb command
         blast_title = config_entry["blast_title"]

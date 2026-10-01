@@ -110,7 +110,10 @@ This is a **Python CLI tool** for automating model organism dataset aggregation 
 - `--limit-dbs`: Limit processing to first N databases (for testing)
 - `--validate`: Validate BLAST databases after creation using conserved sequences (flag)
 - `--validation-path`: Path to databases for validation (default: /var/sequenceserver-data/blast)
-- `--copy-to-sequenceserver` / `--no-copy-to-sequenceserver`: Copy databases and config to /var/sequenceserver-data/ (default: enabled)
+- `--skip-md5-check`: Skip the MD5 verification of downloaded FASTA files (flag)
+
+There is **no flag to disable copying to SequenceServer**. Copying is
+unconditional — see the warning under *SequenceServer Integration* below.
 
 ### Logging
 
@@ -147,31 +150,51 @@ FASTA files can be optionally archived in `../data/database_{YYYY_Mon_DD}/` for 
 
 ### SequenceServer Integration
 
-By default, the pipeline automatically copies generated BLAST databases and configuration files to `/var/sequenceserver-data/` at the end of each successful run. This directory structure is:
+> **Warning — this publishes to the live service, and you cannot turn it off.**
+> There is no `--no-copy-to-sequenceserver` flag. Earlier versions of this file
+> documented one in three places; it was never implemented, so passing it fails
+> with `Error: No such option`. The copy is unconditional, it is not guarded by
+> a confirmation prompt, and it deletes the destination before writing. If you
+> want a build that does not publish, you must edit `copy_to_production` in
+> `src/utils.py` or run against a scratch `/var/sequenceserver-data`.
+
+At the end of a run the pipeline copies generated BLAST databases and
+configuration files to `/var/sequenceserver-data/`:
 
 ```
 /var/sequenceserver-data/
 ├── blast/
 │   └── {MOD}/
 │       └── {environment}/
-│           └── databases/
-└── config/
+│           └── databases/          <- served by every running container
+└── config-dev/                     <- note: NOT config/
     └── {MOD}/
         └── {environment}/
             └── environment.json
 ```
 
-**Behavior:**
-- Enabled by default (use `--no-copy-to-sequenceserver` to disable)
-- Shows a dry-run preview of what will be copied with file counts and sizes
-- Prompts for interactive confirmation before copying (y/N)
-- Removes existing data for the same MOD/environment before copying
-- Only runs after successful database creation
-- Copies both BLAST database files (.nhr, .nin, .nsq, etc.) and config files
+**Behavior — as implemented:**
+- Always runs. There is no opt-out flag.
+- Prints a dry-run preview of what will be copied, then prints
+  `Proceeding with production copy...` and copies. **It does not prompt.**
+  (`src/create_blast_db.py:990-1040`)
+- `shutil.rmtree`s the destination before `copytree`
+  (`src/utils.py:118-128`), so a failure mid-copy leaves nothing served.
+- Databases go to `/var/sequenceserver-data/blast`, which every running
+  SequenceServer container mounts — so a copy is live immediately, with no
+  staging and no rollback.
+- Config goes to `CONFIG_DEPLOY_ROOT`, which defaults to
+  **`/var/sequenceserver-data/config-dev`**, not `config/`
+  (`src/utils.py:151`). Promoting config to production is a separate manual
+  `cp -a`. A build therefore publishes databases to production while its
+  config reaches dev only.
+- Runs when **at least one** entry succeeded, not when all did. A run in which
+  most entries fail still publishes the partial set and republishes the full
+  config describing databases that were never built.
 
-**Use cases:**
-- Enable (default): For production deployments where SequenceServer serves the databases
-- Disable (`--no-copy-to-sequenceserver`): For testing or when databases are served from a different location
+**Why this matters.** The ALLIANCE deployment has served one of its nine
+declared genomes since 2024 for exactly this combination of reasons. See
+`docs/alliance_2024_build_failure.md`.
 
 ### Testing
 
