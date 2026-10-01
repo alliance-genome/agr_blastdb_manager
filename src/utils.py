@@ -462,6 +462,31 @@ def edit_fasta(fasta_file: str, config_entry: dict) -> bool:
 # Defline tags that name a gene, e.g. "[locus_tag=YFL039C] [gene=ACT1]".
 GENE_NAME_TAG_RE = re.compile(r"\[(locus_tag|gene)=([^\]]+)\]")
 
+# How each MOD names a gene in its own deflines.
+#
+# The bracket tags above are NCBI's convention and are all the index understood
+# until now, which is why "?name=white" found nothing on FlyBase while
+# "?name=ACT1" worked on SGD: four MODs, four grammars, one of them matched.
+#
+# These are the same patterns lib/sequenceserver/links.rb uses to label a gene
+# link, ported so that the index and the link agree on what a symbol is. Each is
+# anchored on something specific to the MOD that wrote it, so all of them can be
+# tried against every defline without a pattern claiming another MOD's text:
+#
+#   WB    wormpep=CE32785 gene=WBGene00007064 locus=rga-9 status=Confirmed
+#         gene= holds an identifier, not a symbol; locus= is the symbol.
+#   FB    FBpp0070468 type=polypeptide; name=w-PA; parent=FBgn0003996,...
+#         name= is the isoform; the symbol is the part before the -PA suffix.
+#   ZFIN  itsn1|OTTDARP00000003617 BUSM1-173A8.1-002 ...
+#         leads with the symbol. Anchored on a lowercase first letter so clone
+#         names in the same position ("CH211-107M8.1-002|") are left alone.
+#   SGD   handled by sgd_symbol() below, keyed on the SGDID: marker.
+MOD_SYMBOL_RES = (
+    re.compile(r"\blocus=([^\s;]+)"),
+    re.compile(r"\bname=([^\s;]+?)-[A-Z]{2}\b"),
+    re.compile(r"\A([a-z][^|\s]*)\|"),
+)
+
 # Suffix of the index file written next to each BLAST database.
 NAME_INDEX_SUFFIX = ".names.json"
 
@@ -480,6 +505,12 @@ def index_entries(entries) -> dict:
         index.setdefault(accession.lower(), accession)
         for _tag, value in GENE_NAME_TAG_RE.findall(text):
             index.setdefault(value.strip().lower(), accession)
+        for pattern in MOD_SYMBOL_RES:
+            match = pattern.search(text)
+            if match:
+                value = match.group(1).strip()
+                if value:
+                    index.setdefault(value.lower(), accession)
         symbol = sgd_symbol(text)
         if symbol:
             index.setdefault(symbol.lower(), accession)
