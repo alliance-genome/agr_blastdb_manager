@@ -18,19 +18,19 @@ tests/
 
 ```bash
 # All tests
-poetry run pytest tests/
+uv run pytest tests/
 
 # Specific test type
-poetry run pytest tests/unit/
-poetry run pytest tests/integration/
-poetry run pytest tests/performance/
+uv run pytest tests/unit/
+uv run pytest tests/integration/
+uv run pytest tests/performance/
 
 # UI tests (Playwright-based; first run: uv run playwright install chromium)
 uv run pytest tests/ui/test_ui_flow.py
 python tests/ui/test_ui.py -m WB -t nematode --comprehensive
 
 # With coverage
-poetry run pytest tests/ --cov=src --cov-report=html
+uv run pytest tests/ --cov=src --cov-report=html
 ```
 
 ## Test Data

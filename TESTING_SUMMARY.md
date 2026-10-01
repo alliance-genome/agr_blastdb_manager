@@ -63,7 +63,7 @@ I have successfully enhanced the testing framework for the AGR BLAST Database Ma
 
 ### Install Dependencies
 ```bash
-poetry install --with dev --no-root
+uv sync --locked --extra dev
 ```
 
 ### Run Tests
@@ -71,10 +71,10 @@ poetry install --with dev --no-root
 **Basic Tests:**
 ```bash
 # Run infrastructure tests (always work)
-poetry run pytest tests/test_infrastructure.py -v
+uv run pytest tests/test_infrastructure.py -v
 
 # Run version test
-poetry run pytest tests/test_agr_blastdb_manager.py -v
+uv run pytest tests/test_agr_blastdb_manager.py -v
 
 # Using the test runner
 python run_tests.py --install
@@ -154,7 +154,7 @@ python run_tests.py --all           # Run everything
 
 ### ✅ Infrastructure Tests (All Passing)
 ```bash
-$ poetry run pytest tests/test_infrastructure.py -v
+$ uv run pytest tests/test_infrastructure.py -v
 ========================= 16 passed in 0.06s =========================
 
 Tests validated:
@@ -171,7 +171,7 @@ Tests validated:
 
 ### ✅ Basic Functionality Tests
 ```bash
-$ poetry run pytest tests/test_agr_blastdb_manager.py -v
+$ uv run pytest tests/test_agr_blastdb_manager.py -v
 ========================= 1 passed in 0.01s =========================
 
 ✅ Version test passes
@@ -233,8 +233,8 @@ $ python tests/UI/test_ui.py --help
 ## 📚 Next Steps & Usage
 
 ### Immediate Usage
-1. **Install dependencies**: `poetry install --with dev --no-root`
-2. **Run infrastructure tests**: `poetry run pytest tests/test_infrastructure.py -v`
+1. **Install dependencies**: `uv sync --locked --extra dev`
+2. **Run infrastructure tests**: `uv run pytest tests/test_infrastructure.py -v`
 3. **Explore test runner**: `python run_tests.py --help`
 
 ### For UI Testing
