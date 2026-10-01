@@ -1,1 +1,1 @@
-"""User interface testing with Selenium."""
+"""User interface testing with Playwright."""

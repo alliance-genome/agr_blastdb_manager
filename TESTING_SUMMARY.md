@@ -239,7 +239,7 @@ $ python tests/UI/test_ui.py --help
 
 ### For UI Testing
 1. Create `tests/UI/config.json` with actual database configurations
-2. Install Chrome/Chromium for Selenium tests
+2. Install the Playwright browser: `uv run playwright install chromium`
 3. Run comprehensive UI tests
 
 ### For Load Testing

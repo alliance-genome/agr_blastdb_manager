@@ -3,7 +3,7 @@
 test_ui.py
 
 This module provides automated UI testing functionality for the BLAST web interface.
-It uses Selenium WebDriver to automate browser interactions and test various BLAST
+It uses Playwright to automate browser interactions and test various BLAST
 database configurations.
 
 Features:
@@ -11,111 +11,113 @@ Features:
 - Screenshot capture of test results
 - Progress tracking with rich console output
 - Flexible test configuration via JSON
+
+Browsers are managed by Playwright: run `uv run playwright install chromium`
+once, or pass `--browser-channel chrome` to drive an installed Google Chrome.
 """
 
 import json
-import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
 import click
+from playwright.sync_api import Error as PlaywrightError
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import sync_playwright
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.common.exceptions import TimeoutException, WebDriverException, NoSuchElementException
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.action_chains import ActionChains
-from webdriver_manager.chrome import ChromeDriverManager
 
 console = Console()
+
+
+def by_id(element_id: str) -> str:
+    """CSS selector for an id that may not be a valid CSS identifier."""
+    return f'[id="{element_id}"]'
+
+
+SEQUENCE_INPUT = '[name="sequence"]'
+SUBMIT_BUTTON = by_id("method")
+RESULTS_VIEW = by_id("view")
 
 
 class BlastUITester:
     """
     Handles automated testing of the BLAST web interface.
+
+    One browser is launched per run; every tested database gets a fresh
+    browser context (its own cookies, storage and page), so items stay
+    isolated without paying for a browser start each time.
     """
 
-    def __init__(self, base_url: str = "https://blast.alliancegenome.org/blast"):
+    def __init__(
+        self,
+        base_url: str = "https://blast.alliancegenome.org/blast",
+        browser_channel: Optional[str] = None,
+        wait_timeout: int = 30,
+        result_timeout: int = 600,
+    ):
         self.base_url = base_url
-        self.browser = None
-        self.wait_timeout = 30
+        self.browser_channel = browser_channel
+        self.wait_timeout = wait_timeout  # seconds, for page loads and elements
+        self.result_timeout = result_timeout  # seconds, for BLAST results
         self.screenshot_count = 0
+        self._playwright = None
+        self.browser = None
+        self.page = None
 
     def setup_browser(self, headless: bool = True) -> None:
-        """Initialize the Chrome WebDriver with optimized settings."""
-        options = webdriver.ChromeOptions()
-        if headless:
-            options.add_argument('--headless=new')  # Use new headless mode
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--disable-gpu')
-        options.add_argument('--window-size=1920,1080')
-        options.add_argument('--disable-extensions')
-        options.add_argument('--disable-plugins')
-        options.add_argument('--disable-images')  # Faster loading
-        options.add_argument('--disable-web-security')
-        options.add_argument('--disable-features=VizDisplayCompositor')
-        options.add_argument('--remote-debugging-port=9222')
-        options.add_argument('--disable-background-networking')
-        options.add_argument('--disable-default-apps')
-        options.add_argument('--disable-sync')
-        options.add_argument('--metrics-recording-only')
-        options.add_argument('--no-first-run')
-        options.add_argument('--safebrowsing-disable-auto-update')
-        options.add_argument('--disable-background-timer-throttling')
-        options.add_argument('--disable-renderer-backgrounding')
-        options.add_argument('--disable-backgrounding-occluded-windows')
-        options.add_experimental_option('excludeSwitches', ['enable-logging'])
-        options.add_experimental_option('useAutomationExtension', False)
-        
-        # Try different Chrome binary locations
-        chrome_binaries = [
-            '/usr/bin/google-chrome',
-            '/usr/bin/google-chrome-stable', 
-            '/usr/bin/chromium-browser',
-            '/usr/bin/chromium',
-            '/snap/bin/chromium'
-        ]
-        
-        chrome_binary = None
-        for binary in chrome_binaries:
+        """Launch the browser (once) and open a fresh page for the next item."""
+        if self.browser is None:
+            self._playwright = sync_playwright().start()
             try:
-                if Path(binary).exists():
-                    chrome_binary = binary
-                    break
-            except:
-                continue
-        
-        if chrome_binary:
-            options.binary_location = chrome_binary
-            console.log(f"[blue]Using Chrome binary: {chrome_binary}[/blue]")
-        else:
-            console.log("[yellow]No Chrome binary found, trying default...[/yellow]")
-        
-        # Set up Chrome service with automatic ChromeDriver management
-        try:
-            service = Service(ChromeDriverManager().install())
-            self.browser = webdriver.Chrome(service=service, options=options)
-            self.browser.set_page_load_timeout(self.wait_timeout)
-            self.browser.implicitly_wait(10)
+                self.browser = self._playwright.chromium.launch(
+                    headless=headless, channel=self.browser_channel
+                )
+            except PlaywrightError as e:
+                console.log(f"[red]Failed to launch browser: {str(e)}[/red]")
+                console.log(
+                    "[yellow]Install the Playwright browser with: "
+                    "uv run playwright install chromium "
+                    "(or pass --browser-channel chrome to use an installed Chrome)[/yellow]"
+                )
+                self.cleanup()
+                raise
             console.log("[green]✓ Browser initialized successfully[/green]")
-        except Exception as e:
-            console.log(f"[red]Failed to initialize browser: {str(e)}[/red]")
-            console.log("[yellow]UI tests require Chrome/Chromium to be installed.[/yellow]")
-            console.log("[yellow]Consider running: sudo yum install -y google-chrome-stable[/yellow]")
-            raise
+
+        self.close_page()
+        context = self.browser.new_context(viewport={"width": 1920, "height": 1080})
+        context.set_default_timeout(self.wait_timeout * 1000)
+        self.page = context.new_page()
+
+    def close_page(self) -> None:
+        """Close the current page and its context, keeping the browser."""
+        if self.page:
+            try:
+                self.page.context.close()
+            finally:
+                self.page = None
 
     def cleanup(self) -> None:
-        """Safely close the browser instance."""
+        """Safely close the page, the browser and Playwright."""
+        self.close_page()
         if self.browser:
-            self.browser.quit()
+            self.browser.close()
+            self.browser = None
+        if self._playwright:
+            self._playwright.stop()
+            self._playwright = None
 
-    def run_test(self, mod: str, items: List[str], test_type: str,
-                 sequence: str, output_dir: Path) -> None:
+    def search_url(self, mod: str, test_type: str) -> str:
+        return f"{self.base_url}/{mod}/{test_type}"
+
+    def run_test(
+        self,
+        mod: str,
+        items: List[str],
+        test_type: str,
+        sequence: str,
+        output_dir: Path,
+    ) -> None:
         """
         Run UI tests for specified BLAST configurations.
 
@@ -130,251 +132,297 @@ class BlastUITester:
         output_path = output_dir / mod
         output_path.mkdir(parents=True, exist_ok=True)
 
-        with Progress(
+        try:
+            with Progress(
                 SpinnerColumn(),
                 TextColumn("[progress.description]{task.description}"),
-                console=console
-        ) as progress:
+                console=console,
+            ) as progress:
 
-            for item in items:
-                task_desc = f"Testing {item}"
-                progress.add_task(task_desc, total=None)
+                for item in items:
+                    progress.add_task(f"Testing {item}", total=None)
 
-                try:
-                    self.setup_browser()
-                    url = f"{self.base_url}/{mod}/{test_type}"
-                    self.browser.get(url)
+                    try:
+                        self.setup_browser()
+                        page = self.page
+                        page.goto(self.search_url(mod, test_type))
 
-                    # Select database
-                    checkbox = WebDriverWait(self.browser, 10).until(
-                        EC.element_to_be_clickable((By.ID, item))
-                    )
-                    checkbox.click()
+                        # Select database, enter the sequence and submit
+                        page.locator(by_id(item)).click()
+                        page.locator(SEQUENCE_INPUT).fill(sequence)
+                        page.locator(SUBMIT_BUTTON).click()
 
-                    # Input sequence
-                    input_box = WebDriverWait(self.browser, 10).until(
-                        EC.element_to_be_clickable((By.NAME, "sequence"))
-                    )
-                    input_box.send_keys(sequence)
+                        # Wait for results and capture screenshot
+                        page.locator(RESULTS_VIEW).wait_for(
+                            state="attached", timeout=self.result_timeout * 1000
+                        )
+                        screenshot_path = output_path / f"{item}.png"
+                        page.screenshot(path=str(screenshot_path))
+                        console.log(f"Screenshot saved: {screenshot_path}")
 
-                    # Submit search
-                    submit_button = WebDriverWait(self.browser, 10).until(
-                        EC.element_to_be_clickable((By.ID, "method"))
-                    )
-                    submit_button.click()
+                    except PlaywrightTimeoutError:
+                        console.log(f"[red]Timeout waiting for results: {item}[/red]")
+                    except PlaywrightError as e:
+                        console.log(f"[red]Browser error for {item}: {str(e)}[/red]")
+                        self._error_screenshot(
+                            output_path / f"{item}_browser_error.png"
+                        )
+                    except Exception as e:
+                        console.log(f"[red]Unexpected error for {item}: {str(e)}[/red]")
+                        self._error_screenshot(output_path / f"{item}_error.png")
+                    finally:
+                        self.close_page()
+        finally:
+            self.cleanup()
 
-                    # Wait for results and capture screenshot
-                    WebDriverWait(self.browser, 600).until(
-                        EC.presence_of_element_located((By.ID, "view"))
-                    )
-                    screenshot_path = output_path / f"{item}.png"
-                    self.browser.save_screenshot(str(screenshot_path))
-                    console.log(f"Screenshot saved: {screenshot_path}")
+    def _error_screenshot(self, path: Path) -> None:
+        if self.page:
+            try:
+                self.page.screenshot(path=str(path))
+                console.log(f"Error screenshot saved: {path}")
+            except Exception:
+                pass
 
-                except TimeoutException:
-                    console.log(f"[red]Timeout waiting for results: {item}[/red]")
-                except WebDriverException as e:
-                    console.log(f"[red]Browser error for {item}: {str(e)}[/red]")
-                    # Capture error screenshot
-                    if self.browser:
-                        error_screenshot = output_path / f"{item}_browser_error.png"
-                        try:
-                            self.browser.save_screenshot(str(error_screenshot))
-                            console.log(f"Error screenshot saved: {error_screenshot}")
-                        except Exception:
-                            pass
-                except Exception as e:
-                    console.log(f"[red]Unexpected error for {item}: {str(e)}[/red]")
-                    # Capture error screenshot
-                    if self.browser:
-                        error_screenshot = output_path / f"{item}_error.png"
-                        try:
-                            self.browser.save_screenshot(str(error_screenshot))
-                            console.log(f"Error screenshot saved: {error_screenshot}")
-                        except Exception:
-                            pass
-                finally:
-                    self.cleanup()
-
-    def take_screenshot(self, output_path: Path, filename: str, description: str = "") -> bool:
+    def take_screenshot(
+        self, output_path: Path, filename: str, description: str = ""
+    ) -> bool:
         """Take a screenshot with optional description."""
         try:
-            if not self.browser:
+            if not self.page:
                 return False
-            
+
             self.screenshot_count += 1
-            screenshot_path = output_path / f"{self.screenshot_count:03d}_{filename}.png"
-            
-            success = self.browser.save_screenshot(str(screenshot_path))
-            if success:
-                console.log(f"Screenshot saved: {screenshot_path}")
-                if description:
-                    console.log(f"Description: {description}")
-                return True
-            return False
+            screenshot_path = (
+                output_path / f"{self.screenshot_count:03d}_{filename}.png"
+            )
+            self.page.screenshot(path=str(screenshot_path))
+            console.log(f"Screenshot saved: {screenshot_path}")
+            if description:
+                console.log(f"Description: {description}")
+            return True
         except Exception as e:
             console.log(f"[red]Failed to take screenshot: {str(e)}[/red]")
             return False
 
-    def wait_for_element(self, by: str, value: str, timeout: int = None) -> bool:
-        """Wait for element to be present with custom timeout."""
+    def wait_for_element(self, selector: str, timeout: Optional[int] = None) -> bool:
+        """Wait for an element matching a CSS selector to be attached."""
+        if timeout is None:
+            timeout = self.wait_timeout
         try:
-            if timeout is None:
-                timeout = self.wait_timeout
-            
-            WebDriverWait(self.browser, timeout).until(
-                EC.presence_of_element_located((by, value))
+            self.page.locator(selector).first.wait_for(
+                state="attached", timeout=timeout * 1000
             )
             return True
-        except TimeoutException:
-            console.log(f"[yellow]Timeout waiting for element {by}={value}[/yellow]")
+        except PlaywrightTimeoutError:
+            console.log(f"[yellow]Timeout waiting for element {selector}[/yellow]")
             return False
 
     def verify_page_elements(self, expected_elements: List[str]) -> Dict[str, bool]:
-        """Verify that expected elements are present on the page."""
-        results = {}
-        for element_id in expected_elements:
-            try:
-                element = self.browser.find_element(By.ID, element_id)
-                results[element_id] = element.is_displayed()
-            except NoSuchElementException:
-                results[element_id] = False
-        return results
+        """Verify that elements with the expected ids are visible on the page."""
+        return {
+            element_id: self.page.locator(by_id(element_id)).first.is_visible()
+            for element_id in expected_elements
+        }
 
-    def run_comprehensive_test(self, mod: str, items: List[str], test_type: str,
-                             sequence: str, output_dir: Path, headless: bool = True) -> Dict:
+    def run_comprehensive_test(
+        self,
+        mod: str,
+        items: List[str],
+        test_type: str,
+        sequence: str,
+        output_dir: Path,
+        headless: bool = True,
+    ) -> Dict:
         """Run comprehensive UI tests with detailed reporting."""
         results = {
             "total_tests": len(items),
             "successful": 0,
             "failed": 0,
-            "details": []
+            "details": [],
         }
-        
+
         output_path = output_dir / mod / "comprehensive"
         output_path.mkdir(parents=True, exist_ok=True)
-        
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console
-        ) as progress:
-            
-            for i, item in enumerate(items, 1):
-                test_result = {"item": item, "success": False, "errors": [], "screenshots": []}
-                task_desc = f"[{i}/{len(items)}] Testing {item}"
-                progress.add_task(task_desc, total=None)
-                
-                try:
-                    self.setup_browser(headless)
-                    url = f"{self.base_url}/{mod}/{test_type}"
-                    self.browser.get(url)
-                    
-                    # Take initial screenshot
-                    self.take_screenshot(output_path, f"{item}_01_initial", "Initial page load")
-                    
-                    # Verify page loaded correctly
-                    expected_elements = ["sequence", "method"]
-                    element_check = self.verify_page_elements(expected_elements)
-                    if not all(element_check.values()):
-                        missing = [k for k, v in element_check.items() if not v]
-                        test_result["errors"].append(f"Missing elements: {missing}")
-                    
-                    # Select database
-                    if self.wait_for_element(By.ID, item, 15):
-                        checkbox = self.browser.find_element(By.ID, item)
-                        self.browser.execute_script("arguments[0].scrollIntoView(true);", checkbox)
-                        checkbox.click()
-                        
-                        # Take screenshot after selecting database
-                        self.take_screenshot(output_path, f"{item}_02_database_selected", 
-                                           f"Database {item} selected")
-                    else:
-                        test_result["errors"].append(f"Database checkbox {item} not found")
-                        continue
-                    
-                    # Input sequence
-                    if self.wait_for_element(By.NAME, "sequence", 10):
-                        input_box = self.browser.find_element(By.NAME, "sequence")
-                        input_box.clear()
-                        input_box.send_keys(sequence)
-                        
-                        # Take screenshot after entering sequence
-                        self.take_screenshot(output_path, f"{item}_03_sequence_entered", 
-                                           "Sequence entered")
-                    else:
-                        test_result["errors"].append("Sequence input box not found")
-                        continue
-                    
-                    # Submit search
-                    if self.wait_for_element(By.ID, "method", 10):
-                        submit_button = self.browser.find_element(By.ID, "method")
-                        submit_button.click()
-                        
-                        # Take screenshot after submission
-                        self.take_screenshot(output_path, f"{item}_04_submitted", 
-                                           "Search submitted")
-                    else:
-                        test_result["errors"].append("Submit button not found")
-                        continue
-                    
-                    # Wait for results with progress screenshots
-                    result_found = False
-                    for attempt in range(1, 11):  # Up to 10 attempts over 600 seconds
-                        if self.wait_for_element(By.ID, "view", 60):
-                            result_found = True
-                            break
+
+        # Results are polled in slices so progress screenshots can be taken.
+        attempts = 10
+        attempt_timeout = max(1, self.result_timeout // attempts)
+
+        try:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+            ) as progress:
+
+                for i, item in enumerate(items, 1):
+                    test_result = {
+                        "item": item,
+                        "success": False,
+                        "errors": [],
+                        "screenshots": [],
+                    }
+                    progress.add_task(f"[{i}/{len(items)}] Testing {item}", total=None)
+
+                    try:
+                        self.setup_browser(headless)
+                        page = self.page
+                        page.goto(self.search_url(mod, test_type))
+
+                        # Take initial screenshot
+                        self.take_screenshot(
+                            output_path, f"{item}_01_initial", "Initial page load"
+                        )
+
+                        # Verify page loaded correctly
+                        element_check = self.verify_page_elements(
+                            ["sequence", "method"]
+                        )
+                        if not all(element_check.values()):
+                            missing = [k for k, v in element_check.items() if not v]
+                            test_result["errors"].append(f"Missing elements: {missing}")
+
+                        # Select database (Playwright scrolls it into view)
+                        if not self.wait_for_element(by_id(item), 15):
+                            test_result["errors"].append(
+                                f"Database checkbox {item} not found"
+                            )
+                            continue
+                        page.locator(by_id(item)).click()
+                        self.take_screenshot(
+                            output_path,
+                            f"{item}_02_database_selected",
+                            f"Database {item} selected",
+                        )
+
+                        # Input sequence
+                        if not self.wait_for_element(SEQUENCE_INPUT, 10):
+                            test_result["errors"].append("Sequence input box not found")
+                            continue
+                        page.locator(SEQUENCE_INPUT).fill(sequence)
+                        self.take_screenshot(
+                            output_path,
+                            f"{item}_03_sequence_entered",
+                            "Sequence entered",
+                        )
+
+                        # Submit search
+                        if not self.wait_for_element(SUBMIT_BUTTON, 10):
+                            test_result["errors"].append("Submit button not found")
+                            continue
+                        page.locator(SUBMIT_BUTTON).click()
+                        self.take_screenshot(
+                            output_path, f"{item}_04_submitted", "Search submitted"
+                        )
+
+                        # Wait for results with progress screenshots
+                        result_found = False
+                        for attempt in range(1, attempts + 1):
+                            if self.wait_for_element(RESULTS_VIEW, attempt_timeout):
+                                result_found = True
+                                break
+                            self.take_screenshot(
+                                output_path,
+                                f"{item}_05_waiting_{attempt:02d}",
+                                f"Waiting for results - attempt {attempt}",
+                            )
+
+                        if result_found:
+                            self.take_screenshot(
+                                output_path, f"{item}_06_results", "Final results"
+                            )
+                            test_result["success"] = True
+                            console.log(
+                                f"[green]✓ {item} completed successfully[/green]"
+                            )
                         else:
-                            # Take progress screenshot
-                            self.take_screenshot(output_path, f"{item}_05_waiting_{attempt:02d}", 
-                                               f"Waiting for results - attempt {attempt}")
-                    
-                    if result_found:
-                        # Take final results screenshot
-                        self.take_screenshot(output_path, f"{item}_06_results", "Final results")
-                        test_result["success"] = True
-                        results["successful"] += 1
-                        console.log(f"[green]✓ {item} completed successfully[/green]")
-                    else:
-                        test_result["errors"].append("Timeout waiting for results")
-                        results["failed"] += 1
-                
-                except Exception as e:
-                    test_result["errors"].append(str(e))
-                    results["failed"] += 1
-                    console.log(f"[red]✗ {item} failed: {str(e)}[/red]")
-                    
-                    # Take error screenshot
-                    if self.browser:
-                        self.take_screenshot(output_path, f"{item}_99_error", 
-                                           f"Error occurred: {str(e)}")
-                
-                finally:
-                    results["details"].append(test_result)
-                    self.cleanup()
-        
+                            test_result["errors"].append("Timeout waiting for results")
+
+                    except Exception as e:
+                        test_result["errors"].append(str(e))
+                        console.log(f"[red]✗ {item} failed: {str(e)}[/red]")
+                        self.take_screenshot(
+                            output_path, f"{item}_99_error", f"Error occurred: {str(e)}"
+                        )
+
+                    finally:
+                        # Every item counts once, including early exits above.
+                        if test_result["success"]:
+                            results["successful"] += 1
+                        else:
+                            results["failed"] += 1
+                        results["details"].append(test_result)
+                        self.close_page()
+        finally:
+            self.cleanup()
+
         return results
 
 
 @click.command()
 @click.option("-m", "--mod", required=True, help="Model organism database to test")
-@click.option("-t", "--type", required=True, help="Database type (e.g., fungal for SGD)")
-@click.option("-s", "--single_item", type=int, default=1, help="Number of items to test")
-@click.option("-M", "--molecule", type=click.Choice(['nucl', 'prot']),
-              default="nucl", help="Molecule type to test")
-@click.option("-n", "--number_of_items", type=int, help="Number of random items to test")
-@click.option("-c", "--config", type=click.Path(exists=True),
-              default="config.json", help="Path to configuration file")
-@click.option("-o", "--output", type=click.Path(),
-              default="output", help="Output directory for screenshots")
-@click.option("--comprehensive", is_flag=True, 
-              help="Run comprehensive tests with detailed screenshots")
-@click.option("--headless/--no-headless", default=True,
-              help="Run browser in headless mode")
-def run_blast_tests(mod: str, type: str, single_item: int,
-                    molecule: str, number_of_items: Optional[int],
-                    config: str, output: str, comprehensive: bool,
-                    headless: bool) -> None:
+@click.option(
+    "-t", "--type", required=True, help="Database type (e.g., fungal for SGD)"
+)
+@click.option(
+    "-s", "--single_item", type=int, default=1, help="Number of items to test"
+)
+@click.option(
+    "-M",
+    "--molecule",
+    type=click.Choice(["nucl", "prot"]),
+    default="nucl",
+    help="Molecule type to test",
+)
+@click.option(
+    "-n", "--number_of_items", type=int, help="Number of random items to test"
+)
+@click.option(
+    "-c",
+    "--config",
+    type=click.Path(exists=True),
+    default="config.json",
+    help="Path to configuration file",
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(),
+    default="output",
+    help="Output directory for screenshots",
+)
+@click.option(
+    "--comprehensive",
+    is_flag=True,
+    help="Run comprehensive tests with detailed screenshots",
+)
+@click.option(
+    "--headless/--no-headless", default=True, help="Run browser in headless mode"
+)
+@click.option(
+    "--base-url",
+    default="https://blast.alliancegenome.org/blast",
+    show_default=True,
+    help="BLAST web interface to test",
+)
+@click.option(
+    "--browser-channel",
+    default=None,
+    help="Use an installed browser instead of Playwright's Chromium (e.g. chrome, msedge)",
+)
+def run_blast_tests(
+    mod: str,
+    type: str,
+    single_item: int,
+    molecule: str,
+    number_of_items: Optional[int],
+    config: str,
+    output: str,
+    comprehensive: bool,
+    headless: bool,
+    base_url: str,
+    browser_channel: Optional[str],
+) -> None:
     """
     Run automated tests for the BLAST web interface.
 
@@ -393,27 +441,32 @@ def run_blast_tests(mod: str, type: str, single_item: int,
 
         if number_of_items and number_of_items < len(items):
             import random
+
             items = random.sample(items, number_of_items)
         elif single_item > 1:
             items = items[:single_item]
 
-        tester = BlastUITester()
-        
+        tester = BlastUITester(base_url=base_url, browser_channel=browser_channel)
+
         if comprehensive:
             console.log(f"[blue]Running comprehensive tests for {mod}/{type}[/blue]")
-            results = tester.run_comprehensive_test(mod, items, type, sequence, Path(output), headless)
-            
+            results = tester.run_comprehensive_test(
+                mod, items, type, sequence, Path(output), headless
+            )
+
             # Print summary
-            console.log(f"\n[bold]Test Summary:[/bold]")
+            console.log("\n[bold]Test Summary:[/bold]")
             console.log(f"Total tests: {results['total_tests']}")
             console.log(f"[green]Successful: {results['successful']}[/green]")
             console.log(f"[red]Failed: {results['failed']}[/red]")
-            
-            if results['failed'] > 0:
-                console.log(f"\n[red]Failed tests:[/red]")
-                for detail in results['details']:
-                    if not detail['success']:
-                        console.log(f"- {detail['item']}: {', '.join(detail['errors'])}")
+
+            if results["failed"] > 0:
+                console.log("\n[red]Failed tests:[/red]")
+                for detail in results["details"]:
+                    if not detail["success"]:
+                        console.log(
+                            f"- {detail['item']}: {', '.join(detail['errors'])}"
+                        )
         else:
             tester.run_test(mod, items, type, sequence, Path(output))
 

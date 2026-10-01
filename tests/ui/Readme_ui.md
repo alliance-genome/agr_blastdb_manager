@@ -1,6 +1,6 @@
 # BLAST Web Interface UI Testing
 
-This tool provides automated UI testing capabilities for the BLAST web interface using Selenium WebDriver. It allows testing of different Model Organism Databases (MODs) and their various BLAST configurations.
+This tool provides automated UI testing capabilities for the BLAST web interface using Playwright. It allows testing of different Model Organism Databases (MODs) and their various BLAST configurations.
 
 ## Table of Contents
 - [Prerequisites](#prerequisites)
@@ -13,49 +13,28 @@ This tool provides automated UI testing capabilities for the BLAST web interface
 
 ## Prerequisites
 
-- Python 3.8 or higher
-- Poetry (dependency management)
-- Chrome or Chromium browser
-- ChromeDriver matching your Chrome version
+- Python 3.10 or higher
+- uv (dependency management)
+- A Playwright browser (installed below), or an installed Google Chrome
 
 ## Installation
 
-1. Ensure Poetry is installed on your system. If not, install it following the [official instructions](https://python-poetry.org/docs/#installation).
-
-2. Clone this repository and navigate to the project directory:
+1. Install the project with its dev extra, which includes Playwright:
 ```bash
-git clone <repository-url>
-cd <project-directory>
+uv sync --extra dev
 ```
 
-3. Install dependencies using Poetry:
+2. Download the browser Playwright drives (once per machine; it goes in the
+   user cache, not system-wide):
 ```bash
-poetry install
+uv run playwright install chromium
 ```
 
-4. Add the required dependencies to your project:
-```bash
-poetry add selenium rich click
-```
-
-Your `pyproject.toml` should include these dependencies:
-```toml
-[tool.poetry.dependencies]
-python = "^3.8"
-selenium = "^4.9.0"
-rich = "^13.3.5"
-click = "^8.1.3"
-
-[tool.poetry.dev-dependencies]
-# Add any development dependencies here
-```
+   To use an already installed Google Chrome instead, pass
+   `--browser-channel chrome` to `test_ui.py` (or set `PLAYWRIGHT_CHANNEL=chrome`
+   for `test_ui_flow.py` and `simple_test.py`). No ChromeDriver is needed.
 
 ## Configuration
-
-### ChromeDriver Setup
-
-1. Download ChromeDriver that matches your Chrome version from [ChromeDriver Downloads](https://sites.google.com/chromium.org/driver/)
-2. Add ChromeDriver to your system PATH
 
 ### Configuration File (config.json)
 
@@ -91,7 +70,7 @@ Create a `config.json` file with your test configurations:
 ### Basic Command Structure
 
 ```bash
-poetry run python test_ui.py [OPTIONS]
+uv run python tests/ui/test_ui.py [OPTIONS]
 ```
 
 ### Required Options
@@ -106,22 +85,26 @@ poetry run python test_ui.py [OPTIONS]
 - `-n, --number_of_items`: Number of random items to test
 - `-c, --config`: Path to configuration file (default: config.json)
 - `-o, --output`: Output directory for screenshots (default: output)
+- `--comprehensive`: Step-by-step screenshots and a pass/fail summary
+- `--headless/--no-headless`: Show the browser window (default: headless)
+- `--base-url`: BLAST interface to test (default: https://blast.alliancegenome.org/blast)
+- `--browser-channel`: Use an installed browser such as `chrome` instead of Playwright's Chromium
 
 ### Example Commands
 
 1. Test a single database:
 ```bash
-poetry run python test_ui.py --mod SGD --type fungal
+uv run python tests/ui/test_ui.py --mod SGD --type fungal
 ```
 
 2. Test multiple databases with protein sequences:
 ```bash
-poetry run python test_ui.py --mod SGD --type fungal --molecule prot --number_of_items 3
+uv run python tests/ui/test_ui.py --mod SGD --type fungal --molecule prot --number_of_items 3
 ```
 
 3. Test with custom configuration:
 ```bash
-poetry run python test_ui.py --mod WB --type nematode --config custom_config.json
+uv run python tests/ui/test_ui.py --mod WB --type nematode --config custom_config.json
 ```
 
 ### Poetry Scripts
@@ -163,10 +146,10 @@ The tool provides rich console output including:
 
 ### Common Issues
 
-1. ChromeDriver Version Mismatch
+1. Browser Not Installed
 ```
-Error: SessionNotCreatedException
-Solution: Update ChromeDriver to match your Chrome version
+Error: Executable doesn't exist ... Looks like Playwright was just installed or updated.
+Solution: Run `uv run playwright install chromium`, or pass --browser-channel chrome
 ```
 
 2. Configuration Not Found
@@ -177,19 +160,18 @@ Solution: Ensure config.json exists and is properly formatted
 
 3. Browser Launch Failed
 ```
-Error: WebDriverException
-Solution: Check Chrome installation and ChromeDriver path
+Error: playwright._impl._errors.Error
+Solution: Reinstall the browser with `uv run playwright install chromium`
 ```
 
 ### Debug Tips
 
 1. Disable Headless Mode:
-   - Edit `setup_browser()` in the code
-   - Remove the `--headless` option to see browser automation in action
+   - Pass `--no-headless` to watch the browser
 
 2. Increase Wait Times:
-   - Adjust the `WebDriverWait` timeout values for slower connections
-   - Default wait is 10 seconds for elements, 600 seconds for results
+   - Pass `wait_timeout` / `result_timeout` (seconds) to `BlastUITester`
+   - Defaults are 30 seconds for pages and elements, 600 seconds for results
 
 3. Check Screenshots:
    - Screenshots are saved even if tests fail
@@ -203,7 +185,7 @@ Solution: Check Chrome installation and ChromeDriver path
 2. Create a new branch
 3. Install development dependencies:
 ```bash
-poetry install --with dev
+uv sync --extra dev
 ```
 
 ### Code Style
@@ -216,9 +198,10 @@ Follow these guidelines:
 
 ### Running Tests
 
-If you add tests for the testing script itself:
+The testing script has its own pytest check, which runs it against a local
+stand-in for the search page (skipped when no Playwright browser is installed):
 ```bash
-poetry run pytest tests/
+uv run pytest tests/ui/test_ui_flow.py
 ```
 
 ### Contributing
