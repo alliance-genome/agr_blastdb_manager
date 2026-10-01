@@ -126,6 +126,22 @@ That entry also still claims `version: WS292`, so the object at that S3 key has
 been replaced since Adam wrote the config, and the entry may want a fresh URI
 rather than only a fresh checksum.
 
+## A second instance, and the same mechanism
+
+FlyBase's FB2026_03 lost its *D. melanogaster* Transcripts database to exactly
+this pattern on 2026-09-15: `makeblastdb` rejected the FASTA, the entry failed,
+the run exited 0, and the remaining four databases shipped. Curators reported it
+as "the option to search annotated transcripts has disappeared". Seven previous
+releases had the database.
+
+Different proximate cause -- duplicate sequence ids in the export rather than a
+full disk -- but the same three mechanisms let it reach users and stay there:
+partial failure is not failure, the config is republished regardless, and
+nothing afterwards checks that what is served matches what is declared.
+
+`deduplicate_fasta` in `src/create_blast_db.py` now handles the duplicate ids.
+It does not address any of the three mechanisms above.
+
 ## What to do about it
 
 The repair plan lives in the SequenceServer repo at
