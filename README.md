@@ -7,7 +7,7 @@ Items marked with '(dev)' indicate dependencies that are only needed if running 
 * Unix / OS X (x86_64 or arm64 platforms)
 * Docker
 * Python 3.10+ (dev)
-* [Poetry](https://python-poetry.org/) (dev)
+* [uv](https://docs.astral.sh/uv/) (dev)
 * gunzip (dev)
 * xargs (dev)
 * makeblastdb - NCBI BLAST 2.12.0+ (dev)

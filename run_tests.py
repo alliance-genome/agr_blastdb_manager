@@ -57,27 +57,27 @@ def main():
     # Install dependencies if requested
     if args.install or args.all:
         total_count += 1
-        if run_command(["poetry", "install", "--with", "dev"], "Installing test dependencies"):
+        if run_command(["uv", "sync", "--locked", "--extra", "dev"], "Installing test dependencies"):
             success_count += 1
     
     # Run unit tests
     if args.unit or args.all:
         total_count += 1
-        cmd = ["poetry", "run", "pytest", "tests/test_utils.py", "tests/test_terminal.py", "tests/test_create_blast_db.py", "-v"]
+        cmd = ["uv", "run", "pytest", "tests/test_utils.py", "tests/test_terminal.py", "tests/test_create_blast_db.py", "-v"]
         if run_command(cmd, "Running unit tests"):
             success_count += 1
     
     # Run integration tests
     if args.integration or args.all:
         total_count += 1
-        cmd = ["poetry", "run", "pytest", "tests/test_integration.py", "-v"]
+        cmd = ["uv", "run", "pytest", "tests/test_integration.py", "-v"]
         if run_command(cmd, "Running integration tests"):
             success_count += 1
     
     # Run performance tests
     if args.performance or args.all:
         total_count += 1
-        cmd = ["poetry", "run", "pytest", "tests/test_performance.py", "-v"]
+        cmd = ["uv", "run", "pytest", "tests/test_performance.py", "-v"]
         if run_command(cmd, "Running performance tests"):
             success_count += 1
     
@@ -96,7 +96,7 @@ def main():
     # Generate coverage report
     if args.coverage or args.all:
         total_count += 1
-        cmd = ["poetry", "run", "pytest", "tests/", "--cov=src", "--cov-report=html", "--cov-report=term"]
+        cmd = ["uv", "run", "pytest", "tests/", "--cov=src", "--cov-report=html", "--cov-report=term"]
         if run_command(cmd, "Generating coverage report"):
             success_count += 1
             print("📊 Coverage report generated in htmlcov/index.html")

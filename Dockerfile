@@ -16,11 +16,17 @@ WORKDIR /workflow
 
 COPY . .
 
-RUN pip install -U pip wheel
-RUN pip install poetry
-RUN poetry config virtualenvs.create false
-RUN poetry lock --no-update
-RUN poetry install  --no-interaction --no-ansi
+# uv, pinned. The project moved to uv in 2025-08 but this file kept driving
+# poetry, which no longer has a [tool.poetry] section to read -- so the image
+# was resolving dependencies by a different route than uv.lock describes.
+COPY --from=ghcr.io/astral-sh/uv:0.8.17 /uv /bin/uv
+
+# --locked fails rather than silently re-resolving, so the image and uv.lock
+# cannot drift apart. --no-dev keeps black, pillow, locust and the rest of the
+# test tooling out of a production image; they were being installed before.
+RUN uv sync --locked --no-dev
+
+ENV PATH=/workflow/.venv/bin:${PATH}
 
 VOLUME ["/workflow/data", "/workflow/logs", "/conf"]
 CMD ["python", "src/create_blast_db.py", "--help"]

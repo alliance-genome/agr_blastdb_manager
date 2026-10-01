@@ -17,13 +17,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Install poetry
-        run: pipx install poetry
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-          cache: 'poetry'
-      - run: poetry install
+      # --locked fails rather than re-resolving, so CI runs the dependency set
+      # uv.lock describes instead of whatever resolves on the day.
+      - run: uv sync --locked --extra dev
       - name: Update FlyBase metadata file
         run: |
           rm ./conf/flybase/databases.json && \

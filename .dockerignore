@@ -1,3 +1,7 @@
 logs/
 data/
 .git/
+# The image builds its own environment with `uv sync`; copying a local .venv in
+# would shadow it and ship whatever was on the developer's machine.
+.venv/
+**/__pycache__/

@@ -51,18 +51,18 @@ open htmlcov/index.html
 
 ### Unit Tests
 ```bash
-poetry run pytest tests/unit/ -v                    # All unit tests
-poetry run pytest tests/unit/test_utils.py -v       # Specific test file
+uv run pytest tests/unit/ -v                    # All unit tests
+uv run pytest tests/unit/test_utils.py -v       # Specific test file
 ```
 
 ### Integration Tests
 ```bash
-poetry run pytest tests/integration/ -v --tb=short  # All integration tests
+uv run pytest tests/integration/ -v --tb=short  # All integration tests
 ```
 
 ### Performance Tests
 ```bash
-poetry run pytest tests/performance/test_performance.py -v
+uv run pytest tests/performance/test_performance.py -v
 ```
 
 ## File Locations After Reorganization

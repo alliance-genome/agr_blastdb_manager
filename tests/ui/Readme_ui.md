@@ -107,18 +107,18 @@ uv run python tests/ui/test_ui.py --mod SGD --type fungal --molecule prot --numb
 uv run python tests/ui/test_ui.py --mod WB --type nematode --config custom_config.json
 ```
 
-### Poetry Scripts
+### Entry point
 
-Add these convenient scripts to your `pyproject.toml`:
+Declare a script in `pyproject.toml`:
 
 ```toml
-[tool.poetry.scripts]
+[project.scripts]
 test-ui = "test_ui:run_blast_tests"
 ```
 
 Then run tests using:
 ```bash
-poetry run test-ui --mod SGD --type fungal
+uv run test-ui --mod SGD --type fungal
 ```
 
 ## Test Output
@@ -218,7 +218,7 @@ uv run pytest tests/ui/test_ui_flow.py
 ├── test_ui.py
 ├── config.json
 ├── pyproject.toml
-├── poetry.lock
+├── uv.lock
 ├── README.md
 └── output/
     └── <MOD>/

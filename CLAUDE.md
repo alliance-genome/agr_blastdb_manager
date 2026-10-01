@@ -15,7 +15,7 @@ AGR BLAST Database Manager - A Python-based pipeline for automating the aggregat
 - `make docker-run-help` - Run container with help output
 
 ### Native Development
-- `uv sync` or `poetry install` - Install Python dependencies (project uses uv as primary package manager)
+- `uv sync --locked --extra dev` - Install Python dependencies (uv is the only supported package manager)
 - `uv run python src/create_blast_db.py --help` - Main script help
 - `black agr_blastdb_manager scripts` - Format code
 - `make format` - Alternative formatting command
@@ -251,7 +251,7 @@ Create a `.env` file in `src/` directory (see `src/.env.example` for template):
 
 ## Important Notes
 
-- Always use Python 3.10+ with **uv** as primary package manager (poetry also supported)
+- Always use Python 3.10+ with **uv**. Poetry is not supported: this project has no `[tool.poetry]` section.
 - Docker is the recommended deployment method
 - The system requires external tools: makeblastdb, gunzip, wget, jq
 - FASTA files can be large - cleanup is enabled by default but configurable with `-cl/--cleanup`
@@ -333,7 +333,7 @@ uv run python src/create_blast_db.py -g conf/global.yaml -e prod --validate -u -
 ### Dependencies
 
 - Python 3.10+
-- uv (primary) or Poetry for dependency management
+- uv for dependency management
 - NCBI BLAST+ tools (makeblastdb)
 - Docker for containerized execution
 - AWS CLI/boto3 for S3 operations
