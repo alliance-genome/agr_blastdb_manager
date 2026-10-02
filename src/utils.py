@@ -657,6 +657,14 @@ def index_entries(entries, aliases=None, display=None) -> dict:
     for accession, text in entries:
         if not accession:
             continue
+        # A caller may hand over a raw FASTA line. Normalise the '>' away here,
+        # at the one point both index paths share, because the ZFIN pattern in
+        # MOD_SYMBOL_RES is \A-anchored -- a ZFIN defline leads with its symbol
+        # -- so a stray '>' silently costs that MOD every gene symbol. That
+        # really happened: build_name_index passed the raw line and the
+        # backfill did not, so the two paths produced different indexes for the
+        # same database.
+        text = text[1:] if text.startswith(">") else text
         put(accession, accession)
 
         if aliases:
@@ -766,7 +774,18 @@ def build_name_index(
                     # ">ACCESSION [gene=X] [locus_tag=Y] ..."
                     parts = line[1:].split(None, 1)
                     if parts:
-                        yield parts[0], line
+                        # The '>' is stripped, and that matters. The ZFIN entry
+                        # in MOD_SYMBOL_RES is anchored with \A, because a ZFIN
+                        # defline LEADS with its symbol ("itsn1|OTTDARP...").
+                        # While this yielded the raw line that anchor could
+                        # never match, so a ZFIN rebuild wrote an
+                        # accession-only index -- while the backfill script,
+                        # which reads deflines back out of the built database
+                        # and so never has a '>', indexed the symbols fine.
+                        # Both paths share index_entries exactly so that a
+                        # backfilled index and a freshly built one cannot
+                        # disagree; this is what made them disagree.
+                        yield parts[0], line[1:]
 
     display: dict[str, str] = {}
     try:

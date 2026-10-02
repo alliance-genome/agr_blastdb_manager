@@ -408,3 +408,42 @@ def test_a_rebuild_removes_a_stale_companion_file(tmp_path):
     build_name_index(str(fasta), str(tmp_path / "somedb"))
 
     assert not stale.exists()
+
+
+# --- the two index paths must agree ------------------------------------------
+
+ZFIN_STYLE = "itsn1|OTTDARP00000003617 BUSM1-173A8.1-002 cdna:known chromosome"
+
+
+def test_build_and_backfill_derive_the_same_names(tmp_path):
+    """
+    build_name_index reads a FASTA; the backfill reads deflines back out of a
+    built database. They share index_entries so the two cannot disagree -- but
+    only if they hand it the same text.
+
+    They did not. build_name_index passed the raw FASTA line, '>' included,
+    and the ZFIN pattern is anchored with \\A because a ZFIN defline leads with
+    its symbol. So a ZFIN rebuild silently produced an accession-only index
+    while the backfill produced a correct one.
+    """
+    fasta = tmp_path / "zfin.fa"
+    fasta.write_text(f">{ZFIN_STYLE}\nATGGATTCT\n")
+
+    build_name_index(str(fasta), str(tmp_path / "zfindb"))
+    built = json.loads((tmp_path / "zfindb.names.json").read_text())
+
+    # What the backfill feeds it: accession and defline, no '>'.
+    accession = ZFIN_STYLE.split()[0]
+    backfilled = index_entries([(accession, ZFIN_STYLE)])
+
+    assert built == backfilled
+    assert built["itsn1"] == accession
+
+
+def test_the_leading_angle_bracket_does_not_change_the_index():
+    """The property the test above protects, stated directly."""
+    for defline in (ZFIN_STYLE, FB_STYLE[1:], SGD_STYLE[1:], NCBI_STYLE[1:]):
+        accession = defline.split()[0]
+        assert index_entries([(accession, defline)]) == index_entries(
+            [(accession, ">" + defline)]
+        ), f"the '>' changed the index for {accession}"
