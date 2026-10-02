@@ -490,6 +490,10 @@ MOD_SYMBOL_RES = (
 # Suffix of the index file written next to each BLAST database.
 NAME_INDEX_SUFFIX = ".names.json"
 
+# Suffix of the companion file holding the spelling each name is written with,
+# for the keys where it differs from the lower-cased key. See index_entries().
+NAME_DISPLAY_SUFFIX = ".names.display.json"
+
 
 # The gene a record belongs to, where the defline names one. FlyBase writes
 # "parent=FBgn0003996"; this is the join to any external table of gene names.
@@ -615,7 +619,7 @@ def gene_aliases(mod_code: str, environment: str, logger=None) -> dict:
     return _GENE_ALIAS_CACHE[key]
 
 
-def index_entries(entries, aliases=None) -> dict:
+def index_entries(entries, aliases=None, display=None) -> dict:
     """
     Build a lower-cased name -> accession map from (accession, defline) pairs.
 
@@ -627,12 +631,33 @@ def index_entries(entries, aliases=None) -> dict:
     "white" appears nowhere in its databases -- so a curator typing the gene's
     actual name finds nothing. Passing {"FBgn0003996": ["white", "mini-white",
     ...]} makes those searchable without touching the FASTA.
+
+    `display` is an optional dict that collects the spelling each name is
+    actually written with, for the keys where that differs from the key itself.
+    Keys are lower-cased so a lookup can be case-insensitive, which left the
+    search box showing "dll" for Dll and "cg2759" for CG2759. Passing a dict
+    here captures what was lost; passing nothing keeps the old behaviour and
+    costs nothing. It is deliberately a second dict rather than a richer value
+    in the index: the index is read in full on every gene search -- 928 MB of
+    it on FlyBase -- so it must not grow, and keeping its shape means older
+    deployments go on reading it unchanged.
     """
     index: dict[str, str] = {}
+
+    def put(name: str, accession: str) -> None:
+        # First name wins, matching the scan this replaced -- so the spelling
+        # recorded has to be the one that won, not whichever came last.
+        key = name.lower()
+        if not key or key in index:
+            return
+        index[key] = accession
+        if display is not None and name != key:
+            display[key] = name
+
     for accession, text in entries:
         if not accession:
             continue
-        index.setdefault(accession.lower(), accession)
+        put(accession, accession)
 
         if aliases:
             parent = PARENT_GENE_RE.search(text)
@@ -640,18 +665,18 @@ def index_entries(entries, aliases=None) -> dict:
                 for alias in aliases.get(parent.group(1), ()):
                     alias = alias.strip()
                     if alias:
-                        index.setdefault(alias.lower(), accession)
+                        put(alias, accession)
         for _tag, value in GENE_NAME_TAG_RE.findall(text):
-            index.setdefault(value.strip().lower(), accession)
+            put(value.strip(), accession)
         for pattern in MOD_SYMBOL_RES:
             match = pattern.search(text)
             if match:
                 value = match.group(1).strip()
                 if value:
-                    index.setdefault(value.lower(), accession)
+                    put(value, accession)
         symbol = sgd_symbol(text)
         if symbol:
-            index.setdefault(symbol.lower(), accession)
+            put(symbol, accession)
     return index
 
 
@@ -675,6 +700,31 @@ def sgd_symbol(defline: str) -> Optional[str]:
         if token.startswith("SGDID:") and i > 0:
             return tokens[i - 1]
     return None
+
+
+def write_display_names(display: dict, db_path: str, logger=None) -> int:
+    """
+    Write the companion file holding each name's own spelling, or remove it.
+
+    Removing matters on a rebuild: a stale file from a previous build would go
+    on labelling names the current index no longer holds. Returns how many
+    spellings were written.
+    """
+    path = Path(f"{db_path}{NAME_DISPLAY_SUFFIX}")
+    try:
+        if not display:
+            path.unlink(missing_ok=True)
+            return 0
+        with open(path, "w") as fh:
+            json.dump(display, fh, separators=(",", ":"), sort_keys=True)
+    except OSError as e:
+        if logger:
+            logger.warning(f"Could not write display names {path}: {e}")
+        return 0
+
+    if logger:
+        logger.info(f"Wrote {len(display)} name spellings to {path}")
+    return len(display)
 
 
 def build_name_index(
@@ -718,8 +768,9 @@ def build_name_index(
                     if parts:
                         yield parts[0], line
 
+    display: dict[str, str] = {}
     try:
-        index = index_entries(deflines(), aliases)
+        index = index_entries(deflines(), aliases, display)
     except OSError as e:
         if logger:
             logger.warning(f"Could not read {fasta_file} to build name index: {e}")
@@ -733,6 +784,12 @@ def build_name_index(
         if logger:
             logger.warning(f"Could not write name index {index_path}: {e}")
         return 0
+
+    # Written separately, and only when there is something to say: a database
+    # whose names are all lower case gets no file, and the server falls back to
+    # the key, which is the same spelling. Failing to write it loses only the
+    # capitalisation in the search box, so it must not fail the index.
+    write_display_names(display, db_path, logger)
 
     if logger:
         logger.info(f"Wrote name index with {len(index)} names to {index_path}")
