@@ -36,6 +36,7 @@ from terminal import (
 from utils import (
     log_safe_filename,
     build_name_index,
+    gene_aliases,
     cleanup_fasta_files,
     copy_config_file,
     copy_config_to_production,
@@ -251,7 +252,9 @@ def deduplicate_fasta(fasta_path: str, seqtype: str, logger) -> Optional[Dict]:
     }
 
 
-def run_makeblastdb(config_entry: Dict, output_dir: str, logger, mod_code: str) -> bool:
+def run_makeblastdb(
+    config_entry: Dict, output_dir: str, logger, mod_code: str, environment: str = ""
+) -> bool:
     """
     Runs the makeblastdb command to create a BLAST database.
     """
@@ -352,8 +355,18 @@ def run_makeblastdb(config_entry: Dict, output_dir: str, logger, mod_code: str) 
 
         # Index gene names before the FASTA is removed below, so SequenceServer
         # can resolve ?name= deep links without scanning every database.
+        #
+        # The alias table is fetched once per run and goes in alongside, so a
+        # rebuild keeps the full gene names searchable. Without it the index
+        # holds symbols only, which is the state curators reported: searching
+        # FlyBase for "white" found nothing, because only "w" is in the defline.
         db_path = f"{output_dir}/{fasta_file.replace(extensions, 'db')}"
-        indexed = build_name_index(unzipped_fasta, db_path, logger)
+        indexed = build_name_index(
+            unzipped_fasta,
+            db_path,
+            logger,
+            gene_aliases(mod_code, environment, logger),
+        )
         if indexed:
             print_status(f"Indexed {indexed} gene names", "success")
 
@@ -614,7 +627,9 @@ def process_entry(
                     return False
 
             # Run makeblastdb
-            if not run_makeblastdb(entry, output_dir, logger, mod_code):
+            if not run_makeblastdb(
+                entry, output_dir, logger, mod_code, environment
+            ):
                 error_msg = "Database creation failed"
                 log_error(error_msg)
                 FAILURE_DETAILS.append(

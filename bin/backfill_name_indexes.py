@@ -18,6 +18,18 @@ Usage:
     bin/backfill_name_indexes.py /var/sequenceserver-data/blast
     bin/backfill_name_indexes.py /var/sequenceserver-data/blast --dry-run
     bin/backfill_name_indexes.py /var/sequenceserver-data/blast --mod FB
+
+Deflines carry a gene's symbol and nothing else, so a curator searching
+FlyBase for "white" finds nothing -- only "w" is in the file. Pass FlyBase's
+synonym table to index the full names too:
+
+    curl -O https://s3ftp.flybase.org/releases/current/precomputed_files/\
+synonyms/fb_synonym_fb_2026_03.tsv.gz
+    bin/backfill_name_indexes.py /var/sequenceserver-data/blast --mod FB \
+        --aliases fb_synonym_fb_2026_03.tsv.gz --force
+
+The build path does this on its own now (see gene_aliases() in utils.py), so
+this flag is for indexes built before that, which is all of them today.
 """
 
 from __future__ import annotations
@@ -31,7 +43,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from utils import NAME_INDEX_SUFFIX, index_entries  # noqa: E402
+from utils import (  # noqa: E402
+    NAME_INDEX_SUFFIX,
+    flybase_aliases,
+    index_entries,
+)
 
 
 def databases(root: Path, mod: str | None):
@@ -84,11 +100,25 @@ def main() -> int:
     ap.add_argument("--blastdbcmd", default="blastdbcmd")
     ap.add_argument("--dry-run", action="store_true", help="report what would be written")
     ap.add_argument("--force", action="store_true", help="rewrite indexes that already exist")
+    ap.add_argument(
+        "--aliases",
+        type=Path,
+        help="FlyBase fb_synonym_*.tsv.gz, to make full gene names searchable "
+        "alongside the symbols the deflines carry",
+    )
     args = ap.parse_args()
 
     if not args.root.is_dir():
         print(f"not a directory: {args.root}", file=sys.stderr)
         return 2
+
+    aliases = None
+    if args.aliases:
+        if not args.aliases.exists():
+            print(f"no such alias file: {args.aliases}", file=sys.stderr)
+            return 2
+        aliases = flybase_aliases(args.aliases)
+        print(f"  loaded names for {len(aliases):,} genes from {args.aliases.name}")
 
     written = skipped = empty = failed = 0
     names_total = 0
@@ -101,7 +131,7 @@ def main() -> int:
             continue
 
         try:
-            index = index_entries(deflines(db, args.blastdbcmd))
+            index = index_entries(deflines(db, args.blastdbcmd), aliases)
         except OSError as e:
             print(f"  FAILED {db}: {e}", file=sys.stderr)
             failed += 1

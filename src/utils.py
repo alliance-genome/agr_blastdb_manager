@@ -491,18 +491,156 @@ MOD_SYMBOL_RES = (
 NAME_INDEX_SUFFIX = ".names.json"
 
 
-def index_entries(entries) -> dict:
+# The gene a record belongs to, where the defline names one. FlyBase writes
+# "parent=FBgn0003996"; this is the join to any external table of gene names.
+PARENT_GENE_RE = re.compile(r"\bparent=([^;\s,]+)")
+
+# Where a MOD publishes a table of every name it knows a gene by.
+#
+# Only FlyBase so far, and only because they publish one. The deflines carry a
+# single symbol -- FlyBase writes "name=w-RA", so the string "white" appears
+# nowhere in any of their databases -- and a curator searching for a gene types
+# its name far more often than its symbol. This is the table that closes that
+# gap; see gene_aliases() for how the release is derived.
+GENE_ALIAS_SOURCES = {
+    "FB": (
+        "https://s3ftp.flybase.org/releases/current/precomputed_files/"
+        "synonyms/fb_synonym_{release}.tsv.gz"
+    ),
+}
+
+# Parsed alias tables, keyed by (mod_code, environment). FlyBase's table is a
+# million rows and a FlyBase build writes 1,560 indexes, so parsing it per
+# database would dominate the build; parse it once per run.
+_GENE_ALIAS_CACHE: dict[tuple, dict] = {}
+
+
+def flybase_aliases(path) -> dict:
+    """
+    Gene id -> every name FlyBase knows it by, from their synonym table.
+
+    `fb_synonym_fb_<release>.tsv.gz` is published under
+    releases/current/precomputed_files/synonyms/ and is tab-separated:
+
+        primary_FBid  organism  current_symbol  current_fullname \
+            fullname_synonym(s)  symbol_synonym(s)
+
+    so FBgn0003996 carries "w", "white", "mini-white", "CG2759" and the rest.
+
+    Takes the file gzipped or plain. Rows for other species are kept: a FlyBase
+    deployment carries more than D. melanogaster, and because the join is by
+    gene id a name can only ever reach its own gene's records.
+
+    Note that a handful of symbols carry FlyBase's SGML entities for greek
+    letters -- "14-3-3&epsilon;", "&ggr;-tubulin". They are left as published:
+    15 of 131,148 names on the transcript set, and prefix search reaches all but
+    the three that lead with one.
+    """
+    import csv
+    import gzip
+
+    opener = gzip.open if str(path).endswith(".gz") else open
+    aliases: dict[str, list] = {}
+    with opener(path, "rt", encoding="utf-8", errors="replace") as handle:
+        for row in csv.reader(handle, delimiter="\t"):
+            if not row or row[0].startswith("#") or len(row) < 4:
+                continue
+            gene_id = row[0].strip()
+            if not gene_id:
+                continue
+            names = []
+            for column in row[2:6]:
+                # Synonym columns are pipe-separated; symbol and fullname are not.
+                names.extend(part for part in column.split("|") if part)
+            if names:
+                aliases.setdefault(gene_id, []).extend(names)
+    return aliases
+
+
+def gene_aliases(mod_code: str, environment: str, logger=None) -> dict:
+    """
+    The alias table for a MOD's release, downloading it once if need be.
+
+    `environment` is the release the build is for, e.g. "FB2026_03", which is
+    also how the published filename is spelled -- fb_synonym_fb_2026_03.tsv.gz.
+    Deriving it rather than taking a path means a rebuild picks the names up on
+    its own; without that, a rebuilt FlyBase database would quietly lose every
+    full gene name and the search box would regress to symbols only, which is
+    the state curators reported as broken.
+
+    Returns {} for a MOD that publishes no such table, and on any failure --
+    with a warning, because the build must not fail over a search convenience.
+    """
+    key = (mod_code, environment)
+    if key in _GENE_ALIAS_CACHE:
+        return _GENE_ALIAS_CACHE[key]
+
+    _GENE_ALIAS_CACHE[key] = {}
+    template = GENE_ALIAS_SOURCES.get((mod_code or "").upper())
+    if not template:
+        return _GENE_ALIAS_CACHE[key]
+
+    # FB2026_03 -> fb_2026_03
+    match = re.fullmatch(r"([A-Za-z]+)(\d{4}_\d+)", environment or "")
+    if not match:
+        if logger:
+            logger.warning(
+                f"Cannot derive a {mod_code} alias-table release from "
+                f"environment {environment!r}; gene names will not be indexed"
+            )
+        return _GENE_ALIAS_CACHE[key]
+
+    url = template.format(release=f"{match.group(1).lower()}_{match.group(2)}")
+    cache = Path("../data") / Path(url).name
+    try:
+        if not cache.exists():
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            if logger:
+                logger.info(f"Fetching gene alias table {url}")
+            import urllib.request
+
+            with urllib.request.urlopen(url, timeout=300) as response:
+                cache.write_bytes(response.read())
+        _GENE_ALIAS_CACHE[key] = flybase_aliases(cache)
+        if logger:
+            logger.info(
+                f"Loaded names for {len(_GENE_ALIAS_CACHE[key]):,} genes "
+                f"from {cache.name}"
+            )
+    except Exception as e:  # network, gzip, CSV -- none of it is fatal
+        if logger:
+            logger.warning(f"Could not load gene aliases from {url}: {e}")
+        _GENE_ALIAS_CACHE[key] = {}
+
+    return _GENE_ALIAS_CACHE[key]
+
+
+def index_entries(entries, aliases=None) -> dict:
     """
     Build a lower-cased name -> accession map from (accession, defline) pairs.
 
     Shared by build_name_index and by any tool backfilling indexes for databases
     whose source FASTA is already gone, so both derive names the same way.
+
+    `aliases` optionally maps a gene id to further names for it. Deflines carry
+    the symbol and nothing else -- FlyBase writes "name=w-RA", and the string
+    "white" appears nowhere in its databases -- so a curator typing the gene's
+    actual name finds nothing. Passing {"FBgn0003996": ["white", "mini-white",
+    ...]} makes those searchable without touching the FASTA.
     """
     index: dict[str, str] = {}
     for accession, text in entries:
         if not accession:
             continue
         index.setdefault(accession.lower(), accession)
+
+        if aliases:
+            parent = PARENT_GENE_RE.search(text)
+            if parent:
+                for alias in aliases.get(parent.group(1), ()):
+                    alias = alias.strip()
+                    if alias:
+                        index.setdefault(alias.lower(), accession)
         for _tag, value in GENE_NAME_TAG_RE.findall(text):
             index.setdefault(value.strip().lower(), accession)
         for pattern in MOD_SYMBOL_RES:
@@ -539,7 +677,9 @@ def sgd_symbol(defline: str) -> Optional[str]:
     return None
 
 
-def build_name_index(fasta_file: str, db_path: str, logger=None) -> int:
+def build_name_index(
+    fasta_file: str, db_path: str, logger=None, aliases=None
+) -> int:
     """
     Write a gene-name -> accession index next to a BLAST database.
 
@@ -555,6 +695,9 @@ def build_name_index(fasta_file: str, db_path: str, logger=None) -> int:
         (SGD's fungal set, where the accession is an opaque RefSeq CDS id);
       - the accession itself, used by SGD's main set among others, where the
         defline is just ">YAL069W ..." and the systematic name IS the accession.
+      - any further names in `aliases`, joined to the record by the gene id its
+        defline names. Deflines carry one symbol and no full name, so this is
+        what makes "white" find FBgn0003996; see gene_aliases().
 
     Names are stored lower-cased so lookups can be case-insensitive. Where two
     deflines claim the same name the first wins, matching the scan it replaces.
@@ -576,7 +719,7 @@ def build_name_index(fasta_file: str, db_path: str, logger=None) -> int:
                         yield parts[0], line
 
     try:
-        index = index_entries(deflines())
+        index = index_entries(deflines(), aliases)
     except OSError as e:
         if logger:
             logger.warning(f"Could not read {fasta_file} to build name index: {e}")
