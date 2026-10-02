@@ -310,3 +310,101 @@ def test_gene_aliases_warns_on_an_unparseable_release(monkeypatch, tmp_path):
     )
     assert utils.gene_aliases("FB", "latest", Logger()) == {}
     assert any("latest" in w for w in warnings)
+
+
+# --- display spellings -------------------------------------------------------
+#
+# Index keys are lower-cased so a lookup can be case-insensitive. That is right
+# for lookups and wrong for display: the search box listed FlyBase's Dll as
+# "dll" and CG2759 as "cg2759". The spellings are collected alongside, into a
+# companion file, so the index itself keeps both its shape and its size -- it
+# is read in full on every gene search, 928 MB of it on FlyBase.
+
+
+def test_display_records_the_spelling_that_was_indexed():
+    display = {}
+    index = index_entries([("FBpp0070468", FB_STYLE)], None, display)
+
+    # The lookup key is unchanged...
+    assert index["w"] == "FBpp0070468"
+    # ...and the accession's own capitalisation is recoverable.
+    assert display["fbpp0070468"] == "FBpp0070468"
+
+
+def test_display_omits_names_that_are_already_lower_case():
+    """It only has to carry the difference. "w" is spelt "w"."""
+    display = {}
+    index_entries([("FBpp0070468", FB_STYLE)], None, display)
+    assert "w" not in display
+
+
+def test_display_covers_aliases_too(tmp_path):
+    """The aliases are where most of the capitalisation is: CG numbers and
+    capitalised full names came in with FlyBase's synonym table."""
+    display = {}
+    index_entries(
+        [("FBpp0070468", FB_STYLE)],
+        flybase_aliases(_synonym_file(tmp_path)),
+        display,
+    )
+    assert display["cg2759"] == "CG2759"
+    assert display["dmwhite"] == "DMWHITE"
+
+    # FlyBase lists this gene's name as "white" and also carries "White" as a
+    # synonym. The spelling kept is the one that reached the index first, which
+    # is the current name -- so there is no entry at all, the key being the
+    # spelling. The box therefore shows "white", not "White".
+    assert "white" not in display
+
+
+def test_display_agrees_with_the_name_that_won():
+    """First name wins in the index, so the spelling kept must be that one --
+    not whichever came last."""
+    first = ">A1 type=polypeptide; name=Abc-PA; parent=FBgn1;"
+    second = ">A2 type=polypeptide; name=ABC-PA; parent=FBgn2;"
+    display = {}
+    index = index_entries([("A1", first), ("A2", second)], None, display)
+
+    assert index["abc"] == "A1"
+    assert display["abc"] == "Abc"
+
+
+def test_display_is_optional_and_changes_nothing():
+    """Passing no dict has to leave the index byte-identical, so that a caller
+    that does not want spellings pays nothing."""
+    assert index_entries([("FBpp0070468", FB_STYLE)]) == index_entries(
+        [("FBpp0070468", FB_STYLE)], None, {}
+    )
+
+
+def test_build_writes_the_companion_file(tmp_path):
+    fasta = tmp_path / "in.fa"
+    fasta.write_text(f"{FB_STYLE}\nMGSTKA\n")
+
+    build_name_index(str(fasta), str(tmp_path / "somedb"))
+
+    written = tmp_path / "somedb.names.display.json"
+    assert written.exists()
+    assert json.loads(written.read_text())["fbpp0070468"] == "FBpp0070468"
+
+
+def test_build_writes_no_companion_file_when_every_name_is_lower_case(tmp_path):
+    """No file means "the key is the spelling", which is true and costs a read
+    rather than a parse."""
+    fasta = tmp_path / "in.fa"
+    fasta.write_text(">yfl039c act1 SGDID:S000001855, Chr VI\nATGTCT\n")
+
+    build_name_index(str(fasta), str(tmp_path / "somedb"))
+    assert not (tmp_path / "somedb.names.display.json").exists()
+
+
+def test_a_rebuild_removes_a_stale_companion_file(tmp_path):
+    """Otherwise it would go on labelling names the new index no longer holds."""
+    stale = tmp_path / "somedb.names.display.json"
+    stale.write_text('{"gone":"GONE"}')
+
+    fasta = tmp_path / "in.fa"
+    fasta.write_text(">yfl039c act1 SGDID:S000001855, Chr VI\nATGTCT\n")
+    build_name_index(str(fasta), str(tmp_path / "somedb"))
+
+    assert not stale.exists()

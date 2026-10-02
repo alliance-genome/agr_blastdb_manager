@@ -30,6 +30,14 @@ synonyms/fb_synonym_fb_2026_03.tsv.gz
 
 The build path does this on its own now (see gene_aliases() in utils.py), so
 this flag is for indexes built before that, which is all of them today.
+
+Index keys are lower-cased so a lookup can be case-insensitive, which left the
+search box showing "dll" for Dll and "cg2759" for CG2759. The spellings go in a
+companion file; --display-only writes just that and leaves .names.json alone,
+which is what to use on a live deployment:
+
+    bin/backfill_name_indexes.py /var/sequenceserver-data/blast --mod FB \
+        --aliases fb_synonym_fb_2026_03.tsv.gz --display-only
 """
 
 from __future__ import annotations
@@ -44,9 +52,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from utils import (  # noqa: E402
+    NAME_DISPLAY_SUFFIX,
     NAME_INDEX_SUFFIX,
     flybase_aliases,
     index_entries,
+    write_display_names,
 )
 
 
@@ -93,6 +103,22 @@ def deflines(db: Path, blastdbcmd: str):
         proc.wait()
 
 
+class Printer:
+    """
+    Minimal logger so write_display_names can report a failed write.
+
+    Without one it swallows the error and returns 0, which is indistinguishable
+    from "this database had no spellings to record" -- and that is exactly the
+    answer a missing file gives, so the failure would be invisible.
+    """
+
+    def warning(self, message):
+        print(f"  WARNING {message}", file=sys.stderr)
+
+    def info(self, message):
+        pass
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("root", type=Path, help="e.g. /var/sequenceserver-data/blast")
@@ -105,6 +131,12 @@ def main() -> int:
         type=Path,
         help="FlyBase fb_synonym_*.tsv.gz, to make full gene names searchable "
         "alongside the symbols the deflines carry",
+    )
+    ap.add_argument(
+        "--display-only",
+        action="store_true",
+        help="write only the companion spelling file, leaving .names.json "
+        "untouched -- the safe way to add capitalisation to a live deployment",
     )
     args = ap.parse_args()
 
@@ -126,12 +158,19 @@ def main() -> int:
 
     for db in sorted(databases(args.root, args.mod)):
         index_path = Path(f"{db}{NAME_INDEX_SUFFIX}")
-        if index_path.exists() and not args.force:
+        if args.display_only:
+            # The inverse of the usual skip: a database with no index has no
+            # names to label, and this mode must not create one.
+            if not index_path.exists():
+                skipped += 1
+                continue
+        elif index_path.exists() and not args.force:
             skipped += 1
             continue
 
+        display: dict = {}
         try:
-            index = index_entries(deflines(db, args.blastdbcmd), aliases)
+            index = index_entries(deflines(db, args.blastdbcmd), aliases, display)
         except OSError as e:
             print(f"  FAILED {db}: {e}", file=sys.stderr)
             failed += 1
@@ -143,6 +182,15 @@ def main() -> int:
             # writing none: the lookup treats an index as authoritative for its
             # database and would stop scanning.
             empty += 1
+            continue
+
+        if args.display_only:
+            names_total += len(display)
+            if args.dry_run:
+                print(f"  would write {len(display):>7} spellings  {db}{NAME_DISPLAY_SUFFIX}")
+            else:
+                write_display_names(display, str(db), Printer())
+            written += 1
             continue
 
         names_total += len(index)
@@ -160,13 +208,16 @@ def main() -> int:
             print(f"  FAILED writing {index_path}: {e}", file=sys.stderr)
             failed += 1
             continue
+        write_display_names(display, str(db), Printer())
         written += 1
 
     elapsed = time.monotonic() - started
     verb = "would write" if args.dry_run else "wrote"
+    what = "spelling file(s)" if args.display_only else "index(es)"
+    unit = "spellings" if args.display_only else "names"
     print(
-        f"\n{verb} {written} index(es), {names_total:,} names; "
-        f"{skipped} already had one, {empty} had no names to index, {failed} failed "
+        f"\n{verb} {written} {what}, {names_total:,} {unit}; "
+        f"{skipped} skipped, {empty} had no names to index, {failed} failed "
         f"({elapsed:.1f}s)"
     )
     return 1 if failed else 0
