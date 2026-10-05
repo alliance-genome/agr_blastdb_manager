@@ -445,7 +445,7 @@ def process_files(
     cleanup: bool = False,
     limit_dbs: Optional[int] = None,
     skip_md5_check: bool = False,
-) -> None:
+) -> int:
     """
     Process configuration files with enhanced logging.
     """
@@ -453,6 +453,11 @@ def process_files(
     LOGGER.info(
         f"Parameters: check_only={check_only}, store_files={store_files}, cleanup={cleanup}, skip_md5_check={skip_md5_check}"
     )
+
+    # Summed across every MOD/environment a YAML run covers, and returned, so
+    # that create_dbs can exit non-zero. This used to return None and discard
+    # both results.
+    failed = 0
 
     try:
         if config_yaml:
@@ -472,7 +477,7 @@ def process_files(
 
                     if json_file.exists():
                         LOGGER.info(f"Found JSON file: {json_file}")
-                        process_json_entries(
+                        failed += process_json_entries(
                             str(json_file),
                             env,
                             provider["name"],
@@ -493,13 +498,15 @@ def process_files(
 
         elif input_json:
             LOGGER.info(f"Processing single JSON file: {input_json}")
-            process_json_entries(
+            failed += process_json_entries(
                 input_json, environment, None, db_list, check_only, store_files, cleanup, limit_dbs, skip_md5_check
             )
 
     except Exception as e:
         LOGGER.error(f"Failed to process configuration files: {str(e)}", exc_info=True)
         raise
+
+    return failed
 
 
 def process_entry(
@@ -726,9 +733,17 @@ def process_json_entries(
     cleanup: bool = True,
     limit_dbs: Optional[int] = None,
     skip_md5_check: bool = False,
-) -> bool:
+) -> int:
     """
     Process entries from a JSON configuration file with enhanced progress display.
+
+    Returns the number of entries that FAILED, so a caller can set an exit code.
+    This used to return `successful > 0`, which is true of a run where one
+    database out of two hundred built -- and both call sites discarded it
+    anyway, so `create_dbs` announced "PIPELINE COMPLETED SUCCESSFULLY" and
+    exited 0 no matter how much had failed. A pipeline that cannot report
+    failure through its exit status cannot be run from cron or CI, and every
+    other hazard in this file is one a green run hides.
     """
     print_header("Processing JSON Entries")
     start_time = datetime.now()
@@ -746,7 +761,9 @@ def process_json_entries(
         mod_code = mod if mod is not None else get_mod_from_json(json_file)
         if not mod_code:
             log_error("Invalid or missing MOD code")
-            return False
+            # Nothing was attempted, but the caller asked for this config and
+            # did not get it, so this is a failure rather than a no-op.
+            return 1
 
         print_status(f"Using MOD code: {mod_code}", "info")
 
@@ -764,6 +781,11 @@ def process_json_entries(
         total_entries = len(entries)
         processed = 0
         successful = 0
+        # Counted rather than derived. `processed - successful` treated an entry
+        # skipped by --db-list as a failure, because `processed` is incremented
+        # before the skip, so a narrow run reported failures it had not had.
+        failed = 0
+        skipped = 0
 
         print_status(f"Found {total_entries} entries to process", "info")
 
@@ -774,6 +796,7 @@ def process_json_entries(
 
             if db_list and entry_name not in db_list:
                 log_warning(f"Skipping {entry_name} (not in requested list)")
+                skipped += 1
                 continue
 
             try:
@@ -781,8 +804,21 @@ def process_json_entries(
                     successful += 1
                     print_progress_line(processed, total_entries, entry_name, "success")
                 else:
+                    failed += 1
                     print_progress_line(processed, total_entries, entry_name, "error")
             except Exception as e:
+                failed += 1
+                # process_entry records its own failures in FAILURE_DETAILS, but
+                # an exception escaping it does not reach any of those sites, so
+                # record it here or it vanishes from the summary.
+                FAILURE_DETAILS.append(
+                    {
+                        "entry": entry_name,
+                        "error": str(e),
+                        "stage": "process_entry",
+                        "uri": entry.get("uri", "unknown"),
+                    }
+                )
                 log_error(f"Failed to process entry {entry_name}", e)
                 print_progress_line(processed, total_entries, entry_name, "error")
 
@@ -818,7 +854,7 @@ def process_json_entries(
 
         # Show final summary
         duration = datetime.now() - start_time
-        failed_count = processed - successful
+        failed_count = failed
 
         show_summary(
             "JSON Processing",
@@ -827,9 +863,12 @@ def process_json_entries(
                 "Processed": processed,
                 "Successful": successful,
                 "Failed": failed_count,
-                "Success Rate": f"{(successful / total_entries * 100):.1f}%"
-                if total_entries > 0
-                else "0%",
+                "Skipped": skipped,
+                # Of what was attempted. Dividing by total_entries reported a
+                # --db-list run of one database out of two hundred as 0.5%.
+                "Success Rate": f"{(successful / (successful + failed) * 100):.1f}%"
+                if (successful + failed) > 0
+                else "n/a",
                 "Cleanup Performed": str(cleanup and not check_only),
             },
             duration,
@@ -865,18 +904,20 @@ def process_json_entries(
 
         SLACK_MESSAGES.append(
             {
-                "color": "#36a64f" if successful == total_entries else "#ff9900",
+                "color": "#36a64f" if failed == 0 else "#ff9900",
                 "title": "Processing Summary",
                 "text": summary_text,
                 "mrkdwn_in": ["text"],
             }
         )
 
-        return successful > 0
+        return failed
 
     except Exception as e:
         log_error(f"Failed to process JSON file {json_file}", e)
-        return False
+        # The whole config is unaccounted for. Report one failure rather than
+        # zero, so the caller's exit code reflects that nothing was verified.
+        return 1
 
 
 def show_failure_summary() -> None:
@@ -1064,12 +1105,20 @@ def create_dbs(
 
         if len(sys.argv) == 1:
             LOGGER.info("No arguments provided, showing help")
-            click.echo(create_dbs.get_help(ctx=None))
+            # get_help needs a real context; passing None raised
+            # "'NoneType' object has no attribute 'make_formatter'", which the
+            # handler below then reported as PIPELINE FAILED with that message
+            # as the error -- so asking for help looked like a broken build.
+            click.echo(create_dbs.get_help(click.get_current_context()))
             return
+
+        # Bound before the branches: the no-arguments path above returns
+        # without running either, and --validate-only can run neither too.
+        failed = 0
 
         if config_yaml:
             LOGGER.info(f"Processing YAML config: {config_yaml}")
-            process_files(
+            failed = process_files(
                 config_yaml,
                 None,
                 None,
@@ -1082,7 +1131,7 @@ def create_dbs(
             )
         elif input_json:
             LOGGER.info(f"Processing JSON config: {input_json}")
-            process_files(
+            failed = process_files(
                 None,
                 input_json,
                 environment,
@@ -1276,19 +1325,35 @@ def create_dbs(
             s3_sync(Path("../data"), skip_efs_sync)
 
         duration = datetime.now() - start_time
-        LOGGER.info(f"Process completed successfully in {duration}")
 
-        # Print final summary
-        print("\n" + "="*80)
-        print("║" + " "*78 + "║")
-        print("║" + " PIPELINE COMPLETED SUCCESSFULLY ".center(78) + "║")
-        print("║" + " "*78 + "║")
-        print("="*80)
-        print(f"\n✓ Total Duration: {duration}")
-        print(f"✓ Check the log file for details: {LOGGER.handlers[0].baseFilename if LOGGER.handlers else 'blast_db_creation.log'}")
+        # The banner and the exit status both follow the failure count. They
+        # used to be unconditional: a run where every single database failed
+        # still printed "PIPELINE COMPLETED SUCCESSFULLY" and exited 0, which
+        # is why nobody noticed ALLIANCE shipping a partial build in 2024.
+        if failed:
+            LOGGER.error(f"Process completed with {failed} failure(s) in {duration}")
+            print("\n" + "="*80)
+            print("║" + " "*78 + "║")
+            print("║" + f" PIPELINE COMPLETED WITH {failed} FAILURE(S) ".center(78) + "║")
+            print("║" + " "*78 + "║")
+            print("="*80)
+        else:
+            LOGGER.info(f"Process completed successfully in {duration}")
+            print("\n" + "="*80)
+            print("║" + " "*78 + "║")
+            print("║" + " PIPELINE COMPLETED SUCCESSFULLY ".center(78) + "║")
+            print("║" + " "*78 + "║")
+            print("="*80)
+
+        mark = "✗" if failed else "✓"
+        print(f"\n{mark} Total Duration: {duration}")
+        print(f"{mark} Check the log file for details: {LOGGER.handlers[0].baseFilename if LOGGER.handlers else 'blast_db_creation.log'}")
         if not check_parse_seqids:
-            print(f"✓ Databases location: /var/sequenceserver-data/blast/")
+            print(f"{mark} Databases location: /var/sequenceserver-data/blast/")
         print("\n" + "="*80 + "\n")
+
+        if failed:
+            sys.exit(1)
 
     except Exception as e:
         LOGGER.error(f"Process failed: {str(e)}", exc_info=True)
