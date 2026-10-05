@@ -58,6 +58,86 @@ PROCESSED_DATABASES: List[Tuple[str, str]] = []  # Track (MOD, environment) pair
 LOGGER = setup_detailed_logger("create_blast_db", "blast_db_creation.log")
 
 
+def database_stem(uri: str) -> str:
+    """
+    The filename stem makeblastdb writes its files under, for a source URI.
+
+    Note what this does to a name: `extensions` is every dot-separated tail
+    Path.suffixes finds, so it starts at the FIRST dot, and the stem is
+    truncated there --
+
+        GCF_000002035.6_GRCz11_genomic.fna.gz  ->  GCF_000002035db
+        GCF_000002035.6_GRCz11_rna.fna.gz      ->  GCF_000002035db
+        c_elegans.PRJNA13758.WS298.genomic.fa.gz -> c_elegansdb
+
+    -- which is why distinct sources can land on one path. Kept as-is rather
+    than corrected: the stem names the files of every deployed database and the
+    .names.json beside each one, so changing it is a migration, not a fix.
+    Factored out here so that the collision check below and the build itself
+    cannot disagree about where a database goes.
+    """
+    fasta_file = Path(uri).name
+    extensions = "".join(Path(fasta_file).suffixes)
+    return fasta_file.replace(extensions, "db")
+
+
+def database_output_dir(environment: str, mod: str, config_entry: Dict) -> str:
+    """
+    The directory a config entry's database is built into.
+
+    Derived here and nowhere else; create_db_structure creates what this
+    returns, and find_output_path_conflicts predicts it.
+    """
+    sanitized_blast_title = re.sub(r"\W+", "_", config_entry["blast_title"]).strip("_")
+    base = f"../data/blast/{mod}/{environment}/databases"
+
+    # SGD main (non-fungal) uses seqcol_type for top-level organization
+    if "seqcol_type" in config_entry:
+        sanitized_seqcol_type = re.sub(r"\W+", "_", config_entry["seqcol_type"]).strip("_")
+        return f"{base}/{sanitized_seqcol_type}/{sanitized_blast_title}/"
+    # Legacy seqcol field (used by some MODs)
+    if "seqcol" in config_entry:
+        return f"{base}/{config_entry['seqcol']}/{sanitized_blast_title}/"
+    # Default: use genus/species organization
+    return (
+        f"{base}/{config_entry['genus']}/{config_entry['species']}/"
+        f"{sanitized_blast_title.replace(' ', '_')}/"
+    )
+
+
+def find_output_path_conflicts(
+    entries: List[Dict], mod: str, environment: str
+) -> Dict[str, List[Dict]]:
+    """
+    Entries that would build to the same place, keyed by that place.
+
+    Nothing checked this. Two entries resolving to one output path do not
+    error: the second makeblastdb simply overwrites the first, and BOTH are
+    reported as successes, so the run claims to have built a database that is
+    not there. WS285 does it four times -- three C. elegans bioprojects share
+    the blast_title "C. elegans Genome Assembly", and two C. remanei ones do
+    the same -- so ten entries collapse into four databases and six are lost
+    without a word.
+
+    Returns only the paths claimed more than once, so an empty result is the
+    normal case.
+    """
+    by_path: Dict[str, List[Dict]] = {}
+    for entry in entries:
+        uri = entry.get("uri")
+        if not uri or not entry.get("blast_title"):
+            continue
+        try:
+            path = database_output_dir(environment, mod, entry) + database_stem(uri)
+        except KeyError:
+            # Missing genus/species or similar; the entry will fail its own
+            # validation with a better message than this check could give.
+            continue
+        by_path.setdefault(path, []).append(entry)
+
+    return {path: es for path, es in by_path.items() if len(es) > 1}
+
+
 def create_db_structure(
     environment: str, mod: str, config_entry: Dict, logger
 ) -> Tuple[str, str]:
@@ -78,27 +158,8 @@ def create_db_structure(
         f"Starting database structure creation for {config_entry['blast_title']}"
     )
 
-    blast_title = config_entry["blast_title"]
-    sanitized_blast_title = re.sub(r"\W+", "_", blast_title).strip("_")
-
-    # Determine the path based on config
-    # SGD main (non-fungal) uses seqcol_type for top-level organization
-    if "seqcol_type" in config_entry:
-        seqcol_type = config_entry['seqcol_type']
-        sanitized_seqcol_type = re.sub(r"\W+", "_", seqcol_type).strip("_")
-        db_path = f"../data/blast/{mod}/{environment}/databases/{sanitized_seqcol_type}/{sanitized_blast_title}/"
-        logger.info(f"Using seqcol_type path structure: {db_path}")
-    # Legacy seqcol field (used by some MODs)
-    elif "seqcol" in config_entry:
-        db_path = f"../data/blast/{mod}/{environment}/databases/{config_entry['seqcol']}/{sanitized_blast_title}/"
-        logger.info(f"Using seqcol path structure: {db_path}")
-    # Default: use genus/species organization
-    else:
-        db_path = (
-            f"../data/blast/{mod}/{environment}/databases/{config_entry['genus']}/{config_entry['species']}/"
-            f"{sanitized_blast_title.replace(' ', '_')}/"
-        )
-        logger.info(f"Using species path structure: {db_path}")
+    db_path = database_output_dir(environment, mod, config_entry)
+    logger.info(f"Using path structure: {db_path}")
 
     config_path = f"../data/config/{mod}/{environment}"
 
@@ -309,8 +370,7 @@ def run_makeblastdb(
     unzipped_fasta = f"../data/{fasta_file.replace('.gz', '')}"
     # Hoisted above the try so both failure paths can name the files this
     # invocation owns, including a failure before the command is built.
-    extensions = "".join(Path(fasta_file).suffixes)
-    db_stem = fasta_file.replace(extensions, "db")
+    db_stem = database_stem(config_entry["uri"])
 
     logger.info(f"Starting makeblastdb process for {fasta_file}")
     logger.info(f"Configuration: {json.dumps(config_entry, indent=2)}")
@@ -825,6 +885,40 @@ def process_json_entries(
             entries = entries[:limit_dbs]
             print_status(f"Limiting processing to first {limit_dbs} databases", "warning")
             
+        # Refused before anything is downloaded.
+        #
+        # Two entries resolving to one output path do not error: the second
+        # makeblastdb overwrites the first and both are reported as successes,
+        # so the run claims databases it has not got. Checked here rather than
+        # at build time so the answer arrives in a second instead of after
+        # several GB of downloads.
+        #
+        # Every colliding entry is refused, not all-but-one. Which one would
+        # have survived depends on config order, so picking a winner would be
+        # arbitrary, and the config genuinely does not say which database
+        # should be at that path -- that is a question for whoever wrote it.
+        conflicts = find_output_path_conflicts(entries, mod_code, environment)
+        refused = set()
+        for path, colliding in sorted(conflicts.items()):
+            titles = ", ".join(repr(e.get("blast_title")) for e in colliding)
+            sources = ", ".join(Path(e["uri"]).name for e in colliding)
+            log_error(
+                f"{len(colliding)} entries would build to the same path and "
+                f"overwrite each other: {path} (titles: {titles}; sources: "
+                f"{sources}). Give them distinct blast_titles."
+            )
+            for entry in colliding:
+                refused.add(id(entry))
+                FAILURE_DETAILS.append(
+                    {
+                        "entry": entry.get("blast_title", "Unknown"),
+                        "error": f"output path collides with {len(colliding) - 1} "
+                                 f"other entry/entries at {path}",
+                        "stage": "output path check",
+                        "uri": entry.get("uri", "unknown"),
+                    }
+                )
+
         total_entries = len(entries)
         processed = 0
         successful = 0
@@ -844,6 +938,11 @@ def process_json_entries(
             if db_list and entry_name not in db_list:
                 log_warning(f"Skipping {entry_name} (not in requested list)")
                 skipped += 1
+                continue
+
+            if id(entry) in refused:
+                failed += 1
+                print_progress_line(processed, total_entries, entry_name, "error")
                 continue
 
             try:
