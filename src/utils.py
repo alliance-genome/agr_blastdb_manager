@@ -54,6 +54,16 @@ def copy_config_file(json_file: Path, config_dir: Path, logger) -> bool:
         return False
 
 
+# Where a build installs its BLAST databases.
+#
+# Hardcoded until now, which made copy_to_production -- the most destructive
+# function in this repo -- impossible to exercise in a test. Mirrors
+# CONFIG_DEPLOY_ROOT below.
+BLAST_DEPLOY_ROOT = Path(
+    os.environ.get("AGR_BLAST_ROOT", "/var/sequenceserver-data/blast")
+)
+
+
 def copy_to_production(
     source_databases_path: str,
     mod: str,
@@ -67,9 +77,7 @@ def copy_to_production(
     """
     try:
         source_path = Path(source_databases_path)
-        dest_path = Path(
-            f"/var/sequenceserver-data/blast/{mod}/{environment}/databases"
-        )
+        dest_path = BLAST_DEPLOY_ROOT / mod / environment / "databases"
 
         if not source_path.exists():
             logger.error(f"Source databases path does not exist: {source_path}")
@@ -99,9 +107,27 @@ def copy_to_production(
                             f"    - {db_dir.name}/ ({file_count} files, {size_mb:.1f} MB)"
                         )
 
+                # Spelled out per directory, because the previous wording
+                # ("will replace existing directory", of dest_path) described
+                # a wipe of the whole release that no longer happens -- and
+                # which, when it did, gave no hint of how many databases it
+                # would take with it.
                 if dest_path.exists():
+                    source_names = {c.name for c in source_path.iterdir()}
+                    existing = {c.name for c in dest_path.iterdir()}
+                    replaced = sorted(source_names & existing)
+                    added = sorted(source_names - existing)
+                    kept = sorted(existing - source_names)
+                    console.print(f"  Replacing {len(replaced)} existing:")
+                    for name in replaced:
+                        console.print(f"    [yellow]~[/yellow] {name}")
+                    if added:
+                        console.print(f"  Adding {len(added)} new:")
+                        for name in added:
+                            console.print(f"    [green]+[/green] {name}")
                     console.print(
-                        f"  [red]Will replace existing directory:[/red] {dest_path}"
+                        f"  [green]Leaving {len(kept)} already in production "
+                        f"untouched[/green]"
                     )
                 else:
                     console.print(
@@ -114,19 +140,47 @@ def copy_to_production(
             return True
 
         # Create production directory structure
-        dest_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Copy database directory structure
         import shutil
 
-        # Remove existing databases directory if it exists
-        if dest_path.exists():
-            shutil.rmtree(dest_path)
-            logger.info(f"Removed existing databases directory: {dest_path}")
+        dest_path.mkdir(parents=True, exist_ok=True)
 
-        # Copy the entire databases directory
-        shutil.copytree(source_path, dest_path)
-        logger.info(f"Copied databases from {source_path} to {dest_path}")
+        # Replaced one database directory at a time, NOT by wiping dest_path
+        # first.
+        #
+        # The staging tree holds only what this run built. It used to
+        # rmtree(dest_path) and copytree the staging tree back, so a run that
+        # built one database -- `-d "D. melanogaster Transcripts 6.69"`, or any
+        # run where most entries failed -- deleted every other database of that
+        # MOD and release from production and restored only its own. On
+        # FB2026_03 that is 199 databases removed to install one, with no
+        # atomicity and nothing to roll back to.
+        #
+        # A database directory is the unit the build produces, so replacing one
+        # wholesale is right: it clears files a previous build left behind.
+        # Removing its siblings is not, and nothing here knows whether a
+        # sibling is stale or simply untouched by this run.
+        replaced, added, kept = 0, 0, 0
+        for child in sorted(source_path.iterdir()):
+            target = dest_path / child.name
+            if child.is_dir():
+                if target.exists():
+                    shutil.rmtree(target)
+                    replaced += 1
+                else:
+                    added += 1
+                shutil.copytree(child, target)
+            else:
+                if not target.exists():
+                    added += 1
+                shutil.copy2(child, target)
+
+        source_names = {c.name for c in source_path.iterdir()}
+        kept = sum(1 for c in dest_path.iterdir() if c.name not in source_names)
+
+        logger.info(
+            f"Installed databases from {source_path} to {dest_path}: "
+            f"{replaced} replaced, {added} added, {kept} left untouched"
+        )
 
         return True
     except Exception as e:
