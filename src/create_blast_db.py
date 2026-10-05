@@ -15,7 +15,6 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from shutil import rmtree
 from subprocess import PIPE, Popen
 from typing import Dict, List, Optional, Tuple
 
@@ -252,6 +251,53 @@ def deduplicate_fasta(fasta_path: str, seqtype: str, logger) -> Optional[Dict]:
     }
 
 
+def remove_partial_database(output_dir: str, db_stem: str, logger) -> None:
+    """
+    Remove the database files THIS invocation was writing, and nothing else.
+
+    Both failure paths in run_makeblastdb used to rmtree(output_dir). That
+    directory is derived from genus/species/blast_title (see
+    create_db_structure), and two config entries sharing a blast_title share
+    it -- which is not hypothetical: ZFIN has two entries both titled "ZFIN
+    TALEN Sequences", and WS285 collapses three C. elegans bioprojects the
+    same way. So one entry's failure deleted another entry's finished
+    database, and the run still reported the survivor as a success.
+
+    It was also wrong for an entry on its own. A failed REBUILD deleted the
+    previous build's working database and left an empty directory, so a
+    transient download or makeblastdb failure turned a serving database into
+    no database at all.
+
+    makeblastdb writes files sharing one stem, so the stem is exactly the set
+    this invocation owns. The directory itself is removed only if nothing is
+    left in it.
+    """
+    directory = Path(output_dir)
+    if not directory.exists():
+        return
+
+    removed = 0
+    for leftover in sorted(directory.glob(f"{db_stem}.*")):
+        try:
+            leftover.unlink()
+            removed += 1
+        except OSError as e:
+            logger.warning(f"Could not remove {leftover}: {e}")
+
+    survivors = sorted(c.name for c in directory.iterdir())
+    if survivors:
+        logger.info(
+            f"Removed {removed} partial file(s) for {db_stem} from {output_dir}; "
+            f"left {len(survivors)} file(s) belonging to other databases"
+        )
+    else:
+        try:
+            directory.rmdir()
+            logger.info(f"Removed {removed} partial file(s) and the now-empty {output_dir}")
+        except OSError as e:
+            logger.warning(f"Could not remove empty {output_dir}: {e}")
+
+
 def run_makeblastdb(
     config_entry: Dict, output_dir: str, logger, mod_code: str, environment: str = ""
 ) -> bool:
@@ -261,6 +307,10 @@ def run_makeblastdb(
     start_time = datetime.now()
     fasta_file = Path(config_entry["uri"]).name
     unzipped_fasta = f"../data/{fasta_file.replace('.gz', '')}"
+    # Hoisted above the try so both failure paths can name the files this
+    # invocation owns, including a failure before the command is built.
+    extensions = "".join(Path(fasta_file).suffixes)
+    db_stem = fasta_file.replace(extensions, "db")
 
     logger.info(f"Starting makeblastdb process for {fasta_file}")
     logger.info(f"Configuration: {json.dumps(config_entry, indent=2)}")
@@ -299,12 +349,11 @@ def run_makeblastdb(
         # Prepare makeblastdb command
         blast_title = config_entry["blast_title"]
         sanitized_blast_title = re.sub(r"\W+", "_", blast_title).strip("_")
-        extensions = "".join(Path(fasta_file).suffixes)
 
         makeblast_command = (
             f"makeblastdb -in {unzipped_fasta} -dbtype {config_entry['seqtype']} "
             f"-title '{sanitized_blast_title}' "
-            f"-out {output_dir}/{fasta_file.replace(extensions, 'db')} "
+            f"-out {output_dir}/{db_stem} "
             f"-taxid {config_entry['taxon_id'].replace('NCBITaxon:', '')} "
             f"{parse_ids_flag}"
         ).strip()
@@ -344,8 +393,7 @@ def run_makeblastdb(
                 },
             )
 
-            if Path(output_dir).exists():
-                rmtree(output_dir)
+            remove_partial_database(output_dir, db_stem, logger)
             return False
 
         logger.info("makeblastdb completed successfully")
@@ -360,7 +408,7 @@ def run_makeblastdb(
         # rebuild keeps the full gene names searchable. Without it the index
         # holds symbols only, which is the state curators reported: searching
         # FlyBase for "white" found nothing, because only "w" is in the defline.
-        db_path = f"{output_dir}/{fasta_file.replace(extensions, 'db')}"
+        db_path = f"{output_dir}/{db_stem}"
         indexed = build_name_index(
             unzipped_fasta,
             db_path,
@@ -392,8 +440,7 @@ def run_makeblastdb(
     except Exception as e:
         logger.error(f"Error in makeblastdb process: {str(e)}", exc_info=True)
         print_status(f"makeblastdb error: {str(e)}", "error")
-        if Path(output_dir).exists():
-            rmtree(output_dir)
+        remove_partial_database(output_dir, db_stem, logger)
         return False
 
 
