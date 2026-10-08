@@ -188,6 +188,92 @@ VALID_RESIDUES = {
 }
 
 
+# Characters a seqid_prefix may contain.
+#
+# Deliberately narrow. The prefix becomes part of every sequence id, so it has
+# to survive three things: BLAST's own seqid parsing, which treats "|" as a
+# type separator ("gnl|db|id"); SequenceServer's accession handling, which
+# splits an accession on ":" to take coordinates, so a colon would make every
+# sequence unretrievable; and VALID_SEQUENCE_ID in the server.
+VALID_SEQID_PREFIX = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9_.-]*\Z")
+
+# What separates the prefix from the original id.
+SEQID_PREFIX_SEPARATOR = "_"
+
+
+def prefix_fasta_ids(fasta_path: str, prefix: str, logger) -> Optional[int]:
+    """
+    Prepend `prefix` to every sequence id in a FASTA, in place.
+
+    Why this exists. When a search spans several BLAST databases that use the
+    same sequence ids, BLAST reports each id ONCE and silently drops the rest
+    -- the alignments never reach the output and nothing says so. Four of the
+    nine Alliance reference genomes name their chromosomes 1..n, so a
+    nine-genome tblastn for human ACTB returned 131 hits without one of them
+    being mouse or rat, while mouse on its own returns 20 at evalue 0.0. 23 of
+    the 36 same-type database pairs on that deployment collide; WormBase's
+    nematode assemblies collide the same way on I-VI and X.
+
+    Making the ids unique is the only fix that keeps one BLAST invocation. The
+    alternative, one search per database merged afterwards, changes the shape
+    of every result and every score.
+
+    Only the first whitespace-delimited token is touched; the rest of the
+    defline is left exactly as it was, so descriptions and the key=value tags
+    the name indexer reads are unaffected. Returns the number of deflines
+    rewritten, or None if the prefix is unusable.
+    """
+    if not VALID_SEQID_PREFIX.match(prefix or ""):
+        logger.error(
+            f"seqid_prefix {prefix!r} is not usable: it must start with a letter "
+            f"or digit and contain only letters, digits, '_', '.' and '-'. A ':' "
+            f"would break sequence retrieval and a '|' would be read by BLAST as "
+            f"a seqid type separator."
+        )
+        return None
+
+    marker = f"{prefix}{SEQID_PREFIX_SEPARATOR}"
+    path = Path(fasta_path)
+    temporary = path.with_suffix(path.suffix + ".prefixing")
+
+    rewritten = already = 0
+    try:
+        with open(path, "r") as source, open(temporary, "w") as target:
+            for line in source:
+                if not line.startswith(">"):
+                    target.write(line)
+                    continue
+
+                body = line[1:]
+                parts = body.split(None, 1)
+                if not parts:
+                    target.write(line)
+                    continue
+
+                seqid = parts[0]
+                # Idempotent: a FASTA kept by --store-files and rebuilt must
+                # not end up as GRCh38_GRCh38_1.
+                if seqid.startswith(marker):
+                    already += 1
+                    target.write(line)
+                    continue
+
+                rest = f" {parts[1]}" if len(parts) > 1 else "\n"
+                target.write(f">{marker}{seqid}{rest}")
+                rewritten += 1
+
+        temporary.replace(path)
+    except OSError as e:
+        logger.error(f"Could not prefix sequence ids in {fasta_path}: {e}")
+        temporary.unlink(missing_ok=True)
+        return None
+
+    if already:
+        logger.info(f"{already} sequence id(s) already carried the prefix {prefix!r}")
+    logger.info(f"Prefixed {rewritten} sequence id(s) with {marker!r} in {fasta_path}")
+    return rewritten
+
+
 def deduplicate_fasta(fasta_path: str, seqtype: str, logger) -> Optional[Dict]:
     """
     Make a FASTA indexable under -parse_seqids, which refuses duplicate ids.
@@ -405,6 +491,28 @@ def run_makeblastdb(
                     f"records; letting makeblastdb reject this file",
                     "error",
                 )
+
+        # Make the sequence ids unique across databases, where the config asks
+        # for it. Must happen before makeblastdb, so the database carries the
+        # prefixed ids, and before build_name_index below, which reads the same
+        # file -- otherwise the index and the database would disagree about
+        # what a sequence is called.
+        seqid_prefix = config_entry.get("seqid_prefix")
+        if seqid_prefix:
+            if prefix_fasta_ids(unzipped_fasta, seqid_prefix, logger) is None:
+                log_error(
+                    f"Refusing to build {config_entry['blast_title']}: its "
+                    f"seqid_prefix {seqid_prefix!r} is not usable"
+                )
+                FAILURE_DETAILS.append(
+                    {
+                        "entry": config_entry.get("blast_title", "Unknown"),
+                        "error": f"unusable seqid_prefix {seqid_prefix!r}",
+                        "stage": "seqid prefix",
+                        "uri": config_entry.get("uri", "unknown"),
+                    }
+                )
+                return False
 
         # Prepare makeblastdb command
         blast_title = config_entry["blast_title"]
