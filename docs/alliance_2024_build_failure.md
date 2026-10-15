@@ -142,6 +142,48 @@ nothing afterwards checks that what is served matches what is declared.
 `deduplicate_fasta` in `src/create_blast_db.py` now handles the duplicate ids.
 It does not address any of the three mechanisms above.
 
+## The three mechanisms, closed 2026-10-15
+
+All three are shut. The fourth, the tests that encoded the broken state, was
+dealt with earlier: ALLIANCE's `databaseFloor` is 9, the declared number.
+
+**1. Partial failure is now failure.** `process_json_entries` returns the
+count of entries that failed, `process_files` sums it across every
+MOD/environment a YAML run covers, and `create_dbs` exits non-zero on it. An
+entry skipped by `--db-list` is not counted, because `processed - successful`
+had treated a narrow run's skips as failures. Covered by
+`tests/unit/test_pipeline_exit_code.py`.
+
+**2. A partial build no longer publishes.** The condition on
+`copy_config_file` was `successful > 0`; it is `failed == 0` now, and the same
+gate holds back `PROCESSED_DATABASES`, which is what gets copied to
+production, and the genome browser map. `--force-publish` accepts a partial
+build, which is a decision and so has to be typed. Covered by
+`tests/unit/test_publish_gate.py`.
+
+**3. Free space is checked before anything is downloaded.** One HEAD request
+per entry gives the summed source sizes, and the requirement is the kept total
+plus one transient peak, because `run_makeblastdb` unlinks the unzipped FASTA
+and the `.gz` as each entry finishes:
+
+    required = sum(gz) x BUILT_FACTOR + largest_gz x (1 + UNCOMPRESSED + BUILT)
+
+Both factors were measured on this corpus rather than assumed. `gunzip` of the
+yeast and *C. elegans* genomic FASTAs gave 3.06x and 3.05x, so
+`UNCOMPRESSED_FACTOR` is 3.1. The nine built Alliance databases total 3.64 GB
+against 4.67 GB of summed sources, so 0.78x, rounded up to 1.0 in
+`BUILT_FACTOR` because nothing measured a protein or transcript set. For the
+Alliance config that comes to 9.9 GB required against 3.6 GB actually kept,
+which is the direction a pre-flight check should err. A source whose server
+will not give a Content-Length contributes nothing and cannot block a build;
+`--skip-space-check` turns the check off.
+
+Still not done: nothing afterwards compares what is served against what is
+declared. The gate above stops a partial build from publishing a manifest, but
+a manifest an earlier partial build already published stays wrong until
+someone rebuilds. That is the check that would have found this in 2024, and it
+does not exist.
+
 ## What to do about it
 
 The repair plan lives in the SequenceServer repo at
