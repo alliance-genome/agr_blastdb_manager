@@ -275,9 +275,14 @@ The deployed zebrafish database still carries `"last-updated":
 built without `-parse_seqids` — which is why its accessions come back as
 `BL_ORD_ID:0`.
 
-Nothing in the pipeline checks free space before starting, and there is still no
-`ENOSPC` handler that stops the run rather than continuing to the next entry. The
-host is at 170 GB of 250 GB used.
+Free space is checked before anything is downloaded as of 2026-10-15: one HEAD
+request per entry, and the run refuses to start when the total will not fit.
+How the requirement is estimated, and what its two factors were measured
+against, is in "The three mechanisms, closed 2026-10-15" in
+`docs/alliance_2024_build_failure.md`. There is still no `ENOSPC` handler
+mid-run that stops rather than continuing to the next entry, so the
+pre-flight check is the only thing standing between a build and that state.
+The host is at 183 GB of 250 GB used.
 
 ### FB2026_03's pin is stale right now
 

@@ -12,7 +12,10 @@ Date: Started July 2023, Refactored [Current Date]
 import hashlib
 import json
 import re
+import shutil
 import sys
+import urllib.error
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 from subprocess import PIPE, Popen
@@ -136,6 +139,108 @@ def find_output_path_conflicts(
         by_path.setdefault(path, []).append(entry)
 
     return {path: es for path, es in by_path.items() if len(es) > 1}
+
+
+# How a compressed source turns into bytes on disk, measured on this corpus
+# 2026-10-15 rather than assumed.
+#
+# UNCOMPRESSED: gunzip of the yeast and C. elegans genomic FASTAs gave 3.06x
+# and 3.05x their gz size.
+#
+# BUILT: the nine built Alliance databases total 3.64 GB against 4.67 GB of
+# summed gz sources, so 0.78x. Rounded up to 1.0 here, because a protein set
+# and a transcript set do not compress like a genome and nothing measured
+# those.
+UNCOMPRESSED_FACTOR = 3.1
+BUILT_FACTOR = 1.0
+
+
+def remote_content_length(uri: str, timeout: int = 20) -> int:
+    """
+    Content-Length of a source, or 0 where the server will not say.
+
+    A HEAD request, so nothing is downloaded. Returning 0 rather than raising
+    is deliberate: a server that hides the length must not be able to stop a
+    build, and an underestimate here only makes the space check weaker than
+    it could be.
+    """
+    if not uri or not uri.lower().startswith(("http://", "https://")):
+        return 0
+    try:
+        request = urllib.request.Request(uri, method="HEAD")
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return int(response.headers.get("Content-Length") or 0)
+    except (urllib.error.URLError, ValueError, OSError):
+        return 0
+
+
+def estimate_disk_required(entries: List[Dict]) -> Tuple[int, int, int]:
+    """
+    Bytes this run needs, what it will keep, and its transient peak.
+
+    Peak disk is not the sum of everything. run_makeblastdb unlinks both the
+    unzipped FASTA and the .gz as soon as an entry builds, so only one entry's
+    intermediates exist at a time, and the kept databases accumulate. So:
+
+        keep = BUILT_FACTOR x sum(gz)
+        peak = largest gz + its uncompressed FASTA + its database
+
+    Returns (required, keep, peak) in bytes. A source whose length the server
+    will not give contributes nothing, so required is a floor, not a promise.
+    """
+    sizes = [remote_content_length(entry.get("uri", "")) for entry in entries]
+    total_gz = sum(sizes)
+    largest = max(sizes) if sizes else 0
+
+    keep = int(BUILT_FACTOR * total_gz)
+    peak = int(largest * (1 + UNCOMPRESSED_FACTOR + BUILT_FACTOR))
+    return keep + peak, keep, peak
+
+
+def format_gb(nbytes: int) -> str:
+    return f"{nbytes / 1e9:.1f} GB"
+
+
+def check_disk_space(entries: List[Dict], target: Path) -> Optional[str]:
+    """
+    Reason this run cannot fit, or None if it can.
+
+    Checked before anything is downloaded. Nothing checked it before: a build
+    that ran out of space produced seven ENOSPC failures and, until the exit
+    code was threaded through, still exited 0. Catching it here costs one HEAD
+    request per entry and answers in a second.
+    """
+    probe = target
+    while not probe.exists() and probe != probe.parent:
+        probe = probe.parent
+
+    try:
+        free = shutil.disk_usage(probe).free
+    except OSError as error:
+        LOGGER.warning(f"Could not read free space at {probe}: {error}")
+        return None
+
+    required, keep, peak = estimate_disk_required(entries)
+    if not required:
+        LOGGER.warning(
+            "No source reported a Content-Length, so free space was not checked"
+        )
+        return None
+
+    LOGGER.info(
+        f"Disk estimate: {format_gb(required)} needed "
+        f"({format_gb(keep)} of databases kept, {format_gb(peak)} transient peak), "
+        f"{format_gb(free)} free at {probe}"
+    )
+    if free >= required:
+        return None
+
+    return (
+        f"Not enough disk space at {probe}: {format_gb(free)} free, about "
+        f"{format_gb(required)} needed for {len(entries)} entries "
+        f"({format_gb(keep)} of databases plus a {format_gb(peak)} transient "
+        f"peak). Free space or pass --skip-space-check."
+    )
 
 
 def create_db_structure(
@@ -660,6 +765,8 @@ def process_files(
     cleanup: bool = False,
     limit_dbs: Optional[int] = None,
     skip_md5_check: bool = False,
+    force_publish: bool = False,
+    skip_space_check: bool = False,
 ) -> int:
     """
     Process configuration files with enhanced logging.
@@ -702,6 +809,8 @@ def process_files(
                             cleanup,
                             limit_dbs,
                             skip_md5_check,
+                            force_publish,
+                            skip_space_check,
                         )
                     else:
                         LOGGER.warning(f"JSON file not found: {json_file}")
@@ -714,7 +823,8 @@ def process_files(
         elif input_json:
             LOGGER.info(f"Processing single JSON file: {input_json}")
             failed += process_json_entries(
-                input_json, environment, None, db_list, check_only, store_files, cleanup, limit_dbs, skip_md5_check
+                input_json, environment, None, db_list, check_only, store_files,
+                cleanup, limit_dbs, skip_md5_check, force_publish, skip_space_check
             )
 
     except Exception as e:
@@ -948,6 +1058,8 @@ def process_json_entries(
     cleanup: bool = True,
     limit_dbs: Optional[int] = None,
     skip_md5_check: bool = False,
+    force_publish: bool = False,
+    skip_space_check: bool = False,
 ) -> int:
     """
     Process entries from a JSON configuration file with enhanced progress display.
@@ -1027,6 +1139,26 @@ def process_json_entries(
                     }
                 )
 
+        # Refused before anything is downloaded, for the same reason as the
+        # path conflicts above.
+        if not check_only and not skip_space_check:
+            shortfall = check_disk_space(
+                entries, Path(f"../data/blast/{mod_code}/{environment}")
+            )
+            if shortfall:
+                log_error(shortfall)
+                FAILURE_DETAILS.append(
+                    {
+                        "entry": f"{mod_code}/{environment}",
+                        "error": shortfall,
+                        "stage": "disk space check",
+                        "uri": "n/a",
+                    }
+                )
+                # Every entry counts as failed: none of them ran, and the
+                # caller's exit code has to say the config was not built.
+                return len(entries)
+
         total_entries = len(entries)
         processed = 0
         successful = 0
@@ -1076,8 +1208,28 @@ def process_json_entries(
                 log_error(f"Failed to process entry {entry_name}", e)
                 print_progress_line(processed, total_entries, entry_name, "error")
 
-        # After all entries are processed successfully, copy the configuration file
-        if successful > 0 and not check_only:
+        # Publish the config only when every entry built.
+        #
+        # This used to be `successful > 0`, and that one condition is how the
+        # Alliance deployment came to declare nine reference genomes while
+        # serving one for two years. copy_config_file republishes the build
+        # INPUT as environment.json, so a run where one entry of nine built
+        # wrote a manifest promising all nine, and the app read it and
+        # believed it. The same condition also put the MOD/environment pair on
+        # PROCESSED_DATABASES, which is what gets copied to production.
+        #
+        # An entry skipped by --db-list is not a failure, so a narrow run
+        # still publishes. --force-publish is for deciding to accept a partial
+        # build, which is a decision and should be typed.
+        publish = failed == 0 or force_publish
+        if successful > 0 and not check_only and not publish:
+            log_error(
+                f"Not publishing {mod_code}/{environment}: {failed} of "
+                f"{total_entries} entries failed, so environment.json would "
+                f"declare databases that were not built. Fix the failures, or "
+                f"pass --force-publish to accept a partial build."
+            )
+        if successful > 0 and not check_only and publish:
             # Track this MOD/environment pair for selective production copy
             PROCESSED_DATABASES.append((mod_code, environment))
             LOGGER.info(f"Tracked {mod_code}/{environment} for production copy")
@@ -1309,6 +1461,18 @@ def send_slack_messages_in_batches(
     is_flag=True,
     default=False,
 )
+@click.option(
+    "--force-publish",
+    help="Publish environment.json even when some entries failed",
+    is_flag=True,
+    default=False,
+)
+@click.option(
+    "--skip-space-check",
+    help="Start without checking free space against the sources' sizes",
+    is_flag=True,
+    default=False,
+)
 def create_dbs(
     config_yaml: str,
     input_json: str,
@@ -1326,6 +1490,8 @@ def create_dbs(
     validate: bool,
     validation_path: str,
     skip_md5_check: bool,
+    force_publish: bool,
+    skip_space_check: bool,
 ) -> None:
     """
     Main function that runs the pipeline for processing configuration files and creating BLAST databases.
@@ -1382,6 +1548,8 @@ def create_dbs(
                 cleanup,
                 limit_dbs,
                 skip_md5_check,
+                force_publish,
+                skip_space_check,
             )
         elif input_json:
             LOGGER.info(f"Processing JSON config: {input_json}")
@@ -1395,6 +1563,8 @@ def create_dbs(
                 cleanup,
                 limit_dbs,
                 skip_md5_check,
+                force_publish,
+                skip_space_check,
             )
 
         # Handle Slack updates with better error checking and batching
